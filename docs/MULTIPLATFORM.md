@@ -30,8 +30,7 @@ This document analyzes cross-platform compatibility for the MPC Designations pro
 - No external dependencies
 - Compiles with any POSIX-compliant compiler (gcc, clang)
 - Will work on RHEL 8.6+ (gcc 8.5), Rocky 9 (gcc 11), CentOS 7+ (gcc 4.8.5), RPi OS, and Windows (MSVC, MinGW, Cygwin)
-
-**Potential issue:** The Makefile uses `cc` which is fine for Unix-like systems but Windows needs adjustments (CMake or batch files).
+- **CMake support added** for cross-platform builds including Windows/Visual Studio
 
 ### Python Implementation
 
@@ -55,29 +54,51 @@ This document analyzes cross-platform compatibility for the MPC Designations pro
 - Available on virtually all target platforms
 - RHEL/Rocky ship Tcl 8.5 or 8.6
 
+### Swift Implementation
+
+**Status: Good (platform-limited)**
+
+- macOS: Excellent support (native toolchain)
+- Linux: Supported via Swift.org toolchain (Ubuntu, CentOS, Amazon Linux)
+- Windows: Experimental support as of Swift 5.9
+- Uses Foundation framework for regex; could be optimized for pure Swift
+- **Package.swift** could be added for Swift Package Manager support
+
+### Perl Implementation
+
+**Status: Excellent**
+
+- Perl 5 is ubiquitous on Unix-like systems
+- Available on Windows via Strawberry Perl or ActivePerl
+- RHEL/Rocky/CentOS ship Perl 5.x by default
+- No external CPAN dependencies required
+
 ---
 
 ## Recommended Changes for Multi-Platform Support
 
 ### 1. Build System Improvements
 
-**Add CMake as alternative to Make:**
+**CMake added for C implementation:**
 
 ```
 c/
-├── Makefile          # Keep for Unix simplicity
-├── CMakeLists.txt    # Add for Windows/IDE support
+├── Makefile          # Unix simplicity
+├── CMakeLists.txt    # Windows/IDE support (ADDED)
 ```
 
 CMake provides:
 - Native Windows support (generates Visual Studio projects)
 - Cross-compilation support
-- Better dependency detection
+- CTest integration for automated testing
+- Static library target for embedding
 
-**Add Windows batch file or PowerShell script:**
-
-```
-c/build.bat           # Simple: cl /O2 src/*.c /Fe:mpc_designation.exe
+Build with CMake:
+```bash
+mkdir build && cd build
+cmake ..
+cmake --build .
+ctest  # Run tests
 ```
 
 ### 2. Python Packaging Enhancements
@@ -132,16 +153,26 @@ Platform-specific installation instructions for:
 
 ## Language Support Across Platforms
 
-| Language | Windows | Linux | macOS | RPi | Legacy RHEL/CentOS | Notes |
-|----------|---------|-------|-------|-----|-------------------|-------|
-| **C** | Yes | Yes | Yes | Yes | Yes | Best portability - reference implementation |
-| **Python** | Yes | Yes | Yes | Yes | Partial (version) | Most accessible - lower version floor recommended |
-| **Tcl** | Partial | Yes | Yes | Yes | Yes | Good for embedded/scripting |
-| **JavaScript/Node** | Yes | Yes | Yes | Partial | Partial | Would enable web tools |
-| **Rust** | Yes | Yes | Yes | Partial | Limited | Modern alternative to C, good WASM support |
-| **Go** | Yes | Yes | Yes | Partial | Partial | Single binary distribution |
-| **Java** | Yes | Yes | Yes | Partial | Yes | Excellent legacy support |
-| **Perl** | Partial | Yes | Yes | Yes | Yes | Ubiquitous on Unix systems |
+### Implemented Languages
+
+| Language | Windows | Linux | macOS | RPi | Legacy RHEL/CentOS | Build Tool | Notes |
+|----------|---------|-------|-------|-----|-------------------|------------|-------|
+| **C** | Yes | Yes | Yes | Yes | Yes | Make, CMake | Reference implementation |
+| **Python** | Yes | Yes | Yes | Yes | Partial (version) | pip | Most accessible |
+| **Tcl** | Partial | Yes | Yes | Yes | Yes | None needed | Good for scripting |
+| **Swift** | Experimental | Yes | Yes | No | No | Make | macOS primary |
+| **Perl** | Yes | Yes | Yes | Yes | Yes | None needed | Ubiquitous on Unix |
+
+### Potential Future Languages
+
+| Language | Windows | Linux | macOS | RPi | Legacy RHEL/CentOS | Build Tool | Notes |
+|----------|---------|-------|-------|-----|-------------------|------------|-------|
+| **JavaScript/Node** | Yes | Yes | Yes | Partial | Partial | npm | Would enable web tools |
+| **Rust** | Yes | Yes | Yes | Partial | Limited | Cargo | Modern alternative to C |
+| **Go** | Yes | Yes | Yes | Partial | Partial | go mod | Single binary distribution |
+| **Java** | Yes | Yes | Yes | Partial | Yes | Maven/Gradle | Excellent legacy support |
+| **Ruby** | Yes | Yes | Yes | Yes | Yes | Gem | Scripting alternative |
+| **Lua** | Yes | Yes | Yes | Yes | Yes | None needed | Embedded scripting |
 
 ---
 
@@ -183,10 +214,11 @@ These should be emphasized in documentation for easy integration into other proj
 
 ## Implementation Priority
 
-1. **Lower Python to 3.6** for RHEL 8/CentOS compatibility
-2. **Add CMake** for Windows build support
-3. **Expand CI** to test macOS and Windows
-4. **Add Docker image** for reproducible deployment
+1. ~~**Add CMake** for Windows build support~~ ✅ Done
+2. **Lower Python to 3.6** for RHEL 8/CentOS compatibility
+3. **Add Swift Package Manager** (Package.swift) for cross-platform Swift
+4. **Expand CI** to test macOS and Windows
+5. **Add Docker image** for reproducible deployment
 
 ---
 

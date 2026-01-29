@@ -15,13 +15,40 @@ make
 
 ## Installation
 
-### From Source
+### Using Make (Unix/macOS/Linux)
 
 ```bash
 cd c
 make
 # Optionally install to /usr/local/bin:
 sudo cp mpc_designation /usr/local/bin/
+```
+
+### Using CMake (Cross-platform, including Windows)
+
+```bash
+cd c
+mkdir build && cd build
+cmake ..
+cmake --build .
+
+# For Release build:
+cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake --build .
+
+# Run tests:
+ctest
+
+# Install (Unix):
+sudo cmake --install .
+```
+
+On Windows with Visual Studio:
+```cmd
+cd c
+mkdir build && cd build
+cmake ..
+cmake --build . --config Release
 ```
 
 ## CLI Usage
@@ -92,11 +119,18 @@ int main() {
 
 ### Compiling Your Code
 
+**Direct compilation:**
 ```bash
 cc -O2 -I/path/to/mpc_designation your_code.c /path/to/mpc_designation.c -o your_program
 ```
 
-Or copy `mpc_designation.c` and `mpc_designation.h` into your project.
+**Using CMake** (add to your CMakeLists.txt):
+```cmake
+add_subdirectory(path/to/mpc_designation/c)
+target_link_libraries(your_target PRIVATE mpc_designation_lib)
+```
+
+Or simply copy `mpc_designation.c` and `mpc_designation.h` into your project.
 
 ## API Reference
 

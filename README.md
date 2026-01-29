@@ -10,9 +10,11 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 |----------|-----------|--------|
 | **C** | [`c/`](c/) | Production |
 | **Python** | [`python/`](python/) | Production |
-| **TCL** | [`tcl/`](tcl/) | Production |
+| **Tcl** | [`tcl/`](tcl/) | Production |
+| **Swift** | [`swift/`](swift/) | Production |
+| **Perl** | [`perl/`](perl/) | Production |
 
-All implementations pass the same test suite and produce identical results.
+All implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
 
 ## Quick Start
 
@@ -28,10 +30,22 @@ from mpc_designation import convert_simple
 convert_simple('1995 XA')  # Returns 'J95X00A'
 ```
 
-### TCL
+### Tcl
 ```tcl
 source mpc_designation.tcl
 MPCDesignation::convertSimple "1995 XA"  ;# Returns "J95X00A"
+```
+
+### Swift
+```bash
+cd swift && make
+./mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+### Perl
+```perl
+use MPC::Designation qw(convert_simple);
+convert_simple('1995 XA');  # Returns 'J95X00A'
 ```
 
 ## Examples
@@ -85,28 +99,40 @@ MPC_designations/
 │   ├── src/            # Source code
 │   ├── test/           # Test files
 │   └── examples/       # Usage examples
-└── tcl/
-    ├── README.md       # TCL documentation
-    ├── src/            # Source code
-    ├── test/           # Test files
-    └── examples/       # Usage examples
+├── tcl/
+│   ├── README.md       # Tcl documentation
+│   ├── src/            # Source code
+│   ├── test/           # Test files
+│   └── examples/       # Usage examples
+├── swift/
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
+└── perl/
+    ├── src/            # Source code (MPC/Designation.pm)
+    └── test/           # Test files
 ```
 
 ## Testing
 
-Each implementation includes tests against 2+ million known-good conversions and error handling tests.
+Each implementation includes tests against 2+ million known-good conversions and 94 error handling tests.
 
 ```bash
-# C
-cd c && make test-all
+# Run all tests for all languages
+make test-all
 
-# Python
-cd python
-python test/test_errors.py ../test-data/error_test_cases.csv
+# Run tests for a specific language
+make test-c
+make test-python
+make test-tcl
+make test-swift
+make test-perl
 
-# TCL
-cd tcl
-tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
+# Quick error tests only (faster)
+make test-errors
+
+# Benchmark all implementations
+./scripts/benchmark.sh
 ```
 
 ## Sparse Checkout
@@ -149,6 +175,7 @@ git sparse-checkout set python test-data docs
 - [Specification](docs/SPECIFICATION.md) - MPC format specification reference
 - [Format Tables](docs/FORMATS.md) - Quick reference for all formats
 - [Error Checking](docs/ERROR_CHECKING.md) - Validation documentation
+- [Multi-Platform](docs/MULTIPLATFORM.md) - Platform support and compatibility
 
 ## Contributing
 

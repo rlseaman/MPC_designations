@@ -19,8 +19,15 @@ c/mpc_designation
 c/test_csv
 c/test_errors
 c/examples/example_usage
+c/build/
 *.o
 *.a
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile.cmake
 
 # Swift build artifacts
 swift/mpc_designation
