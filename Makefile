@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-js test-ruby test-rust test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-errors test-all validate version
 
 # Default: build all
 all: build-c build-swift build-go build-java build-rust
@@ -47,7 +47,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-js test-ruby test-rust
+test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -100,6 +100,15 @@ test-java: test-data/prov_unpack_to_pack.csv
 		$(MAKE) -C java test-all; \
 	else \
 		echo "Java not installed, skipping Java tests"; \
+	fi
+
+# Julia tests
+test-julia: test-data/prov_unpack_to_pack.csv
+	@echo "=== Julia Tests ==="
+	@if command -v julia >/dev/null 2>&1; then \
+		$(MAKE) -C julia test-all; \
+	else \
+		echo "Julia not installed, skipping Julia tests"; \
 	fi
 
 # JavaScript tests
@@ -175,6 +184,7 @@ help:
 	@echo "  test-perl    Run Perl tests only"
 	@echo "  test-go      Run Go tests only"
 	@echo "  test-java    Run Java tests only"
+	@echo "  test-julia   Run Julia tests only"
 	@echo "  test-js      Run JavaScript tests only"
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"

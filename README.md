@@ -12,6 +12,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Go** | [`go/`](go/) | Production |
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
+| **Julia** | [`julia/`](julia/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **Python** | [`python/`](python/) | Production |
 | **Ruby** | [`ruby/`](ruby/) | Production |
@@ -84,6 +85,18 @@ java -cp classes mpc.MPCDesignationCLI '1995 XA'    # Output: J95X00A
 ```java
 import mpc.MPCDesignation;
 String result = MPCDesignation.convertSimple("1995 XA");  // Returns "J95X00A"
+```
+
+### Julia
+```bash
+cd julia
+julia src/mpc_designation_cli.jl '1995 XA'    # Output: J95X00A
+```
+
+```julia
+push!(LOAD_PATH, "src")
+using MPCDesignation
+result = convert_simple("1995 XA")  # Returns "J95X00A"
 ```
 
 ### Ruby
@@ -181,6 +194,10 @@ MPC_designations/
 │   ├── Makefile
 │   ├── src/            # Source code (mpc package)
 │   └── test/           # Test files
+├── julia/
+│   ├── Makefile
+│   ├── src/            # Source code (MPCDesignation module)
+│   └── test/           # Test files
 ├── rust/
 │   ├── Cargo.toml      # Rust package definition
 │   ├── Makefile
@@ -207,6 +224,7 @@ make test-all
 make test-c
 make test-go
 make test-java
+make test-julia
 make test-js
 make test-perl
 make test-python
