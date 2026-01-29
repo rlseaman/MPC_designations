@@ -27,6 +27,11 @@ extern "C" {
 #define MPC_MAX_PACKED      16
 #define MPC_MAX_UNPACKED    32
 
+/* Version - can be overridden by build process from root VERSION file */
+#ifndef MPC_VERSION
+#define MPC_VERSION         "1.0.0"
+#endif
+
 /* Designation format types */
 typedef enum {
     MPC_FORMAT_UNKNOWN = 0,
@@ -158,6 +163,14 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen);
  *   Static string describing the error
  */
 const char *mpc_strerror(int errcode);
+
+/*
+ * Get the library version string.
+ *
+ * Returns:
+ *   Version string (e.g., "1.0.0")
+ */
+const char *mpc_version(void);
 
 #ifdef __cplusplus
 }

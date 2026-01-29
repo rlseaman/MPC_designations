@@ -6,19 +6,23 @@ SRCDIR = src
 TESTDIR = test
 TEST_DATA = ../test-data
 
-# Include path for header
+# Read version from root VERSION file
+VERSION := $(shell cat ../VERSION 2>/dev/null || echo "1.0.0")
+
+# Include path for header and version definition
 INCLUDES = -I$(SRCDIR)
+DEFINES = -DMPC_VERSION=\"$(VERSION)\"
 
 all: mpc_designation test_csv test_errors
 
 mpc_designation: $(SRCDIR)/mpc_designation_cli.c $(SRCDIR)/mpc_designation.c $(SRCDIR)/mpc_designation.h
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(SRCDIR)/mpc_designation_cli.c $(SRCDIR)/mpc_designation.c
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(SRCDIR)/mpc_designation_cli.c $(SRCDIR)/mpc_designation.c
 
 test_csv: $(TESTDIR)/test_csv.c $(SRCDIR)/mpc_designation.c $(SRCDIR)/mpc_designation.h
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TESTDIR)/test_csv.c $(SRCDIR)/mpc_designation.c
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(TESTDIR)/test_csv.c $(SRCDIR)/mpc_designation.c
 
 test_errors: $(TESTDIR)/test_errors.c $(SRCDIR)/mpc_designation.c $(SRCDIR)/mpc_designation.h
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TESTDIR)/test_errors.c $(SRCDIR)/mpc_designation.c
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(TESTDIR)/test_errors.c $(SRCDIR)/mpc_designation.c
 
 clean:
 	rm -f mpc_designation test_csv test_errors

@@ -60,9 +60,22 @@ class MPCDesignationError(Exception):
     pass
 
 
+def validate_raw_input(s: str) -> None:
+    """
+    Validate raw input string BEFORE trimming.
+    Raises MPCDesignationError if:
+    - Contains non-printing characters (including tabs at any position)
+    - Contains non-ASCII characters (> 126)
+    """
+    for c in s:
+        code = ord(c)
+        if code < 32 or code > 126:
+            raise MPCDesignationError(f"Invalid character in designation: {repr(c)}")
+
+
 def validate_whitespace(s: str) -> None:
     """
-    Validate whitespace in a designation string.
+    Validate whitespace in a trimmed designation string.
     Raises MPCDesignationError if:
     - Contains non-printing characters (except space)
     - Contains tabs
@@ -80,6 +93,11 @@ def validate_whitespace(s: str) -> None:
             prev_space = True
         else:
             prev_space = False
+
+
+def is_valid_half_month(letter: str) -> bool:
+    """Check if a letter is a valid half-month letter (A-Y excluding I)."""
+    return letter.isalpha() and 'A' <= letter <= 'Y' and letter != 'I'
 
 
 # =============================================================================
@@ -388,6 +406,9 @@ def pack_provisional(unpacked: str) -> str:
     if match:
         number = int(match.group(1))
         survey = match.group(2)
+        # Survey number must be positive
+        if number < 1:
+            raise MPCDesignationError(f"Survey number must be positive: {number}")
         return f"{SURVEY_UNPACKED_TO_PACKED[survey]}{number:04d}"
 
     # Check for old-style designation: "A908 CJ" or "B842 FA"
@@ -420,6 +441,10 @@ def pack_provisional(unpacked: str) -> str:
     half_month = match.group(2)
     second_letter = match.group(3)
     order_str = match.group(4)
+
+    # Validate half-month letter (I is not used)
+    if not is_valid_half_month(half_month):
+        raise MPCDesignationError(f"Invalid half-month letter: {half_month}")
 
     century = year[0:2]
     year_short = year[2:4]
@@ -498,6 +523,10 @@ def pack_comet_provisional(unpacked: str) -> str:
     half_month = match.group(2)
     order_num = int(match.group(3))
     fragment = match.group(4)
+
+    # Comet order number must be positive
+    if order_num < 1:
+        raise MPCDesignationError(f"Comet order number must be positive: {order_num}")
 
     century = year[0:2]
     year_short = year[2:4]
@@ -607,6 +636,10 @@ def pack_satellite(unpacked: str) -> str:
     year = match.group(1)
     planet = match.group(2)
     number = int(match.group(3))
+
+    # Satellite number must be positive
+    if number < 1:
+        raise MPCDesignationError(f"Satellite number must be positive: {number}")
 
     century = year[0:2]
     year_short = year[2:4]
@@ -867,6 +900,9 @@ def detect_format(designation: str) -> Dict[str, Any]:
     Returns: dict with keys: format, type, subtype
     """
     result = {'format': '', 'type': '', 'subtype': ''}
+
+    # Validate raw input BEFORE trimming to catch leading/trailing tabs
+    validate_raw_input(designation)
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if len(designation) == 12:

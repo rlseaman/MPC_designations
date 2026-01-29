@@ -165,11 +165,28 @@ static int is_satellite_planet(char c) {
 
 static void trim(char *s) {
     char *start = s;
-    while (*start && isspace((unsigned char)*start)) start++;
+    while (*start && *start == ' ') start++;  /* Only trim spaces, not other whitespace */
     if (start != s) memmove(s, start, strlen(start) + 1);
 
     char *end = s + strlen(s) - 1;
-    while (end >= s && isspace((unsigned char)*end)) *end-- = '\0';
+    while (end >= s && *end == ' ') *end-- = '\0';
+}
+
+/*
+ * Validate raw input string before any processing:
+ * - Check for null bytes, tabs, and non-ASCII characters
+ * - Must be called on the original input, not trimmed
+ * Returns MPC_OK if valid, MPC_ERR_FORMAT if invalid
+ */
+static int validate_raw_input(const char *s) {
+    for (const char *p = s; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+        /* Reject non-printing characters except space */
+        if (c < 32 || c > 126) {
+            return MPC_ERR_FORMAT;
+        }
+    }
+    return MPC_OK;
 }
 
 /*
@@ -196,6 +213,13 @@ static int validate_whitespace(const char *s) {
         }
     }
     return MPC_OK;
+}
+
+/*
+ * Check if a character is a valid half-month letter (A-Y, excluding I)
+ */
+static int is_valid_half_month(char c) {
+    return (c >= 'A' && c <= 'Y' && c != 'I');
 }
 
 /* ========================================================================= */
@@ -284,6 +308,10 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
     int num;
     char survey[8];
     if (sscanf(buf, "%d %7s", &num, survey) == 2) {
+        /* Survey number must be positive */
+        if (num < 1) {
+            return MPC_ERR_FORMAT;
+        }
         if (strcmp(survey, "P-L") == 0) {
             snprintf(output, outlen, "PLS%04d", num);
             return MPC_OK;
@@ -305,7 +333,7 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
     char half_month, second_letter;
     if (sscanf(buf, "%c%1d%2d %c%c", &prefix, &century_digit, &year_short, &half_month, &second_letter) == 5) {
         if ((prefix == 'A' || prefix == 'B') &&
-            isupper(half_month) && isupper(second_letter)) {
+            is_valid_half_month(half_month) && isupper(second_letter)) {
             char century_code;
             if (century_digit == 8) century_code = 'I';
             else if (century_digit == 9) century_code = 'J';
@@ -319,8 +347,8 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
 
     /* Standard provisional: "1995 XA" or "1995 XA12" */
     int year;
-    char letters[8] = {0};
-    if (sscanf(buf, "%4d %7s", &year, letters) != 2) {
+    char letters[32] = {0};
+    if (sscanf(buf, "%4d %31s", &year, letters) != 2) {
         return MPC_ERR_FORMAT;
     }
 
@@ -330,9 +358,25 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
 
     half_month = letters[0];
     second_letter = letters[1];
-    int order_num = 0;
+
+    /* Validate half-month letter (I is not used) */
+    if (!is_valid_half_month(half_month)) {
+        return MPC_ERR_FORMAT;
+    }
+    long order_num = 0;
     if (strlen(letters) > 2) {
-        order_num = atoi(letters + 2);
+        /* Validate that remaining chars are all digits */
+        for (size_t i = 2; letters[i]; i++) {
+            if (!isdigit(letters[i])) {
+                return MPC_ERR_FORMAT;
+            }
+        }
+        /* Check for cycle count overflow */
+        char *endptr;
+        order_num = strtol(letters + 2, &endptr, 10);
+        if (*endptr != '\0' || order_num < 0 || order_num > 999999) {
+            return MPC_ERR_RANGE;
+        }
     }
 
     int century = year / 100;
@@ -344,16 +388,20 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
 
     /* Check if we need extended format (cycle >= 620) */
     if (order_num >= 620) {
-        int year_digit = year % 100;
-        int base_sequence = (order_num - 620) * 25 + letter_to_position(second_letter) - 1;
+        int year_digit = year % 100;  /* Two-digit year encoded as base-62 */
+        long base_sequence = (order_num - 620) * 25 + letter_to_position(second_letter) - 1;
+        /* Maximum 4-digit base-62 value is 62^4 - 1 = 14776335 */
+        if (base_sequence > 14776335L) {
+            return MPC_ERR_RANGE;
+        }
         char seq_encoded[5];
-        num_to_base62_string(base_sequence, seq_encoded, 4);
+        num_to_base62_string((int)base_sequence, seq_encoded, 4);
         snprintf(output, outlen, "_%c%c%s", num_to_base62(year_digit), half_month, seq_encoded);
         return MPC_OK;
     }
 
     char order_encoded[4];
-    if (encode_cycle_count(order_num, order_encoded) != MPC_OK) {
+    if (encode_cycle_count((int)order_num, order_encoded) != MPC_OK) {
         return MPC_ERR_RANGE;
     }
 
@@ -461,6 +509,11 @@ static int pack_comet_provisional(const char *unpacked, char *output, size_t out
         }
     }
 
+    /* Comet order number must be positive */
+    if (order_num < 1) {
+        return MPC_ERR_FORMAT;
+    }
+
     int century = year / 100;
     int year_short = year % 100;
 
@@ -474,10 +527,22 @@ static int pack_comet_provisional(const char *unpacked, char *output, size_t out
     }
 
     /* Fragment encoding: "0" for none, lowercase letter(s) for fragment */
+    /* Fragment must be 1-2 uppercase letters only */
     char fragment_code[4];
     if (fragment[0] == '\0') {
         strcpy(fragment_code, "0");
     } else {
+        /* Validate fragment: must be 1-2 letters only */
+        if (!isupper(fragment[0])) {
+            return MPC_ERR_FORMAT;
+        }
+        if (fragment[1] && !isupper(fragment[1])) {
+            return MPC_ERR_FORMAT;
+        }
+        if (fragment[2]) {
+            /* Fragment too long (> 2 chars) */
+            return MPC_ERR_FORMAT;
+        }
         fragment_code[0] = tolower(fragment[0]);
         if (fragment[1]) {
             fragment_code[1] = tolower(fragment[1]);
@@ -613,6 +678,11 @@ static int pack_satellite(const char *unpacked, char *output, size_t outlen) {
         return MPC_ERR_FORMAT;
     }
 
+    /* Satellite number must be positive */
+    if (number < 1) {
+        return MPC_ERR_FORMAT;
+    }
+
     int century = year / 100;
     int year_short = year % 100;
 
@@ -719,6 +789,11 @@ static int pack_ancient_comet(const char *unpacked, char *output, size_t outlen)
     }
 
     if (!is_comet_type(comet_type)) return MPC_ERR_FORMAT;
+
+    /* Comet order number must be positive */
+    if (order_num < 1) {
+        return MPC_ERR_FORMAT;
+    }
 
     char order_encoded[4];
     if (encode_cycle_count(order_num, order_encoded) != MPC_OK) {
@@ -950,6 +1025,11 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     info->type = MPC_TYPE_UNKNOWN;
     info->subtype[0] = '\0';
 
+    /* Validate raw input for invalid characters (tabs, non-ASCII, etc.) */
+    if (validate_raw_input(input) != MPC_OK) {
+        return MPC_ERR_FORMAT;
+    }
+
     size_t orig_len = strlen(input);
 
     /* Check for packed 12-char comet before trimming */
@@ -1132,10 +1212,12 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         return MPC_OK;
     }
 
-    /* Check for unpacked survey */
+    /* Check for unpacked survey - must have explicit space between number and code */
     int num;
     char survey[8];
-    if (sscanf(buf, "%d %7s", &num, survey) == 2) {
+    /* Find the space position - survey format is "NNNN P-L" */
+    char *space_pos = strchr(buf, ' ');
+    if (space_pos && space_pos > buf && sscanf(buf, "%d %7s", &num, survey) == 2) {
         if (strcmp(survey, "P-L") == 0) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_SURVEY;
@@ -1151,12 +1233,14 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Check for old-style asteroid: "A908 CJ" */
+    /* Check for old-style asteroid: "A908 CJ" - exactly 7 chars: Ayyy HH */
     char prefix;
     int cd, ys;
     char hm, sl;
-    if (sscanf(buf, "%c%1d%2d %c%c", &prefix, &cd, &ys, &hm, &sl) == 5) {
-        if ((prefix == 'A' || prefix == 'B') && isupper(hm) && isupper(sl)) {
+    if (len == 7 && buf[4] == ' ' &&
+        sscanf(buf, "%c%1d%2d %c%c", &prefix, &cd, &ys, &hm, &sl) == 5) {
+        if ((prefix == 'A' || prefix == 'B') && isupper(hm) && isupper(sl) &&
+            isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3])) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_PROVISIONAL;
             strcpy(info->subtype, "provisional (old-style pre-1925)");
@@ -1203,8 +1287,8 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
 
     /* Try without number: "C/1995 O1" - must have space before provisional */
     /* Find the space position to validate format */
-    const char *space_pos = strchr(buf, ' ');
-    if (space_pos && sscanf(buf, "%c/%d %31s", &comet_type, &year, prov) == 3) {
+    const char *comet_space_pos = strchr(buf, ' ');
+    if (comet_space_pos && sscanf(buf, "%c/%d %31s", &comet_type, &year, prov) == 3) {
         if (is_comet_type(comet_type)) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_FULL;
@@ -1219,9 +1303,12 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Check for unpacked numbered comet: "1P" or "354P" */
-    if (sscanf(buf, "%d%c", &comet_num, &comet_type) == 2) {
-        if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0) {
+    /* Check for unpacked numbered comet: "1P" or "354P" - must be exactly digits followed by P/D */
+    int chars_consumed = 0;
+    if (sscanf(buf, "%d%c%n", &comet_num, &comet_type, &chars_consumed) == 2) {
+        /* Ensure entire string was consumed (no trailing content) */
+        if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0 &&
+            (size_t)chars_consumed == len) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
             snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(comet_type));
@@ -1304,4 +1391,8 @@ const char *mpc_strerror(int errcode) {
         case MPC_ERR_BUFFER: return "Buffer too small";
         default: return "Unknown error";
     }
+}
+
+const char *mpc_version(void) {
+    return MPC_VERSION;
 }

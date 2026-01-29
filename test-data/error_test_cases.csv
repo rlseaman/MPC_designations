@@ -1,11 +1,14 @@
 category,subcategory,input,expected_error,description
+# Note: null_byte and null_middle tests will fail for C implementation because
+# C strings terminate at null bytes - this is a known limitation.
+# Python and TCL implementations handle these correctly.
 # Whitespace Errors
 whitespace,double_space,1995  XA,format,Double space between year and letters
 whitespace,triple_space,1995   XA,format,Triple space between year and letters
 whitespace,missing_space,1995XA,format,Missing space between year and letters
-whitespace,tab_instead,1995	XA,format,Tab character instead of space
-whitespace,leading_tab,	1995 XA,format,Leading tab character
-whitespace,trailing_tab,1995 XA	,format,Trailing tab character
+whitespace,tab_instead,1995\tXA,format,Tab character instead of space
+whitespace,leading_tab,\t1995 XA,format,Leading tab character
+whitespace,trailing_tab,1995 XA\t,format,Trailing tab character
 whitespace,newline,1995\nXA,format,Newline in designation
 whitespace,carriage_return,1995\rXA,format,Carriage return in designation
 whitespace,form_feed,1995\fXA,format,Form feed in designation
@@ -27,7 +30,7 @@ invalid_char,control_z,1995\x1aXA,format,Control-Z (EOF marker)
 invalid_char,extended_ascii,1995\x80XA,format,Extended ASCII character (128)
 invalid_char,high_ascii,1995\xffXA,format,High ASCII character (255)
 invalid_char,nbsp,1995\xa0XA,format,Non-breaking space (160)
-invalid_char,unicode_space,1995 XA,format,Unicode em space (U+2003)
+invalid_char,unicode_space,1995\xe2\x80\x83XA,format,Unicode em space (U+2003)
 # Out of Bounds - Asteroid Numbers
 out_of_bounds,asteroid_zero,0,range,Asteroid number zero
 out_of_bounds,asteroid_negative,-1,range,Negative asteroid number
@@ -106,6 +109,6 @@ boundary,max_extended,619999,valid,Maximum extended before tilde
 boundary,min_tilde,620000,valid,Minimum tilde format
 boundary,max_tilde,15396335,valid,Maximum tilde format
 boundary,min_year,1000 AA,valid,Minimum standard year
-boundary,max_standard_year,2199 ZZ,valid,Maximum standard year (century L)
+boundary,max_standard_year,2199 YZ,valid,Maximum standard year (century L)
 boundary,ancient_comet,C/240 V1,valid,Ancient year comet (< 1000 CE)
 boundary,bce_comet,C/-146 P1,valid,BCE year comet

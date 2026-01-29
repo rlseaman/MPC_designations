@@ -16,6 +16,25 @@
 # Multiple designations can be provided; output will be labeled.
 
 namespace eval MPCDesignation {
+    # Version - read from VERSION file at repository root
+    variable version
+    proc _initVersion {} {
+        variable version
+        set scriptDir [file dirname [info script]]
+        foreach path [list \
+            [file join $scriptDir .. .. VERSION] \
+            [file join $scriptDir .. .. .. VERSION]] {
+            if {[file exists $path]} {
+                set fp [open $path r]
+                set version [string trim [read $fp]]
+                close $fp
+                return
+            }
+        }
+        set version "1.0.0"  ;# Fallback
+    }
+    _initVersion
+
     # Base-62 character set: 0-9, A-Z, a-z
     variable base62Chars "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
@@ -255,6 +274,14 @@ namespace eval MPCDesignation {
     }
 
     #
+    # Check if a letter is a valid half-month letter (A-Y excluding I)
+    #
+    proc isValidHalfMonth {letter} {
+        set code [scan $letter %c]
+        return [expr {$code >= 65 && $code <= 89 && $code != 73}]  ;# A-Y, not I
+    }
+
+    #
     # Convert second letter (A-Z, skipping I) to position (1-25)
     #
     proc letterToPosition {letter} {
@@ -442,6 +469,10 @@ namespace eval MPCDesignation {
 
         # Check for survey designations: "2040 P-L", "3138 T-1", etc.
         if {[regexp {^(\d+) (P-L|T-1|T-2|T-3)$} $unpacked -> number survey]} {
+            # Survey number must be positive
+            if {$number < 1} {
+                error "Survey number must be positive: $number"
+            }
             set prefix [dict get $surveyUnpackedToPacked $survey]
             return [format "%s%04d" $prefix $number]
         }
@@ -466,6 +497,11 @@ namespace eval MPCDesignation {
         # Regular provisional: "1995 XA" or "1998 SQ108"
         if {![regexp {^(\d{4}) ([A-Z])([A-Z])(\d*)$} $unpacked -> year halfMonth secondLetter cycleStr]} {
             error "Invalid unpacked provisional designation: $unpacked"
+        }
+
+        # Validate half-month letter (I is not used)
+        if {![isValidHalfMonth $halfMonth]} {
+            error "Invalid half-month letter: $halfMonth"
         }
 
         if {$cycleStr eq ""} {
@@ -549,6 +585,11 @@ namespace eval MPCDesignation {
         # Match provisional comet: "1995 O1" or "1995 O1-B" or "1930 J1-AA"
         if {![regexp {^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$} $unpacked -> year halfMonth orderNum fragment]} {
             error "Invalid unpacked comet provisional designation: $unpacked"
+        }
+
+        # Comet order number must be positive
+        if {$orderNum < 1} {
+            error "Comet order number must be positive: $orderNum"
         }
 
         set century [string range $year 0 1]
@@ -659,6 +700,11 @@ namespace eval MPCDesignation {
         # Match: S/YYYY P N (year, planet letter, discovery number)
         if {![regexp {^S/(\d{4}) ([JSUN]) (\d+)$} $unpacked -> year planet number]} {
             error "Invalid unpacked satellite designation: $unpacked"
+        }
+
+        # Satellite number must be positive
+        if {$number < 1} {
+            error "Satellite number must be positive: $number"
         }
 
         set century [string range $year 0 1]
@@ -1037,15 +1083,6 @@ namespace eval MPCDesignation {
             return $result
         }
 
-        # Check for unpacked permanent with name "1234 Name"
-        if {[regexp {^(\d+) [A-Z][a-z]} $des -> num]} {
-            dict set result format unpacked
-            dict set result type permanent
-            dict set result subtype "permanent numbered with name"
-            dict set result number $num
-            return $result
-        }
-
         # Check for packed provisional (7 characters starting with century code A-L)
         if {[regexp {^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$} $des]} {
             dict set result format packed
@@ -1104,6 +1141,16 @@ namespace eval MPCDesignation {
             dict set result format unpacked
             dict set result type provisional
             dict set result subtype "provisional"
+            return $result
+        }
+
+        # Check for unpacked permanent with name "1234 Name" (after provisional to avoid conflicts)
+        # Requires at least 2 lowercase letters in name to avoid matching mixed-case provisionals
+        if {[regexp {^(\d+) [A-Z][a-z]{2,}} $des -> num]} {
+            dict set result format unpacked
+            dict set result type permanent
+            dict set result subtype "permanent numbered with name"
+            dict set result number $num
             return $result
         }
 
