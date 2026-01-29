@@ -1,17 +1,36 @@
 # MPC Designations
 
-TCL routines to convert between packed and unpacked Minor Planet Center (MPC) designations for asteroids, comets, and natural satellites.
+Convert between packed and unpacked Minor Planet Center (MPC) designations for asteroids, comets, and natural satellites.
 
 Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
+Available implementations:
+- **TCL** (`mpc_designation.tcl`) - Original implementation
+- **Python** (`mpc_designation.py`) - Python 3 port
+
 ## Usage
 
+### TCL
 ```bash
 ./mpc_designation.tcl <designation> [designation ...]
 ./mpc_designation.tcl -v <designation>   # verbose output
 ```
 
-The program auto-detects whether input is packed or unpacked and converts to the other format.
+### Python
+```bash
+./mpc_designation.py <designation> [designation ...]
+./mpc_designation.py -v <designation>   # verbose output
+```
+
+```python
+# As a module
+from mpc_designation import convert_simple, convert
+
+result = convert_simple('1995 XA')  # Returns 'J95X00A'
+result = convert('1995 XA')         # Returns dict with input, output, info
+```
+
+Both programs auto-detect whether input is packed or unpacked and convert to the other format.
 
 ## Examples
 
@@ -27,8 +46,8 @@ The program auto-detects whether input is packed or unpacked and converts to the
 ./mpc_designation.tcl J95X00A       # -> 1995 XA
 
 # Asteroids - survey
-./mpc_designation.tcl '2040 P-L'    # -> 2040PLS
-./mpc_designation.tcl '3138 T-1'    # -> 3138T1S
+./mpc_designation.tcl '2040 P-L'    # -> PLS2040
+./mpc_designation.tcl '3138 T-1'    # -> T1S3138
 
 # Asteroids - old style (pre-1925)
 ./mpc_designation.tcl 'A908 CJ'     # -> J08C00J
@@ -42,7 +61,7 @@ The program auto-detects whether input is packed or unpacked and converts to the
 
 # Comets - ancient and BCE
 ./mpc_designation.tcl 'C/240 V1'    # -> C240V010
-./mpc_designation.tcl 'C/-146 P1'   # -> C/46P010
+./mpc_designation.tcl 'C/-146 P1'   # -> C.53P010
 
 # Natural satellites
 ./mpc_designation.tcl 'S/2019 S 22' # -> SK19S220
@@ -65,7 +84,7 @@ The program auto-detects whether input is packed or unpacked and converts to the
 | Permanent | 620000+ | ~0000+ | >= 620,000 |
 | Provisional | 1995 XA | J95X00A | Standard |
 | Provisional | 2024 AA631 | _4AMu1A | Cycle >= 620 |
-| Survey | 2040 P-L | 2040PLS | P-L, T-1, T-2, T-3 |
+| Survey | 2040 P-L | PLS2040 | P-L, T-1, T-2, T-3 |
 | Old style | A908 CJ | J08C00J | Pre-1925 |
 
 ### Comets
@@ -76,7 +95,7 @@ The program auto-detects whether input is packed or unpacked and converts to the
 | With fragment | D/1993 F2-B | DJ93F02b |
 | 2-letter fragment | P/1930 J1-AA | PJ30J01aa |
 | Ancient (year < 1000) | C/240 V1 | C240V010 |
-| BCE | C/-146 P1 | C/46P010 |
+| BCE | C/-146 P1 | C.53P010 |
 
 Comet type prefixes: P (periodic), C (non-periodic), D (defunct), X (uncertain), A (asteroid-like), I (interstellar)
 
@@ -93,7 +112,12 @@ A test dataset with 2,021,090 designation pairs is included:
 
 ```bash
 gunzip -k prov_unpack_to_pack.csv.gz
+
+# TCL (~28 seconds)
 tclsh test_csv.tcl prov_unpack_to_pack.csv
+
+# Python (~8 seconds)
+python3 test_csv.py prov_unpack_to_pack.csv
 ```
 
 Expected output:
