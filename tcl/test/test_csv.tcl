@@ -3,7 +3,7 @@
 # Test mpc_designation.tcl against CSV file of known conversions
 #
 
-source [file join [file dirname [info script]] mpc_designation.tcl]
+source [file join [file dirname [info script]] .. src mpc_designation.tcl]
 
 proc runTests {csvFile {maxErrors 100}} {
     set fp [open $csvFile r]

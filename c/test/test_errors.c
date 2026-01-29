@@ -4,15 +4,17 @@
  * Tests various classes of invalid input to ensure proper error detection.
  * Reads test cases from error_test_cases.csv.
  *
- * Compile: cc -O2 -o test_errors test_errors.c mpc_designation.c
+ * Compile: cc -O2 -I../src -o test_errors test_errors.c ../src/mpc_designation.c
  * Usage: ./test_errors [error_test_cases.csv]
+ *
+ * Or use: make test_errors (from c/ directory)
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "mpc_designation.h"
+#include "../src/mpc_designation.h"
 
 #define MAX_LINE 512
 #define MAX_FIELD 256

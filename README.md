@@ -4,153 +4,156 @@ Convert between packed and unpacked Minor Planet Center (MPC) designations for a
 
 Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
-Available implementations:
-- **TCL** (`mpc_designation.tcl`) - Original implementation
-- **Python** (`mpc_designation.py`) - Python 3 port
-- **C** (`mpc_designation.c/h`) - C99 library with CLI
+## Implementations
 
-## Usage
+| Language | Directory | Status |
+|----------|-----------|--------|
+| **C** | [`c/`](c/) | Production |
+| **Python** | [`python/`](python/) | Production |
+| **TCL** | [`tcl/`](tcl/) | Production |
 
-### TCL
-```bash
-./mpc_designation.tcl <designation> [designation ...]
-./mpc_designation.tcl -v <designation>   # verbose output
-```
+All implementations pass the same test suite and produce identical results.
 
-### Python
-```bash
-./mpc_designation.py <designation> [designation ...]
-./mpc_designation.py -v <designation>   # verbose output
-```
-
-```python
-# As a module
-from mpc_designation import convert_simple, convert
-
-result = convert_simple('1995 XA')  # Returns 'J95X00A'
-result = convert('1995 XA')         # Returns dict with input, output, info
-```
+## Quick Start
 
 ### C
 ```bash
-# Build
-make
-
-# CLI usage
-./mpc_designation_c <designation> [designation ...]
-./mpc_designation_c -v <designation>   # verbose output
+cd c && make
+./mpc_designation '1995 XA'    # Output: J95X00A
 ```
 
-```c
-// As a library
-#include "mpc_designation.h"
-
-char output[MPC_MAX_UNPACKED];
-int err = mpc_convert_simple("1995 XA", output, sizeof(output));
-// output now contains "J95X00A"
+### Python
+```python
+from mpc_designation import convert_simple
+convert_simple('1995 XA')  # Returns 'J95X00A'
 ```
 
-All implementations auto-detect whether input is packed or unpacked and convert to the other format.
+### TCL
+```tcl
+source mpc_designation.tcl
+MPCDesignation::convertSimple "1995 XA"  ;# Returns "J95X00A"
+```
 
 ## Examples
 
 ```bash
 # Asteroids - permanent (numbered)
-./mpc_designation.tcl 1             # -> 00001
-./mpc_designation.tcl A0001         # -> 100001
-./mpc_designation.tcl '~0000'       # -> 620000
+1             -> 00001
+100001        -> A0001
+620000        -> ~0000
 
 # Asteroids - provisional
-./mpc_designation.tcl '1995 XA'     # -> J95X00A
-./mpc_designation.tcl '2024 AA631'  # -> _4AMu1A (extended format)
-./mpc_designation.tcl J95X00A       # -> 1995 XA
+1995 XA       -> J95X00A
+2024 AB631    -> _4AMu1B
 
 # Asteroids - survey
-./mpc_designation.tcl '2040 P-L'    # -> PLS2040
-./mpc_designation.tcl '3138 T-1'    # -> T1S3138
-
-# Asteroids - old style (pre-1925)
-./mpc_designation.tcl 'A908 CJ'     # -> J08C00J
+2040 P-L      -> PLS2040
 
 # Comets
-./mpc_designation.tcl 1P            # -> 0001P
-./mpc_designation.tcl 'C/1995 O1'   # -> CJ95O010
-./mpc_designation.tcl 'P/2019 A4'   # -> PK19A040
-./mpc_designation.tcl 'D/1993 F2-B' # -> DJ93F02b (fragment)
-./mpc_designation.tcl 'P/1930 J1-AA'# -> PJ30J01aa (2-letter fragment)
-
-# Comets - ancient and BCE
-./mpc_designation.tcl 'C/240 V1'    # -> C240V010
-./mpc_designation.tcl 'C/-146 P1'   # -> C.53P010
+1P            -> 0001P
+C/1995 O1     -> CJ95O010
+D/1993 F2-B   -> DJ93F02b
 
 # Natural satellites
-./mpc_designation.tcl 'S/2019 S 22' # -> SK19S220
+S/2019 S 22   -> SK19S220
+```
 
-# Verbose mode
-./mpc_designation.tcl -v '2024 AB'
-#   Input:    2024 AB
-#   Detected: unpacked format, provisional
-#   Action:   packing to MPC compact form
-#   Output:   K24A00B
+## Project Structure
+
+```
+MPC_designations/
+├── README.md           # This file
+├── VERSION             # Version number (unified across languages)
+├── LICENSE             # Public domain
+├── CONTRIBUTING.md     # How to add new languages
+├── docs/
+│   ├── SPECIFICATION.md    # MPC format reference
+│   ├── FORMATS.md          # Quick reference tables
+│   └── ERROR_CHECKING.md   # Validation documentation
+├── test-data/
+│   ├── prov_unpack_to_pack.csv.gz  # 2M+ test cases
+│   └── error_test_cases.csv         # Error handling tests
+├── c/
+│   ├── README.md       # C documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   ├── test/           # Test files
+│   └── examples/       # Usage examples
+├── python/
+│   ├── README.md       # Python documentation
+│   ├── pyproject.toml
+│   ├── src/            # Source code
+│   ├── test/           # Test files
+│   └── examples/       # Usage examples
+└── tcl/
+    ├── README.md       # TCL documentation
+    ├── src/            # Source code
+    ├── test/           # Test files
+    └── examples/       # Usage examples
+```
+
+## Testing
+
+Each implementation includes tests against 2+ million known-good conversions and error handling tests.
+
+```bash
+# C
+cd c && make test-all
+
+# Python
+cd python
+python test/test_errors.py ../test-data/error_test_cases.csv
+
+# TCL
+cd tcl
+tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
+```
+
+## Sparse Checkout
+
+Download only the language you need:
+
+```bash
+git clone --filter=blob:none --sparse https://github.com/rlseaman/MPC_designations.git
+cd MPC_designations
+git sparse-checkout set python test-data docs
 ```
 
 ## Supported Formats
 
 ### Asteroids
-| Type | Unpacked | Packed | Range |
-|------|----------|--------|-------|
-| Permanent | 1 - 99999 | 00001 - 99999 | < 100,000 |
-| Permanent | 100001 - 619999 | A0001 - z9999 | 100K - 620K |
-| Permanent | 620000+ | ~0000+ | >= 620,000 |
-| Provisional | 1995 XA | J95X00A | Standard |
-| Provisional | 2024 AA631 | _4AMu1A | Cycle >= 620 |
-| Survey | 2040 P-L | PLS2040 | P-L, T-1, T-2, T-3 |
-| Old style | A908 CJ | J08C00J | Pre-1925 |
+| Type | Unpacked | Packed |
+|------|----------|--------|
+| Permanent (< 100K) | 1 - 99999 | 00001 - 99999 |
+| Permanent (100K-620K) | 100001 - 619999 | A0001 - z9999 |
+| Permanent (620K+) | 620000+ | ~0000+ |
+| Provisional | 1995 XA | J95X00A |
+| Survey | 2040 P-L | PLS2040 |
 
 ### Comets
 | Type | Unpacked | Packed |
 |------|----------|--------|
-| Numbered periodic | 1P, 354P | 0001P, 0354P |
+| Numbered | 1P | 0001P |
 | Provisional | C/1995 O1 | CJ95O010 |
-| With fragment | D/1993 F2-B | DJ93F02b |
-| 2-letter fragment | P/1930 J1-AA | PJ30J01aa |
-| Ancient (year < 1000) | C/240 V1 | C240V010 |
+| Fragment | D/1993 F2-B | DJ93F02b |
+| Ancient | C/240 V1 | C240V010 |
 | BCE | C/-146 P1 | C.53P010 |
-
-Comet type prefixes: P (periodic), C (non-periodic), D (defunct), X (uncertain), A (asteroid-like), I (interstellar)
 
 ### Natural Satellites
 | Unpacked | Packed |
 |----------|--------|
 | S/2019 S 22 | SK19S220 |
 
-Planet codes: J (Jupiter), S (Saturn), U (Uranus), N (Neptune)
+## Documentation
 
-## Testing
+- [Specification](docs/SPECIFICATION.md) - MPC format specification reference
+- [Format Tables](docs/FORMATS.md) - Quick reference for all formats
+- [Error Checking](docs/ERROR_CHECKING.md) - Validation documentation
 
-A test dataset with 2,021,090 designation pairs is included:
+## Contributing
 
-```bash
-gunzip -k prov_unpack_to_pack.csv.gz
-
-# TCL (~28 seconds)
-tclsh test_csv.tcl prov_unpack_to_pack.csv
-
-# Python (~8 seconds)
-python3 test_csv.py prov_unpack_to_pack.csv
-
-# C (~1.2 seconds)
-make test
-# or: ./test_csv_c prov_unpack_to_pack.csv
-```
-
-Expected output:
-```
-Total:  2021090
-Passed: 2021090
-Failed: 0
-```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding new language implementations.
 
 ## License
 
-Public domain.
+Public domain. See [LICENSE](LICENSE).

@@ -1,7 +1,6 @@
 # Large uncompressed test data files
-*.csv
-!*.csv.gz
-!error_test_cases.csv
+test-data/*.csv
+!test-data/error_test_cases.csv
 
 # Claude Code settings
 .claude/
@@ -9,9 +8,27 @@
 # Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
 
 # C build artifacts
-mpc_designation_c
-test_csv_c
-test_errors_c
+c/mpc_designation
+c/test_csv
+c/test_errors
+c/examples/example_usage
 *.o
+*.a
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db

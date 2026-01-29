@@ -9,8 +9,13 @@ Usage: python3 test_errors.py [error_test_cases.csv]
 """
 
 import sys
+import os
 import re
 import codecs
+
+# Add src directory to path for importing mpc_designation
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 from mpc_designation import convert_simple, MPCDesignationError
 
 

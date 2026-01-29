@@ -1,15 +1,17 @@
 /*
  * test_csv.c - Test mpc_designation.c against CSV file of known conversions
  *
- * Compile: cc -O2 -o test_csv test_csv.c mpc_designation.c
+ * Compile: cc -O2 -I../src -o test_csv test_csv.c ../src/mpc_designation.c
  * Usage: ./test_csv <csv_file> [max_errors]
+ *
+ * Or use: make test_csv (from c/ directory)
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include "mpc_designation.h"
+#include "../src/mpc_designation.h"
 
 #define MAX_LINE 256
 

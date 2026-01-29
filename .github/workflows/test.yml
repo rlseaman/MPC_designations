@@ -1,0 +1,92 @@
+name: Test All Languages
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test-c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build C implementation
+        run: |
+          cd c
+          make
+
+      - name: Run C error tests
+        run: |
+          cd c
+          make test-errors
+
+      - name: Run C conversion tests
+        run: |
+          cd c
+          make test
+
+  test-python:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run Python error tests
+        run: |
+          cd python
+          python test/test_errors.py ../test-data/error_test_cases.csv
+
+      - name: Run Python conversion tests
+        run: |
+          gunzip -k test-data/prov_unpack_to_pack.csv.gz
+          cd python
+          python test/test_csv.py ../test-data/prov_unpack_to_pack.csv
+
+  test-tcl:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install TCL
+        run: sudo apt-get update && sudo apt-get install -y tcl
+
+      - name: Run TCL error tests
+        run: |
+          cd tcl
+          tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
+
+      - name: Run TCL conversion tests
+        run: |
+          gunzip -k test-data/prov_unpack_to_pack.csv.gz
+          cd tcl
+          tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv
+
+  cross-language-validation:
+    runs-on: ubuntu-latest
+    needs: [test-c, test-python, test-tcl]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tcl
+
+      - name: Build C implementation
+        run: |
+          cd c
+          make
+
+      - name: Validate cross-language consistency
+        run: |
+          chmod +x scripts/validate_consistency.sh
+          ./scripts/validate_consistency.sh

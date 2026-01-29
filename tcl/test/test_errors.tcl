@@ -8,7 +8,7 @@
 # Usage: tclsh test_errors.tcl [error_test_cases.csv]
 #
 
-source [file join [file dirname [info script]] mpc_designation.tcl]
+source [file join [file dirname [info script]] .. src mpc_designation.tcl]
 
 # Parse escape sequences in a string
 proc unescapeString {s} {

@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 """
 Test mpc_designation.py against CSV file of known conversions.
+
+Usage: python test_csv.py <csv_file> [max_errors]
 """
 
 import sys
+import os
 import time
+
+# Add src directory to path for importing mpc_designation
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+
 from mpc_designation import convert_simple, MPCDesignationError
 
 
