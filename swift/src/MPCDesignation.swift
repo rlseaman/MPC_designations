@@ -114,7 +114,8 @@ struct Patterns {
     static let packedSatellite = try! NSRegularExpression(pattern: #"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$"#)
     static let packedTilde = try! NSRegularExpression(pattern: #"^~[0-9A-Za-z]{4}$"#)
     static let packedLetterPrefix = try! NSRegularExpression(pattern: #"^[A-Za-z][0-9]{4}$"#)
-    static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9][A-Z][0-9A-Za-z]{4}$"#)
+    // Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+    static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$"#)
     static let packedProvisional = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
     static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD]$"#)
@@ -367,8 +368,10 @@ func letterToPosition(_ letter: Character) throws -> Int {
 
 /// Convert a position to half-month letter (1=A, 2=B, ..., skipping I)
 func positionToLetter(_ pos: Int) throws -> Character {
-    guard pos >= 1 && pos <= 24 else {
-        throw MPCDesignationError.outOfRange("Invalid half-month position: \(pos)")
+    // Second letters A-Z excluding I = 25 positions (1-25)
+    // A-H = positions 1-8, J-Z = positions 9-25 (I is skipped)
+    guard pos >= 1 && pos <= 25 else {
+        throw MPCDesignationError.outOfRange("Invalid letter position: \(pos)")
     }
 
     var p = pos
@@ -419,11 +422,9 @@ func unpackExtendedProvisional(_ packed: String) throws -> String {
     let letterPos = (baseSequence % 25) + 1
     let secondLetter = try positionToLetter(letterPos)
 
-    // Determine the full year (assume 2020s decade)
-    var year = 2020 + Int(String(yearDigit))!
-    if year > 2029 {
-        year -= 10
-    }
+    // Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+    // Extended format is for years 2000-2099, year code is year % 100
+    let year = 2000 + (try base62ToNum(yearDigit))
 
     return "\(year) \(halfMonth)\(secondLetter)\(cycle)"
 }

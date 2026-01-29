@@ -249,12 +249,14 @@ func letterToPosition(letter byte) (int, error) {
 
 // positionToLetter converts a position to half-month letter (1=A, 2=B, ..., skipping I)
 func positionToLetter(pos int) (byte, error) {
-	if pos < 1 || pos > 24 {
-		return 0, fmt.Errorf("%w: invalid half-month position: %d", ErrOutOfRange, pos)
+	// Second letters A-Z excluding I = 25 positions (1-25)
+	// A-H = positions 1-8, J-Z = positions 9-25 (I is skipped)
+	if pos < 1 || pos > 25 {
+		return 0, fmt.Errorf("%w: invalid letter position: %d", ErrOutOfRange, pos)
 	}
 	p := pos
 	if p >= 9 {
-		p++
+		p++ // Skip I
 	}
 	return byte('A' + p - 1), nil
 }
@@ -524,11 +526,8 @@ func UnpackExtendedProvisional(packed string) (string, error) {
 		return "", err
 	}
 
-	// Assume 2020s decade
-	year := 2020 + yearVal
-	if year > 2029 {
-		year -= 10
-	}
+	// Extended format is for years 2000-2099, year code is year % 100
+	year := 2000 + yearVal
 
 	return fmt.Sprintf("%d %c%c%d", year, halfMonth, secondLetter, cycle), nil
 }
@@ -1530,7 +1529,9 @@ func isPackedExtended(s string) bool {
 	if len(s) != 7 || s[0] != '_' {
 		return false
 	}
-	if s[1] < '0' || s[1] > '9' {
+	// Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+	c := s[1]
+	if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
 		return false
 	}
 	if s[2] < 'A' || s[2] > 'Z' {

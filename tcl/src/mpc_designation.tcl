@@ -89,6 +89,42 @@ namespace eval MPCDesignation {
         N "Neptune"
     }
 
+    # Pre-compiled regex patterns for performance
+    # Tcl caches compiled patterns when stored in variables
+    variable pat_survey_unpacked {^(\d+) (P-L|T-1|T-2|T-3)$}
+    variable pat_old_style {^[AB](\d)(\d{2}) ([A-Z])([A-Z])$}
+    variable pat_provisional_unpacked {^(\d{4}) ([A-Z])([A-Z])(\d*)$}
+    variable pat_comet_prov_unpacked {^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$}
+    variable pat_comet_numbered_packed {^(\d{4})([PD])$}
+    variable pat_comet_numbered_unpacked {^(\d+)([PD])(?:/[A-Za-z].*)?$}
+    variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
+    variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
+    variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
+    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$}
+    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$}
+    variable pat_packed_comet_9_frag {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$}
+    variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$}
+    variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$}
+    variable pat_packed_tilde {^~[0-9A-Za-z]{4}$}
+    variable pat_packed_letter_prefix {^[A-Za-z][0-9]{4}$}
+    variable pat_packed_5digit {^[0-9]{5}$}
+    variable pat_unpacked_number {^(\d+)$}
+    variable pat_packed_provisional {^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$}
+    variable pat_packed_extended {^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$}
+    variable pat_packed_survey_pls {^(PLS)[0-9]{4}$}
+    variable pat_packed_survey_t {^T([123])S[0-9]{4}$}
+    variable pat_unpacked_survey_pl {^(\d+) P-L$}
+    variable pat_unpacked_survey_t {^(\d+) T-([123])$}
+    variable pat_unpacked_old_style {^[AB]\d{3} [A-Z][A-Z]$}
+    variable pat_unpacked_provisional {^\d{4} [A-Z][A-Z]\d*$}
+    variable pat_unpacked_named {^(\d+) [A-Z][a-z]{2,}}
+    variable pat_packed_satellite {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z]{2}[0-9]$}
+    variable pat_packed_comet_numbered {^[0-9]{4}([PD])$}
+    variable pat_packed_comet_prov {^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$}
+    variable pat_unpacked_comet_full {^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$}
+    variable pat_parenthesized {^\((\d+)\)$}
+    variable pat_asteroid_provisional_start {^\d{4} [A-Z][A-Z]}
+
     #
     # Convert a single base-62 character to its numeric value
     #
@@ -468,7 +504,8 @@ namespace eval MPCDesignation {
         set unpacked [string trim $unpacked]
 
         # Check for survey designations: "2040 P-L", "3138 T-1", etc.
-        if {[regexp {^(\d+) (P-L|T-1|T-2|T-3)$} $unpacked -> number survey]} {
+        variable pat_survey_unpacked
+        if {[regexp $pat_survey_unpacked $unpacked -> number survey]} {
             # Survey number must be positive
             if {$number < 1} {
                 error "Survey number must be positive: $number"
@@ -479,7 +516,8 @@ namespace eval MPCDesignation {
 
         # Check for old-style designation: "A908 CJ" or "B842 FA"
         # Format: [AB]CYY LL where C=century digit, YY=year, LL=half-month+letter
-        if {[regexp {^[AB](\d)(\d{2}) ([A-Z])([A-Z])$} $unpacked -> centuryDigit yearShort halfMonth secondLetter]} {
+        variable pat_old_style
+        if {[regexp $pat_old_style $unpacked -> centuryDigit yearShort halfMonth secondLetter]} {
             # Convert century digit to century code: 8->18(I), 9->19(J), 0->20(K)
             if {$centuryDigit == 8} {
                 set centuryCode "I"
@@ -495,7 +533,8 @@ namespace eval MPCDesignation {
         }
 
         # Regular provisional: "1995 XA" or "1998 SQ108"
-        if {![regexp {^(\d{4}) ([A-Z])([A-Z])(\d*)$} $unpacked -> year halfMonth secondLetter cycleStr]} {
+        variable pat_provisional_unpacked
+        if {![regexp $pat_provisional_unpacked $unpacked -> year halfMonth secondLetter cycleStr]} {
             error "Invalid unpacked provisional designation: $unpacked"
         }
 
@@ -583,7 +622,8 @@ namespace eval MPCDesignation {
         set unpacked [string trim $unpacked]
 
         # Match provisional comet: "1995 O1" or "1995 O1-B" or "1930 J1-AA"
-        if {![regexp {^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$} $unpacked -> year halfMonth orderNum fragment]} {
+        variable pat_comet_prov_unpacked
+        if {![regexp $pat_comet_prov_unpacked $unpacked -> year halfMonth orderNum fragment]} {
             error "Invalid unpacked comet provisional designation: $unpacked"
         }
 
@@ -620,7 +660,8 @@ namespace eval MPCDesignation {
     proc unpackCometNumbered {packed} {
         set packed [string trim $packed]
 
-        if {![regexp {^(\d{4})([PD])$} $packed -> numStr cometType]} {
+        variable pat_comet_numbered_packed
+        if {![regexp $pat_comet_numbered_packed $packed -> numStr cometType]} {
             error "Invalid packed numbered comet designation: $packed"
         }
 
@@ -637,7 +678,8 @@ namespace eval MPCDesignation {
         set unpacked [string trim $unpacked]
 
         # Match "1P" or "354P" or "1P/Halley" (with optional name after slash)
-        if {![regexp {^(\d+)([PD])(?:/[A-Za-z].*)?$} $unpacked -> number cometType]} {
+        variable pat_comet_numbered_unpacked
+        if {![regexp $pat_comet_numbered_unpacked $unpacked -> number cometType]} {
             error "Invalid unpacked numbered comet designation: $unpacked"
         }
 
@@ -698,7 +740,8 @@ namespace eval MPCDesignation {
         set unpacked [string trim $unpacked]
 
         # Match: S/YYYY P N (year, planet letter, discovery number)
-        if {![regexp {^S/(\d{4}) ([JSUN]) (\d+)$} $unpacked -> year planet number]} {
+        variable pat_satellite_unpacked
+        if {![regexp $pat_satellite_unpacked $unpacked -> year planet number]} {
             error "Invalid unpacked satellite designation: $unpacked"
         }
 
@@ -851,7 +894,8 @@ namespace eval MPCDesignation {
     proc isAsteroidStyleUnpacked {provisional} {
         # Asteroid: YYYY LL or YYYY LLnnn (two uppercase letters)
         # Comet: YYYY Ln or YYYY Ln-F (one letter + digit)
-        if {[regexp {^\d{4} [A-Z][A-Z]} $provisional]} {
+        variable pat_asteroid_provisional_start
+        if {[regexp $pat_asteroid_provisional_start $provisional]} {
             return 1
         }
         return 0
@@ -927,7 +971,8 @@ namespace eval MPCDesignation {
 
         # Match: optional number, type, slash, provisional (including negative years)
         # Examples: "C/1995 O1", "1P/1982 U1", "P/2019 A4", "D/1993 F2-B", "C/-146 P1", "C/240 V1"
-        if {![regexp {^(\d*)([PCDXAI])/(-?\d+) (.+)$} $unpacked -> number cometType year provPart]} {
+        variable pat_comet_full_unpacked
+        if {![regexp $pat_comet_full_unpacked $unpacked -> number cometType year provPart]} {
             error "Invalid unpacked comet designation: $unpacked"
         }
 
@@ -940,7 +985,8 @@ namespace eval MPCDesignation {
         # Check for ancient or BCE year
         if {[isAncientYear $year]} {
             # Parse the provisional part for ancient comets: "L1" or "L1-F"
-            if {[regexp {^([A-Z])(\d+)(?:-([A-Z]))?$} $provPart -> halfMonth orderNum fragment]} {
+            variable pat_comet_prov_part
+            if {[regexp $pat_comet_prov_part $provPart -> halfMonth orderNum fragment]} {
                 return [packAncientCometProvisional $cometType $year $halfMonth $orderNum $fragment]
             } else {
                 error "Invalid ancient comet provisional: $provPart"
@@ -978,6 +1024,33 @@ namespace eval MPCDesignation {
     # subtype: more specific description for verbose output
     #
     proc detectFormat {designation} {
+        # Access pre-compiled patterns
+        variable pat_packed_full_comet_12
+        variable pat_packed_comet_8
+        variable pat_packed_comet_9_frag
+        variable pat_packed_ancient_comet
+        variable pat_packed_bce_comet
+        variable pat_parenthesized
+        variable pat_packed_tilde
+        variable pat_packed_letter_prefix
+        variable pat_packed_5digit
+        variable pat_unpacked_number
+        variable pat_packed_provisional
+        variable pat_packed_extended
+        variable pat_packed_survey_pls
+        variable pat_packed_survey_t
+        variable pat_unpacked_survey_pl
+        variable pat_unpacked_survey_t
+        variable pat_unpacked_old_style
+        variable pat_unpacked_provisional
+        variable pat_unpacked_named
+        variable pat_packed_satellite
+        variable pat_satellite_unpacked
+        variable pat_packed_comet_numbered
+        variable pat_packed_comet_prov
+        variable pat_unpacked_comet_full
+        variable pat_comet_numbered_unpacked
+
         # Validate no tabs or non-printable characters
         validateWhitespace $designation
 
@@ -987,7 +1060,7 @@ namespace eval MPCDesignation {
         # Format: 4 chars (spaces or number) + type + 7 char provisional
         # e.g., "    CJ95O010" or "0001PJ86F010"
         if {[string length $designation] == 12 &&
-            [regexp {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$} $designation]} {
+            [regexp $pat_packed_full_comet_12 $designation]} {
             dict set result format packed
             dict set result type comet_full
             dict set result subtype "comet with provisional designation (12-char)"
@@ -997,7 +1070,7 @@ namespace eval MPCDesignation {
         # Check for packed comet designation (8 chars: type + 7 char provisional)
         # e.g., "CJ95O010" or "PK24F010"
         if {[string length $designation] == 8 &&
-            [regexp {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$} $designation]} {
+            [regexp $pat_packed_comet_8 $designation]} {
             dict set result format packed
             dict set result type comet_full
             dict set result subtype "comet with provisional designation (8-char)"
@@ -1007,7 +1080,7 @@ namespace eval MPCDesignation {
         # Check for packed comet with 2-letter fragment (9 chars: type + 7 char provisional + extra fragment char)
         # e.g., "PJ30J01aa" for P/1930 J1-AA
         if {[string length $designation] == 9 &&
-            [regexp {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$} $designation]} {
+            [regexp $pat_packed_comet_9_frag $designation]} {
             dict set result format packed
             dict set result type comet_full
             dict set result subtype "comet with provisional designation (9-char, 2-letter fragment)"
@@ -1017,7 +1090,7 @@ namespace eval MPCDesignation {
         # Check for packed ancient comet (8 chars: type + 3-digit year + provisional)
         # e.g., "C240V010" for C/240 V1
         if {[string length $designation] == 8 &&
-            [regexp {^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$} $designation]} {
+            [regexp $pat_packed_ancient_comet $designation]} {
             dict set result format packed
             dict set result type comet_ancient
             dict set result subtype "comet with ancient provisional (year < 1000)"
@@ -1027,7 +1100,7 @@ namespace eval MPCDesignation {
         # Check for packed BCE comet (8 chars: type + prefix + code + provisional)
         # e.g., "C.53P010" for C/-146 P1, "C/56L010" for C/-43 L1
         if {[string length $designation] == 8 &&
-            [regexp {^([PCDXAI])([/.\\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$} $designation]} {
+            [regexp $pat_packed_bce_comet $designation]} {
             dict set result format packed
             dict set result type comet_bce
             dict set result subtype "comet with BCE provisional"
@@ -1037,7 +1110,7 @@ namespace eval MPCDesignation {
         set des [string trim $designation]
 
         # Remove parentheses if present (common in permanent designations)
-        if {[regexp {^\((\d+)\)$} $des -> num]} {
+        if {[regexp $pat_parenthesized $des -> num]} {
             dict set result format unpacked
             dict set result type permanent
             dict set result subtype "permanent numbered (parenthesized)"
@@ -1046,7 +1119,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for tilde-prefix packed permanent (>= 620000)
-        if {[regexp {^~[0-9A-Za-z]{4}$} $des]} {
+        if {[regexp $pat_packed_tilde $des]} {
             dict set result format packed
             dict set result type permanent
             dict set result subtype "permanent numbered (tilde/base-62, >= 620000)"
@@ -1054,7 +1127,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for packed permanent designation with letter prefix (100000-619999)
-        if {[regexp {^[A-Za-z][0-9]{4}$} $des]} {
+        if {[regexp $pat_packed_letter_prefix $des]} {
             set first [string index $des 0]
             if {[string match {[A-Z]} $first]} {
                 dict set result subtype "permanent numbered (letter-prefix, 100000-359999)"
@@ -1067,7 +1140,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for packed permanent designation (numeric, < 100000)
-        if {[regexp {^[0-9]{5}$} $des]} {
+        if {[regexp $pat_packed_5digit $des]} {
             dict set result format packed
             dict set result type permanent
             dict set result subtype "permanent numbered (5-digit, < 100000)"
@@ -1075,7 +1148,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for unpacked permanent (just a number)
-        if {[regexp {^(\d+)$} $des -> num]} {
+        if {[regexp $pat_unpacked_number $des -> num]} {
             dict set result format unpacked
             dict set result type permanent
             dict set result subtype "permanent numbered"
@@ -1084,7 +1157,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for packed provisional (7 characters starting with century code A-L)
-        if {[regexp {^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$} $des]} {
+        if {[regexp $pat_packed_provisional $des]} {
             dict set result format packed
             dict set result type provisional
             dict set result subtype "provisional"
@@ -1093,7 +1166,7 @@ namespace eval MPCDesignation {
 
         # Check for extended packed provisional (underscore prefix, 7 chars)
         # Format: _YHbbbb where Y=year code, H=half-month, bbbb=base62
-        if {[regexp {^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$} $des]} {
+        if {[regexp $pat_packed_extended $des]} {
             dict set result format packed
             dict set result type provisional_extended
             dict set result subtype "provisional (extended format, cycle >= 620)"
@@ -1101,13 +1174,13 @@ namespace eval MPCDesignation {
         }
 
         # Check for packed survey designation
-        if {[regexp {^(PLS)[0-9]{4}$} $des]} {
+        if {[regexp $pat_packed_survey_pls $des]} {
             dict set result format packed
             dict set result type survey
             dict set result subtype "survey (Palomar-Leiden)"
             return $result
         }
-        if {[regexp {^T([123])S[0-9]{4}$} $des -> surveyNum]} {
+        if {[regexp $pat_packed_survey_t $des -> surveyNum]} {
             dict set result format packed
             dict set result type survey
             dict set result subtype "survey (Trojan T-$surveyNum)"
@@ -1115,13 +1188,13 @@ namespace eval MPCDesignation {
         }
 
         # Check for unpacked survey designation
-        if {[regexp {^(\d+) P-L$} $des]} {
+        if {[regexp $pat_unpacked_survey_pl $des]} {
             dict set result format unpacked
             dict set result type survey
             dict set result subtype "survey (Palomar-Leiden)"
             return $result
         }
-        if {[regexp {^(\d+) T-([123])$} $des -> num surveyNum]} {
+        if {[regexp $pat_unpacked_survey_t $des -> num surveyNum]} {
             dict set result format unpacked
             dict set result type survey
             dict set result subtype "survey (Trojan T-$surveyNum)"
@@ -1129,7 +1202,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for old-style provisional "A908 CJ" or "B842 FA" (pre-1925 format)
-        if {[regexp {^[AB]\d{3} [A-Z][A-Z]$} $des]} {
+        if {[regexp $pat_unpacked_old_style $des]} {
             dict set result format unpacked
             dict set result type provisional
             dict set result subtype "provisional (old-style pre-1925)"
@@ -1137,7 +1210,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for unpacked provisional "YYYY LL" or "YYYY LLnnn"
-        if {[regexp {^\d{4} [A-Z][A-Z]\d*$} $des]} {
+        if {[regexp $pat_unpacked_provisional $des]} {
             dict set result format unpacked
             dict set result type provisional
             dict set result subtype "provisional"
@@ -1146,7 +1219,7 @@ namespace eval MPCDesignation {
 
         # Check for unpacked permanent with name "1234 Name" (after provisional to avoid conflicts)
         # Requires at least 2 lowercase letters in name to avoid matching mixed-case provisionals
-        if {[regexp {^(\d+) [A-Z][a-z]{2,}} $des -> num]} {
+        if {[regexp $pat_unpacked_named $des -> num]} {
             dict set result format unpacked
             dict set result type permanent
             dict set result subtype "permanent numbered with name"
@@ -1157,7 +1230,7 @@ namespace eval MPCDesignation {
         # ============ NATURAL SATELLITE DESIGNATIONS ============
 
         # Check for packed satellite designation: "SK19S220" (S + century + year + planet + num + 0)
-        if {[regexp {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z]{2}[0-9]$} $des]} {
+        if {[regexp $pat_packed_satellite $des]} {
             variable satellitePlanetNames
             set planet [string index $des 4]
             dict set result format packed
@@ -1167,7 +1240,7 @@ namespace eval MPCDesignation {
         }
 
         # Check for unpacked satellite designation: "S/2019 S 22"
-        if {[regexp {^S/(\d{4}) ([JSUN]) (\d+)$} $des -> year planet num]} {
+        if {[regexp $pat_satellite_unpacked $des -> year planet num]} {
             variable satellitePlanetNames
             dict set result format unpacked
             dict set result type satellite
@@ -1178,7 +1251,7 @@ namespace eval MPCDesignation {
         # ============ COMET DESIGNATIONS ============
 
         # Check for packed numbered periodic comet "0001P" or "0354D"
-        if {[regexp {^[0-9]{4}([PD])$} $des -> ctype]} {
+        if {[regexp $pat_packed_comet_numbered $des -> ctype]} {
             dict set result format packed
             dict set result type comet_numbered
             variable cometTypeDescriptions
@@ -1188,7 +1261,7 @@ namespace eval MPCDesignation {
 
         # Check for packed comet provisional only (7 chars, ends with digit or lowercase)
         # Must distinguish from asteroid provisional which ends with uppercase
-        if {[regexp {^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$} $des]} {
+        if {[regexp $pat_packed_comet_prov $des]} {
             dict set result format packed
             dict set result type comet_provisional
             dict set result subtype "comet provisional"
@@ -1201,7 +1274,7 @@ namespace eval MPCDesignation {
         # Also handles ancient: "C/240 V1" and BCE: "C/-146 P1"
         # Must check this BEFORE simple numbered comet to properly match "1P/1982 U1"
         # Pattern matches years including negative (BCE) and short years (ancient)
-        if {[regexp {^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$} $des -> num ctype year provPart fragment]} {
+        if {[regexp $pat_unpacked_comet_full $des -> num ctype year provPart fragment]} {
             variable cometTypeDescriptions
             dict set result format unpacked
             dict set result type comet_full
@@ -1235,7 +1308,7 @@ namespace eval MPCDesignation {
 
         # Check for unpacked numbered periodic comet "1P" or "354P" or "1P/Halley"
         # Note: "1P/1982 U1" is handled above as comet_full
-        if {[regexp {^(\d+)([PD])(?:/[A-Za-z].*)?$} $des -> num ctype]} {
+        if {[regexp $pat_comet_numbered_unpacked $des -> num ctype]} {
             dict set result format unpacked
             dict set result type comet_numbered
             variable cometTypeDescriptions

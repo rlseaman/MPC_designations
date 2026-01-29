@@ -110,7 +110,9 @@ static int letter_to_position(char letter) {
 }
 
 static char position_to_letter(int pos) {
-    if (pos < 1 || pos > 24) return '?';
+    /* Second letters A-Z excluding I = 25 positions (1-25) */
+    /* A-H = positions 1-8, J-Z = positions 9-25 (I is skipped) */
+    if (pos < 1 || pos > 25) return '?';
     if (pos >= 9) pos++;  /* Skip I */
     return 'A' + pos - 1;
 }
@@ -449,9 +451,8 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
         int letter_pos = (base_sequence % 25) + 1;
         char second_letter = position_to_letter(letter_pos);
 
-        /* Assume 2020s decade */
-        int year = 2020 + year_digit;
-        if (year > 2029) year -= 10;
+        /* Extended format is for years 2000-2099, year code is year % 100 */
+        int year = 2000 + year_digit;
 
         snprintf(output, outlen, "%d %c%c%d", year, half_month, second_letter, cycle);
         return MPC_OK;

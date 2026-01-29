@@ -407,9 +407,13 @@ def letter_to_position(letter: str) -> int:
 
 
 def position_to_letter(pos: int) -> str:
-    """Convert a position to half-month letter (1=A, 2=B, ..., skipping I)."""
-    if pos < 1 or pos > 24:
-        raise MPCDesignationError(f"Invalid half-month position: {pos}")
+    """Convert a position to letter (1=A, 2=B, ..., skipping I).
+
+    Second letters A-Z excluding I = 25 positions (1-25).
+    A-H = positions 1-8, J-Z = positions 9-25 (I is skipped).
+    """
+    if pos < 1 or pos > 25:
+        raise MPCDesignationError(f"Invalid letter position: {pos}")
 
     if pos >= 9:
         pos += 1  # Skip I
@@ -478,12 +482,9 @@ def unpack_extended_provisional(packed: str) -> str:
     letter_pos = (base_sequence % 25) + 1
     second_letter = position_to_letter(letter_pos)
 
-    # We need to determine the full year - this is ambiguous with just one digit
-    # Use current decade assumption (2020s) but this may need context
-    # For now, assume 2020s decade
-    year = 2020 + int(year_digit)
-    if year > 2029:
-        year -= 10
+    # Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+    # Extended format is for years 2000-2099, year code is year % 100
+    year = 2000 + base62_to_num(year_digit)
 
     return f"{year} {half_month}{second_letter}{cycle}"
 
@@ -1119,8 +1120,9 @@ def detect_format(designation: str) -> Dict[str, Any]:
     # Check for packed provisional asteroid (7 chars)
     if len(des) == 7:
         # Extended format with underscore
+        # Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
         if des[0] == '_':
-            if re.match(r'^_[0-9][A-Z][0-9A-Za-z]{4}$', des):
+            if re.match(r'^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$', des):
                 result['format'] = 'packed'
                 result['type'] = 'provisional_extended'
                 result['subtype'] = 'provisional (extended format, cycle >=620)'

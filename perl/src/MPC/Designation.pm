@@ -207,7 +207,9 @@ sub letter_to_position {
 
 sub position_to_letter {
     my ($pos) = @_;
-    die "Invalid half-month position: $pos\n" if $pos < 1 || $pos > 24;
+    # Second letters A-Z excluding I = 25 positions (1-25)
+    # A-H = positions 1-8, J-Z = positions 9-25 (I is skipped)
+    die "Invalid letter position: $pos\n" if $pos < 1 || $pos > 25;
     $pos++ if $pos >= 9;
     return chr(ord('A') + $pos - 1);
 }
@@ -738,7 +740,8 @@ sub detect_format {
     # Packed provisional (7 chars)
     if (length($des) == 7) {
         if (substr($des, 0, 1) eq '_') {
-            if ($des =~ /^_[0-9][A-Z][0-9A-Za-z]{4}$/) {
+            # Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+            if ($des =~ /^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$/) {
                 return { format => 'packed', type => 'provisional_extended', subtype => 'provisional extended' };
             }
         }
@@ -817,15 +820,16 @@ sub convert {
             # Extended provisional unpacking
             my $des = $designation;
             $des =~ s/^\s+|\s+$//g;
-            my $year_digit = substr($des, 1, 1);
+            my $year_char = substr($des, 1, 1);
             my $half_month = substr($des, 2, 1);
             my $seq_encoded = substr($des, 3, 4);
             my $base_sequence = base62_string_to_num($seq_encoded);
             my $cycle = 620 + int($base_sequence / 25);
             my $letter_pos = ($base_sequence % 25) + 1;
             my $second_letter = position_to_letter($letter_pos);
-            my $year = 2020 + $year_digit;
-            $year -= 10 if $year > 2029;
+            # Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+            # Extended format is for years 2000-2099, year code is year % 100
+            my $year = 2000 + base62_to_num($year_char);
             $result = "$year $half_month$second_letter$cycle";
         } elsif ($info->{type} eq 'comet_numbered') {
             $result = unpack_comet_numbered($designation);
