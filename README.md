@@ -156,4 +156,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on adding new language imp
 
 ## License
 
-Public domain. See [LICENSE](LICENSE).
+CC0 1.0 Universal - Public Domain Dedication. See [LICENSE](LICENSE).
