@@ -117,6 +117,9 @@ if [ "$ROUNDTRIP" = true ]; then
     if command -v node >/dev/null 2>&1; then
         run_roundtrip_benchmark "JS" "cd js && node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
+    if command -v cargo >/dev/null 2>&1; then
+        run_roundtrip_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
 
     echo ""
     echo "=== Summary: Pack Direction (unpacked → packed) ==="
@@ -221,6 +224,9 @@ else
     run_benchmark "Tcl" "cd tcl && tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv"
     if command -v node >/dev/null 2>&1; then
         run_benchmark "JS" "cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v cargo >/dev/null 2>&1; then
+        run_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_csv ../test-data/prov_unpack_to_pack.csv"
     fi
 
     echo ""
