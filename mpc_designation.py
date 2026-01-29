@@ -135,13 +135,16 @@ def unpack_permanent(packed: str) -> int:
         raise MPCDesignationError(f"Invalid packed permanent designation: {packed}")
 
 
+# Maximum asteroid number: 620000 + 62^4 - 1 = 15396335
+MAX_ASTEROID_NUMBER = 15396335
+
 def pack_permanent(number: int) -> str:
     """
     Pack a permanent (numbered) asteroid designation.
     Input: integer number
     Output: 5 or 6 character packed format
     """
-    if not isinstance(number, int) or number < 1:
+    if not isinstance(number, int) or number < 1 or number > MAX_ASTEROID_NUMBER:
         raise MPCDesignationError(f"Invalid asteroid number: {number}")
 
     if number < 100000:

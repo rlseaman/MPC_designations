@@ -159,8 +159,12 @@ namespace eval MPCDesignation {
     # Input: integer number
     # Output: 5 or 6 character packed format
     #
+    # Maximum asteroid number: 620000 + 62^4 - 1 = 15396335
+    variable maxAsteroidNumber 15396335
+
     proc packPermanent {number} {
-        if {![string is integer -strict $number] || $number < 1} {
+        variable maxAsteroidNumber
+        if {![string is integer -strict $number] || $number < 1 || $number > $maxAsteroidNumber} {
             error "Invalid asteroid number: $number"
         }
 

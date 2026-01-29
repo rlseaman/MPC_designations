@@ -144,8 +144,11 @@ static void trim(char *s) {
 /* Permanent (numbered) asteroid designations                                */
 /* ========================================================================= */
 
+/* Maximum asteroid number: 620000 + 62^4 - 1 = 15396335 */
+#define MPC_MAX_ASTEROID_NUMBER 15396335L
+
 int mpc_pack_permanent(long number, char *output, size_t outlen) {
-    if (number < 1) return MPC_ERR_RANGE;
+    if (number < 1 || number > MPC_MAX_ASTEROID_NUMBER) return MPC_ERR_RANGE;
     if (outlen < 6) return MPC_ERR_BUFFER;
 
     if (number < 100000) {
