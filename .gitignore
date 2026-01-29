@@ -1,5 +1,6 @@
-# Large test data files
+# Large uncompressed test data files
 *.csv
+!*.csv.gz
 
 # Claude Code settings
 .claude/
