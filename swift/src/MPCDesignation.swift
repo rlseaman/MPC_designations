@@ -90,6 +90,48 @@ let SATELLITE_PLANET_NAMES: [Character: String] = [
 /// Maximum asteroid number: 620000 + 62^4 - 1 = 15396335
 let MAX_ASTEROID_NUMBER = 15396335
 
+// MARK: - Pre-compiled Regex Patterns
+
+/// Pre-compiled regex patterns for performance (compiled once at startup)
+struct Patterns {
+    // Pack patterns
+    static let surveyUnpacked = try! NSRegularExpression(pattern: #"^(\d+) (P-L|T-[123])$"#)
+    static let oldStyleUnpacked = try! NSRegularExpression(pattern: #"^[AB](\d)(\d{2}) ([A-Z])([A-Z])$"#)
+    static let provisionalUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])([A-Z])(\d*)$"#)
+    static let cometProvUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$"#)
+    static let cometNumberedPacked = try! NSRegularExpression(pattern: #"^(\d{4})([PD])$"#)
+    static let cometNumberedUnpacked = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#)
+    static let satelliteUnpacked = try! NSRegularExpression(pattern: #"^S/(\d{4}) ([JSUN]) (\d+)$"#)
+    static let cometFullUnpacked = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) (.+)$"#)
+    static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
+
+    // Detect format patterns - packed
+    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
+    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$"#)
+    static let packedCometFull9 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$"#)
+    static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
+    static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
+    static let packedSatellite = try! NSRegularExpression(pattern: #"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$"#)
+    static let packedTilde = try! NSRegularExpression(pattern: #"^~[0-9A-Za-z]{4}$"#)
+    static let packedLetterPrefix = try! NSRegularExpression(pattern: #"^[A-Za-z][0-9]{4}$"#)
+    static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9][A-Z][0-9A-Za-z]{4}$"#)
+    static let packedProvisional = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$"#)
+    static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
+    static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD]$"#)
+    static let packedCometProv = try! NSRegularExpression(pattern: #"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$"#)
+
+    // Detect format patterns - unpacked
+    static let unpackedSatellite = try! NSRegularExpression(pattern: #"^S/\d{4} ([JSUN]) \d+$"#)
+    static let unpackedSurvey = try! NSRegularExpression(pattern: #"^\d+ (P-L|T-[123])$"#)
+    static let unpackedOldStyle = try! NSRegularExpression(pattern: #"^[AB]\d{3} [A-Z][A-Z]$"#)
+    static let unpackedProvisional = try! NSRegularExpression(pattern: #"^\d{4} [A-Z][A-Z]\d*$"#)
+    static let unpackedCometFull = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$"#)
+    static let unpackedCometNumbered = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#)
+
+    // Unpack patterns
+    static let asteroidStylePacked = try! NSRegularExpression(pattern: #"^\d{4} ([A-Z])(.)"#)
+}
+
 // MARK: - Validation Functions
 
 /// Validate raw input string BEFORE trimming
@@ -434,8 +476,7 @@ func packProvisional(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
     // Check for survey designations
-    let surveyPattern = #"^(\d+) (P-L|T-[123])$"#
-    if u.range(of: surveyPattern, options: .regularExpression) != nil {
+    if Patterns.surveyUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) != nil {
         let parts = u.split(separator: " ")
         guard let number = Int(parts[0]) else {
             throw MPCDesignationError.invalidFormat("Invalid survey designation: \(unpacked)")
@@ -451,9 +492,7 @@ func packProvisional(_ unpacked: String) throws -> String {
     }
 
     // Check for old-style designation: "A908 CJ" or "B842 FA"
-    let oldStylePattern = #"^[AB](\d)(\d{2}) ([A-Z])([A-Z])$"#
-    if let regex = try? NSRegularExpression(pattern: oldStylePattern),
-       let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) {
+    if let match = Patterns.oldStyleUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) {
         let centuryDigit = String(u[Range(match.range(at: 1), in: u)!])
         let yearShort = String(u[Range(match.range(at: 2), in: u)!])
         let halfMonth = String(u[Range(match.range(at: 3), in: u)!])
@@ -472,9 +511,7 @@ func packProvisional(_ unpacked: String) throws -> String {
     }
 
     // Match standard provisional: "1995 XA" or "1995 XA12"
-    let provPattern = #"^(\d{4}) ([A-Z])([A-Z])(\d*)$"#
-    guard let regex = try? NSRegularExpression(pattern: provPattern),
-          let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
+    guard let match = Patterns.provisionalUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked provisional designation: \(unpacked)")
     }
 
@@ -566,9 +603,7 @@ func packCometProvisional(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
     // Match provisional comet: "1995 O1" or "1995 O1-B" or "1930 J1-AA"
-    let pattern = #"^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
+    guard let match = Patterns.cometProvUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked comet provisional designation: \(unpacked)")
     }
 
@@ -613,9 +648,7 @@ func packCometProvisional(_ unpacked: String) throws -> String {
 func unpackCometNumbered(_ packed: String) throws -> String {
     let p = packed.trimmingCharacters(in: .whitespaces)
 
-    let pattern = #"^(\d{4})([PD])$"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: p, range: NSRange(p.startIndex..., in: p)) else {
+    guard let match = Patterns.cometNumberedPacked.firstMatch(in: p, range: NSRange(p.startIndex..., in: p)) else {
         throw MPCDesignationError.invalidFormat("Invalid packed numbered comet designation: \(packed)")
     }
 
@@ -630,9 +663,7 @@ func packCometNumbered(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
     // Match "1P" or "354P" or "1P/Halley"
-    let pattern = #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
+    guard let match = Patterns.cometNumberedUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked numbered comet designation: \(unpacked)")
     }
 
@@ -680,9 +711,7 @@ func unpackSatellite(_ packed: String) throws -> String {
 func packSatellite(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
-    let pattern = #"^S/(\d{4}) ([JSUN]) (\d+)$"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
+    guard let match = Patterns.satelliteUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked satellite designation: \(unpacked)")
     }
 
@@ -827,9 +856,7 @@ func isAsteroidStylePacked(_ provisionalPart: String) -> Bool {
 
 /// Check if an unpacked provisional uses asteroid-style (letter after half-month)
 func isAsteroidStyleUnpacked(_ provisional: String) -> Bool {
-    let pattern = #"^\d{4} ([A-Z])(.)"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: provisional, range: NSRange(provisional.startIndex..., in: provisional)),
+    guard let match = Patterns.asteroidStylePacked.firstMatch(in: provisional, range: NSRange(provisional.startIndex..., in: provisional)),
           match.range(at: 2).length > 0 else {
         return false
     }
@@ -909,9 +936,7 @@ func packCometFull(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
     // Match: optional number, type, slash, year, provisional
-    let pattern = #"^(\d*)([PCDXAI])/(-?\d+) (.+)$"#
-    guard let regex = try? NSRegularExpression(pattern: pattern),
-          let match = regex.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
+    guard let match = Patterns.cometFullUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked comet designation: \(unpacked)")
     }
 
@@ -926,9 +951,7 @@ func packCometFull(_ unpacked: String) throws -> String {
 
     // Check for ancient or BCE year
     if isAncientYear(year) {
-        let ancientPattern = #"^([A-Z])(\d+)(?:-([A-Z]))?$"#
-        guard let ancientRegex = try? NSRegularExpression(pattern: ancientPattern),
-              let ancientMatch = ancientRegex.firstMatch(in: provPart, range: NSRange(provPart.startIndex..., in: provPart)) else {
+        guard let ancientMatch = Patterns.ancientCometProv.firstMatch(in: provPart, range: NSRange(provPart.startIndex..., in: provPart)) else {
             throw MPCDesignationError.invalidFormat("Invalid ancient comet provisional: \(provPart)")
         }
 
@@ -979,9 +1002,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if designation.count == 12 {
-        let pattern = #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
+        if Patterns.packedCometFull12.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
             result.format = "packed"
             result.type = "comet_full"
             result.subtype = "comet with provisional designation (12-char)"
@@ -991,9 +1012,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed comet designation (8 chars)
     if designation.count == 8 {
-        let pattern = #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
+        if Patterns.packedCometFull8.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
             result.format = "packed"
             result.type = "comet_full"
             result.subtype = "comet with provisional designation (8-char)"
@@ -1003,9 +1022,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed comet with 2-letter fragment (9 chars)
     if designation.count == 9 {
-        let pattern = #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
+        if Patterns.packedCometFull9.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
             result.format = "packed"
             result.type = "comet_full"
             result.subtype = "comet with provisional designation (9-char, 2-letter fragment)"
@@ -1015,9 +1032,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed ancient comet (8 chars)
     if designation.count == 8 {
-        let pattern = #"^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
+        if Patterns.packedAncientComet.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
             result.format = "packed"
             result.type = "comet_ancient"
             result.subtype = "comet with ancient provisional (year < 1000)"
@@ -1027,9 +1042,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed BCE comet (8 chars)
     if designation.count == 8 {
-        let pattern = #"^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
+        if Patterns.packedBCEComet.firstMatch(in: designation, range: NSRange(designation.startIndex..., in: designation)) != nil {
             result.format = "packed"
             result.type = "comet_bce"
             result.subtype = "comet with BCE provisional"
@@ -1044,9 +1057,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed satellite designation (8 chars starting with S)
     if des.count == 8 && des.first == "S" {
-        let pattern = #"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+        if Patterns.packedSatellite.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "satellite"
             let planet = des[des.index(des.startIndex, offsetBy: 4)]
@@ -1059,9 +1070,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     // Check for packed permanent (numbered) asteroid
     if des.count == 5 {
         if des.first == "~" {
-            let pattern = #"^~[0-9A-Za-z]{4}$"#
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+            if Patterns.packedTilde.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
                 result.format = "packed"
                 result.type = "permanent"
                 result.subtype = "permanent numbered (tilde/base-62, >= 620000)"
@@ -1073,9 +1082,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
             result.subtype = "permanent numbered (5-digit, < 100000)"
             return result
         } else {
-            let pattern = #"^[A-Za-z][0-9]{4}$"#
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+            if Patterns.packedLetterPrefix.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
                 result.format = "packed"
                 result.type = "permanent"
                 if des.first!.isUppercase {
@@ -1092,9 +1099,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     if des.count == 7 {
         // Extended format with underscore
         if des.first == "_" {
-            let pattern = #"^_[0-9][A-Z][0-9A-Za-z]{4}$"#
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+            if Patterns.packedExtended.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
                 result.format = "packed"
                 result.type = "provisional_extended"
                 result.subtype = "provisional (extended format, cycle >=620)"
@@ -1102,9 +1107,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
             }
         }
         // Standard provisional
-        let provPattern = #"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$"#
-        if let regex = try? NSRegularExpression(pattern: provPattern),
-           regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+        if Patterns.packedProvisional.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "provisional"
             result.subtype = "provisional"
@@ -1117,9 +1120,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
             result.subtype = "survey (Palomar-Leiden)"
             return result
         }
-        let surveyPattern = #"^T[123]S\d{4}$"#
-        if let regex = try? NSRegularExpression(pattern: surveyPattern),
-           regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+        if Patterns.packedSurveyT.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "survey"
             result.subtype = "survey (Trojan T-\(des[des.index(des.startIndex, offsetBy: 1)]))"
@@ -1129,9 +1130,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed numbered comet (5 chars ending in P or D)
     if des.count == 5 {
-        let pattern = #"^[0-9]{4}[PD]$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+        if Patterns.packedCometNumbered.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "comet_numbered"
             let cometType = des.last!
@@ -1143,9 +1142,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
 
     // Check for packed comet provisional (7 chars)
     if des.count == 7 {
-        let pattern = #"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$"#
-        if let regex = try? NSRegularExpression(pattern: pattern),
-           regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+        if Patterns.packedCometProv.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "comet_provisional"
             result.subtype = "comet provisional"
@@ -1156,9 +1153,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     // --- UNPACKED FORMATS ---
 
     // Check for unpacked satellite
-    let satPattern = #"^S/\d{4} ([JSUN]) \d+$"#
-    if let regex = try? NSRegularExpression(pattern: satPattern),
-       let match = regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
+    if let match = Patterns.unpackedSatellite.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
         result.format = "unpacked"
         result.type = "satellite"
         let planet = Character(String(des[Range(match.range(at: 1), in: des)!]))
@@ -1176,9 +1171,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     }
 
     // Check for unpacked survey designation
-    let surveyUnpackedPattern = #"^\d+ (P-L|T-[123])$"#
-    if let regex = try? NSRegularExpression(pattern: surveyUnpackedPattern),
-       let match = regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
+    if let match = Patterns.unpackedSurvey.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
         result.format = "unpacked"
         result.type = "survey"
         let survey = String(des[Range(match.range(at: 1), in: des)!])
@@ -1191,9 +1184,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     }
 
     // Check for old-style asteroid designation
-    let oldStylePattern = #"^[AB]\d{3} [A-Z][A-Z]$"#
-    if let regex = try? NSRegularExpression(pattern: oldStylePattern),
-       regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+    if Patterns.unpackedOldStyle.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
         result.format = "unpacked"
         result.type = "provisional"
         result.subtype = "provisional (old-style pre-1925)"
@@ -1201,9 +1192,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     }
 
     // Check for unpacked provisional asteroid
-    let provUnpackedPattern = #"^\d{4} [A-Z][A-Z]\d*$"#
-    if let regex = try? NSRegularExpression(pattern: provUnpackedPattern),
-       regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
+    if Patterns.unpackedProvisional.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
         result.format = "unpacked"
         result.type = "provisional"
         result.subtype = "provisional"
@@ -1211,9 +1200,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     }
 
     // Check for unpacked comet with type prefix
-    let cometFullPattern = #"^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$"#
-    if let regex = try? NSRegularExpression(pattern: cometFullPattern),
-       let match = regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
+    if let match = Patterns.unpackedCometFull.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
         let num = String(des[Range(match.range(at: 1), in: des)!])
         let ctype = Character(String(des[Range(match.range(at: 2), in: des)!]))
         let year = Int(String(des[Range(match.range(at: 3), in: des)!]))!
@@ -1248,9 +1235,7 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
     }
 
     // Check for unpacked numbered periodic comet
-    let numberedCometPattern = #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#
-    if let regex = try? NSRegularExpression(pattern: numberedCometPattern),
-       let match = regex.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
+    if let match = Patterns.unpackedCometNumbered.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) {
         result.format = "unpacked"
         result.type = "comet_numbered"
         let cometType = Character(String(des[Range(match.range(at: 2), in: des)!]))
