@@ -2,10 +2,10 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-errors test-all validate version
 
 # Default: build all
-all: build-c build-swift
+all: build-c build-swift build-go
 
 # Build targets
 build-c:
@@ -14,10 +14,14 @@ build-c:
 build-swift:
 	$(MAKE) -C swift
 
+build-go:
+	$(MAKE) -C go
+
 # Clean all build artifacts
 clean:
 	$(MAKE) -C c clean
 	$(MAKE) -C swift clean
+	$(MAKE) -C go clean
 	rm -rf python/src/mpc_designation/__pycache__
 	rm -rf python/test/__pycache__
 	rm -f test-data/prov_unpack_to_pack.csv
@@ -27,7 +31,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl
+test-all: test-c test-python test-tcl test-swift test-perl test-go
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -68,8 +72,13 @@ test-perl: test-data/prov_unpack_to_pack.csv
 	@echo "--- Perl Conversion Tests ---"
 	cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv
 
+# Go tests
+test-go: build-go test-data/prov_unpack_to_pack.csv
+	@echo "=== Go Tests ==="
+	$(MAKE) -C go test-all
+
 # Error tests only (quick validation)
-test-errors: build-c build-swift
+test-errors: build-c build-swift build-go
 	@echo "=== Error Tests (All Languages) ==="
 	@echo ""
 	@echo "--- C ---"
@@ -86,6 +95,9 @@ test-errors: build-c build-swift
 	@echo ""
 	@echo "--- Perl ---"
 	cd perl && perl test/test_errors.pl ../test-data/error_test_cases.csv
+	@echo ""
+	@echo "--- Go ---"
+	$(MAKE) -C go test-errors
 
 # Cross-language validation
 validate: build-c
@@ -109,6 +121,7 @@ help:
 	@echo "  test-tcl     Run TCL tests only"
 	@echo "  test-swift   Run Swift tests only"
 	@echo "  test-perl    Run Perl tests only"
+	@echo "  test-go      Run Go tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"

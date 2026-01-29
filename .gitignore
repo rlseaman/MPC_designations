@@ -37,6 +37,12 @@ swift/test_errors_debug
 swift/.build/
 *.dSYM/
 
+# Go build artifacts
+go/mpc_designation
+go/test_csv
+go/test_errors
+go/mpc_designation-*
+
 # Editor files
 *.swp
 *.swo

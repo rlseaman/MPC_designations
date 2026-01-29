@@ -13,6 +13,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Tcl** | [`tcl/`](tcl/) | Production |
 | **Swift** | [`swift/`](swift/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
+| **Go** | [`go/`](go/) | Production |
 
 All implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
 
@@ -46,6 +47,17 @@ cd swift && make
 ```perl
 use MPC::Designation qw(convert_simple);
 convert_simple('1995 XA');  # Returns 'J95X00A'
+```
+
+### Go
+```bash
+cd go && make
+./mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+```go
+import "github.com/rlseaman/mpc_designations/go/mpc"
+result, _ := mpc.ConvertSimple("1995 XA")  // Returns "J95X00A"
 ```
 
 ## Examples
@@ -108,9 +120,15 @@ MPC_designations/
 │   ├── Makefile
 │   ├── src/            # Source code
 │   └── test/           # Test files
-└── perl/
-    ├── src/            # Source code (MPC/Designation.pm)
-    └── test/           # Test files
+├── perl/
+│   ├── src/            # Source code (MPC/Designation.pm)
+│   └── test/           # Test files
+└── go/
+    ├── go.mod          # Go module definition
+    ├── Makefile
+    ├── mpc/            # Library package
+    ├── cmd/            # CLI
+    └── test/           # Test runners
 ```
 
 ## Testing

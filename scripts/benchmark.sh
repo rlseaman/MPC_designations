@@ -36,6 +36,7 @@ fi
 echo "Building compiled implementations..."
 make -C c test_csv >/dev/null 2>&1
 make -C swift test_csv >/dev/null 2>&1
+make -C go test_csv >/dev/null 2>&1
 echo ""
 
 # Arrays to store results
@@ -92,6 +93,7 @@ echo ""
 
 # Run each language
 run_benchmark "C" "cd c && ./test_csv ../test-data/prov_unpack_to_pack.csv"
+run_benchmark "Go" "cd go && ./test_csv ../test-data/prov_unpack_to_pack.csv"
 run_benchmark "Swift" "cd swift && ./test_csv ../test-data/prov_unpack_to_pack.csv"
 run_benchmark "Perl" "cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv"
 run_benchmark "Python" "cd python && python3 test/test_csv.py ../test-data/prov_unpack_to_pack.csv"
