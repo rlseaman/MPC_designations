@@ -1,0 +1,27 @@
+{
+  "name": "mpc-designation",
+  "version": "1.0.0",
+  "description": "Convert between packed and unpacked MPC (Minor Planet Center) designations",
+  "main": "src/mpc_designation.js",
+  "scripts": {
+    "test": "node test/test_csv.js ../test-data/prov_unpack_to_pack.csv",
+    "test:roundtrip": "node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv"
+  },
+  "keywords": [
+    "astronomy",
+    "minor-planet",
+    "mpc",
+    "asteroid",
+    "comet",
+    "designation"
+  ],
+  "author": "",
+  "license": "CC0-1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rlseaman/MPC_designations.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

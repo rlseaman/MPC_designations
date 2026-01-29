@@ -114,6 +114,9 @@ if [ "$ROUNDTRIP" = true ]; then
     run_roundtrip_benchmark "Perl" "cd perl && perl test/test_roundtrip.pl ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Python" "cd python && python3 test/test_roundtrip.py ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Tcl" "cd tcl && tclsh test/test_roundtrip.tcl ../test-data/prov_unpack_to_pack.csv 2>&1"
+    if command -v node >/dev/null 2>&1; then
+        run_roundtrip_benchmark "JS" "cd js && node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
 
     echo ""
     echo "=== Summary: Pack Direction (unpacked → packed) ==="
@@ -216,6 +219,9 @@ else
     run_benchmark "Perl" "cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Python" "cd python && python3 test/test_csv.py ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Tcl" "cd tcl && tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv"
+    if command -v node >/dev/null 2>&1; then
+        run_benchmark "JS" "cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
+    fi
 
     echo ""
     echo "=== Summary ==="
