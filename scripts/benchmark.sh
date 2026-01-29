@@ -120,6 +120,9 @@ if [ "$ROUNDTRIP" = true ]; then
     if command -v cargo >/dev/null 2>&1; then
         run_roundtrip_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
+    if command -v ruby >/dev/null 2>&1; then
+        run_roundtrip_benchmark "Ruby" "cd ruby && ruby test/test_roundtrip.rb ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
 
     echo ""
     echo "=== Summary: Pack Direction (unpacked → packed) ==="
@@ -227,6 +230,9 @@ else
     fi
     if command -v cargo >/dev/null 2>&1; then
         run_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_csv ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v ruby >/dev/null 2>&1; then
+        run_benchmark "Ruby" "cd ruby && ruby test/test_csv.rb ../test-data/prov_unpack_to_pack.csv"
     fi
 
     echo ""
