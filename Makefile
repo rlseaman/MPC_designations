@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-errors test-all validate version
 
 # Default: build all
 all: build-c build-swift
@@ -27,7 +27,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift
+test-all: test-c test-python test-tcl test-swift test-perl
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -59,6 +59,15 @@ test-swift: build-swift test-data/prov_unpack_to_pack.csv
 	@echo "=== Swift Tests ==="
 	$(MAKE) -C swift test-all
 
+# Perl tests
+test-perl: test-data/prov_unpack_to_pack.csv
+	@echo "=== Perl Tests ==="
+	@echo "--- Perl Error Tests ---"
+	cd perl && perl test/test_errors.pl ../test-data/error_test_cases.csv
+	@echo ""
+	@echo "--- Perl Conversion Tests ---"
+	cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv
+
 # Error tests only (quick validation)
 test-errors: build-c build-swift
 	@echo "=== Error Tests (All Languages) ==="
@@ -74,6 +83,9 @@ test-errors: build-c build-swift
 	@echo ""
 	@echo "--- Swift ---"
 	$(MAKE) -C swift test-errors
+	@echo ""
+	@echo "--- Perl ---"
+	cd perl && perl test/test_errors.pl ../test-data/error_test_cases.csv
 
 # Cross-language validation
 validate: build-c
@@ -96,6 +108,7 @@ help:
 	@echo "  test-python  Run Python tests only"
 	@echo "  test-tcl     Run TCL tests only"
 	@echo "  test-swift   Run Swift tests only"
+	@echo "  test-perl    Run Perl tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"
