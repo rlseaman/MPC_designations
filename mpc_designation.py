@@ -918,7 +918,9 @@ def detect_format(designation: str) -> Dict[str, Any]:
         if re.match(r'^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$', des):
             result['format'] = 'packed'
             result['type'] = 'satellite'
-            result['subtype'] = 'natural satellite provisional'
+            planet = des[4]
+            planet_name = SATELLITE_PLANET_NAMES.get(planet, planet)
+            result['subtype'] = f'natural satellite ({planet_name})'
             return result
 
     # Check for packed permanent (numbered) asteroid
@@ -928,17 +930,20 @@ def detect_format(designation: str) -> Dict[str, Any]:
             if re.match(r'^~[0-9A-Za-z]{4}$', des):
                 result['format'] = 'packed'
                 result['type'] = 'permanent'
-                result['subtype'] = 'numbered asteroid (>=620,000)'
+                result['subtype'] = 'permanent numbered (tilde/base-62, >= 620000)'
                 return result
         elif des.isdigit():
             result['format'] = 'packed'
             result['type'] = 'permanent'
-            result['subtype'] = 'numbered asteroid (<100,000)'
+            result['subtype'] = 'permanent numbered (5-digit, < 100000)'
             return result
         elif re.match(r'^[A-Za-z][0-9]{4}$', des):
             result['format'] = 'packed'
             result['type'] = 'permanent'
-            result['subtype'] = 'numbered asteroid (100,000-619,999)'
+            if des[0].isupper():
+                result['subtype'] = 'permanent numbered (letter-prefix, 100000-359999)'
+            else:
+                result['subtype'] = 'permanent numbered (letter-prefix, 360000-619999)'
             return result
 
     # Check for packed provisional asteroid (7 chars)
@@ -956,10 +961,15 @@ def detect_format(designation: str) -> Dict[str, Any]:
             result['type'] = 'provisional'
             result['subtype'] = 'provisional'
             return result
-        if re.match(r'^(PLS|T[123]S)\d{4}$', des):
+        if des.startswith('PLS') and des[3:].isdigit():
             result['format'] = 'packed'
             result['type'] = 'survey'
-            result['subtype'] = 'survey designation'
+            result['subtype'] = 'survey (Palomar-Leiden)'
+            return result
+        if re.match(r'^T[123]S\d{4}$', des):
+            result['format'] = 'packed'
+            result['type'] = 'survey'
+            result['subtype'] = f'survey (Trojan T-{des[1]})'
             return result
 
     # Check for packed numbered comet (5 chars ending in P or D)
@@ -967,7 +977,9 @@ def detect_format(designation: str) -> Dict[str, Any]:
         if re.match(r'^[0-9]{4}[PD]$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_numbered'
-            result['subtype'] = 'numbered periodic comet'
+            comet_type = des[4]
+            type_desc = COMET_TYPE_DESCRIPTIONS.get(comet_type, comet_type)
+            result['subtype'] = f'comet numbered {type_desc}'
             return result
 
     # Check for packed comet provisional (7 chars starting with century code)
@@ -981,24 +993,32 @@ def detect_format(designation: str) -> Dict[str, Any]:
     # --- UNPACKED FORMATS ---
 
     # Check for unpacked satellite: "S/2019 S 22"
-    if re.match(r'^S/\d{4} [JSUN] \d+$', des):
+    match = re.match(r'^S/\d{4} ([JSUN]) \d+$', des)
+    if match:
         result['format'] = 'unpacked'
         result['type'] = 'satellite'
-        result['subtype'] = 'natural satellite provisional'
+        planet = match.group(1)
+        planet_name = SATELLITE_PLANET_NAMES.get(planet, planet)
+        result['subtype'] = f'natural satellite ({planet_name})'
         return result
 
     # Check for unpacked permanent (numbered) asteroid
     if des.isdigit():
         result['format'] = 'unpacked'
         result['type'] = 'permanent'
-        result['subtype'] = 'numbered asteroid'
+        result['subtype'] = 'permanent numbered'
         return result
 
     # Check for unpacked survey designation: "2040 P-L" or "3138 T-1"
-    if re.match(r'^\d+ (P-L|T-[123])$', des):
+    match = re.match(r'^\d+ (P-L|T-[123])$', des)
+    if match:
         result['format'] = 'unpacked'
         result['type'] = 'survey'
-        result['subtype'] = 'survey designation'
+        survey = match.group(1)
+        if survey == 'P-L':
+            result['subtype'] = 'survey (Palomar-Leiden)'
+        else:
+            result['subtype'] = f'survey (Trojan {survey})'
         return result
 
     # Check for old-style asteroid designation: "A908 CJ"
@@ -1046,10 +1066,13 @@ def detect_format(designation: str) -> Dict[str, Any]:
         return result
 
     # Check for unpacked numbered periodic comet "1P" or "354P"
-    if re.match(r'^(\d+)([PD])(?:/[A-Za-z].*)?$', des):
+    match = re.match(r'^(\d+)([PD])(?:/[A-Za-z].*)?$', des)
+    if match:
         result['format'] = 'unpacked'
         result['type'] = 'comet_numbered'
-        result['subtype'] = 'numbered periodic comet'
+        comet_type = match.group(2)
+        type_desc = COMET_TYPE_DESCRIPTIONS.get(comet_type, comet_type)
+        result['subtype'] = f'comet numbered {type_desc}'
         return result
 
     raise MPCDesignationError(f"Unable to detect designation format: {designation}")

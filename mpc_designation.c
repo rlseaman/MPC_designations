@@ -22,8 +22,40 @@ static const char CENTURY_TO_LETTER[] = {
 /* Comet types */
 static const char COMET_TYPES[] = "PCDXAI";
 
+/* Comet type descriptions */
+static const char *COMET_TYPE_NAMES[] = {
+    "periodic",      /* P */
+    "non-periodic",  /* C */
+    "defunct",       /* D */
+    "uncertain",     /* X */
+    "minor-planet",  /* A */
+    "interstellar"   /* I */
+};
+
 /* Planet codes for satellites */
 static const char SATELLITE_PLANETS[] = "JSUN";
+
+/* Planet names for satellites */
+static const char *SATELLITE_PLANET_NAMES[] = {
+    "Jupiter",  /* J */
+    "Saturn",   /* S */
+    "Uranus",   /* U */
+    "Neptune"   /* N */
+};
+
+/* Get comet type description */
+static const char *get_comet_type_name(char type) {
+    const char *p = strchr(COMET_TYPES, type);
+    if (p) return COMET_TYPE_NAMES[p - COMET_TYPES];
+    return "unknown";
+}
+
+/* Get planet name for satellite */
+static const char *get_planet_name(char code) {
+    const char *p = strchr(SATELLITE_PLANETS, code);
+    if (p) return SATELLITE_PLANET_NAMES[p - SATELLITE_PLANETS];
+    return "unknown";
+}
 
 /* ========================================================================= */
 /* Utility functions                                                         */
@@ -984,7 +1016,8 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     if (len == 8 && buf[0] == 'S' && buf[1] >= 'A' && buf[1] <= 'L') {
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_SATELLITE;
-        strcpy(info->subtype, "natural satellite provisional");
+        char planet = buf[4];
+        snprintf(info->subtype, sizeof(info->subtype), "natural satellite (%s)", get_planet_name(planet));
         return MPC_OK;
     }
 
@@ -993,7 +1026,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         if (buf[0] == '~') {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PERMANENT;
-            strcpy(info->subtype, "numbered asteroid (>=620,000)");
+            strcpy(info->subtype, "permanent numbered (tilde/base-62, >= 620000)");
             return MPC_OK;
         }
         int all_digits = 1;
@@ -1003,14 +1036,18 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         if (all_digits) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PERMANENT;
-            strcpy(info->subtype, "numbered asteroid (<100,000)");
+            strcpy(info->subtype, "permanent numbered (5-digit, < 100000)");
             return MPC_OK;
         }
         if (isalpha(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) &&
             isdigit(buf[3]) && isdigit(buf[4])) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PERMANENT;
-            strcpy(info->subtype, "numbered asteroid (100,000-619,999)");
+            if (isupper(buf[0])) {
+                strcpy(info->subtype, "permanent numbered (letter-prefix, 100000-359999)");
+            } else {
+                strcpy(info->subtype, "permanent numbered (letter-prefix, 360000-619999)");
+            }
             return MPC_OK;
         }
         /* Check for packed numbered comet */
@@ -1018,7 +1055,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             (buf[4] == 'P' || buf[4] == 'D')) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
-            strcpy(info->subtype, "numbered periodic comet");
+            snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(buf[4]));
             return MPC_OK;
         }
     }
@@ -1032,11 +1069,16 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             return MPC_OK;
         }
         /* Survey */
-        if (strncmp(buf, "PLS", 3) == 0 || strncmp(buf, "T1S", 3) == 0 ||
-            strncmp(buf, "T2S", 3) == 0 || strncmp(buf, "T3S", 3) == 0) {
+        if (strncmp(buf, "PLS", 3) == 0) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_SURVEY;
-            strcpy(info->subtype, "survey designation");
+            strcpy(info->subtype, "survey (Palomar-Leiden)");
+            return MPC_OK;
+        }
+        if (buf[0] == 'T' && buf[2] == 'S' && buf[1] >= '1' && buf[1] <= '3') {
+            info->format = MPC_FORMAT_PACKED;
+            info->type = MPC_TYPE_SURVEY;
+            snprintf(info->subtype, sizeof(info->subtype), "survey (Trojan T-%c)", buf[1]);
             return MPC_OK;
         }
         /* Standard provisional */
@@ -1047,7 +1089,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             strcpy(info->subtype, "provisional");
             return MPC_OK;
         }
-        /* Comet provisional */
+        /* Comet provisional - note: packed comet provisional doesn't include type */
         if (buf[0] >= 'I' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
             isupper(buf[3]) && (islower(buf[6]) || buf[6] == '0')) {
             info->format = MPC_FORMAT_PACKED;
@@ -1059,11 +1101,22 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
 
     /* --- UNPACKED FORMATS --- */
 
-    /* Check for unpacked satellite */
+    /* Check for unpacked satellite: S/YYYY P n */
     if (strncmp(buf, "S/", 2) == 0) {
         info->format = MPC_FORMAT_UNPACKED;
         info->type = MPC_TYPE_SATELLITE;
-        strcpy(info->subtype, "natural satellite provisional");
+        /* Extract planet code (e.g., "S/2019 J 1" -> planet is at position 7) */
+        char planet = '\0';
+        int yr;
+        char pl;
+        if (sscanf(buf, "S/%d %c", &yr, &pl) == 2 && strchr(SATELLITE_PLANETS, pl)) {
+            planet = pl;
+        }
+        if (planet) {
+            snprintf(info->subtype, sizeof(info->subtype), "natural satellite (%s)", get_planet_name(planet));
+        } else {
+            strcpy(info->subtype, "natural satellite provisional");
+        }
         return MPC_OK;
     }
 
@@ -1075,7 +1128,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     if (all_digits && len > 0) {
         info->format = MPC_FORMAT_UNPACKED;
         info->type = MPC_TYPE_PERMANENT;
-        strcpy(info->subtype, "numbered asteroid");
+        strcpy(info->subtype, "permanent numbered");
         return MPC_OK;
     }
 
@@ -1083,11 +1136,17 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     int num;
     char survey[8];
     if (sscanf(buf, "%d %7s", &num, survey) == 2) {
-        if (strcmp(survey, "P-L") == 0 || strcmp(survey, "T-1") == 0 ||
-            strcmp(survey, "T-2") == 0 || strcmp(survey, "T-3") == 0) {
+        if (strcmp(survey, "P-L") == 0) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_SURVEY;
-            strcpy(info->subtype, "survey designation");
+            strcpy(info->subtype, "survey (Palomar-Leiden)");
+            return MPC_OK;
+        }
+        if (strcmp(survey, "T-1") == 0 || strcmp(survey, "T-2") == 0 ||
+            strcmp(survey, "T-3") == 0) {
+            info->format = MPC_FORMAT_UNPACKED;
+            info->type = MPC_TYPE_SURVEY;
+            snprintf(info->subtype, sizeof(info->subtype), "survey (Trojan %s)", survey);
             return MPC_OK;
         }
     }
@@ -1137,7 +1196,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         if (is_comet_type(comet_type)) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_FULL;
-            strcpy(info->subtype, "comet numbered with provisional");
+            snprintf(info->subtype, sizeof(info->subtype), "comet numbered with provisional (%s)", get_comet_type_name(comet_type));
             return MPC_OK;
         }
     }
@@ -1150,11 +1209,11 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_FULL;
             if (year < 0) {
-                strcpy(info->subtype, "comet BCE provisional");
+                snprintf(info->subtype, sizeof(info->subtype), "comet BCE provisional (%s)", get_comet_type_name(comet_type));
             } else if (year < 1000) {
-                strcpy(info->subtype, "comet ancient provisional");
+                snprintf(info->subtype, sizeof(info->subtype), "comet ancient provisional (%s)", get_comet_type_name(comet_type));
             } else {
-                strcpy(info->subtype, "comet provisional");
+                snprintf(info->subtype, sizeof(info->subtype), "comet provisional (%s)", get_comet_type_name(comet_type));
             }
             return MPC_OK;
         }
@@ -1165,7 +1224,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
-            strcpy(info->subtype, "numbered periodic comet");
+            snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(comet_type));
             return MPC_OK;
         }
     }

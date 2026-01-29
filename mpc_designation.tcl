@@ -1131,10 +1131,11 @@ namespace eval MPCDesignation {
         # ============ COMET DESIGNATIONS ============
 
         # Check for packed numbered periodic comet "0001P" or "0354D"
-        if {[regexp {^[0-9]{4}[PD]$} $des]} {
+        if {[regexp {^[0-9]{4}([PD])$} $des -> ctype]} {
             dict set result format packed
             dict set result type comet_numbered
-            dict set result subtype "comet numbered periodic"
+            variable cometTypeDescriptions
+            dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
             return $result
         }
 
@@ -1190,7 +1191,8 @@ namespace eval MPCDesignation {
         if {[regexp {^(\d+)([PD])(?:/[A-Za-z].*)?$} $des -> num ctype]} {
             dict set result format unpacked
             dict set result type comet_numbered
-            dict set result subtype "comet numbered periodic"
+            variable cometTypeDescriptions
+            dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
             dict set result number $num
             dict set result cometType $ctype
             return $result
