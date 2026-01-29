@@ -22,6 +22,14 @@ c/examples/example_usage
 *.o
 *.a
 
+# Swift build artifacts
+swift/mpc_designation
+swift/test_csv
+swift/test_errors
+swift/test_errors_debug
+swift/.build/
+*.dSYM/
+
 # Editor files
 *.swp
 *.swo
