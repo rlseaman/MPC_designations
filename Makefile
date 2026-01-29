@@ -2,10 +2,10 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-js test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-js test-rust test-errors test-all validate version
 
 # Default: build all
-all: build-c build-swift build-go
+all: build-c build-swift build-go build-rust
 
 # Build targets
 build-c:
@@ -17,11 +17,19 @@ build-swift:
 build-go:
 	$(MAKE) -C go
 
+build-rust:
+	@if command -v cargo >/dev/null 2>&1; then \
+		$(MAKE) -C rust; \
+	else \
+		echo "Rust not installed, skipping Rust build"; \
+	fi
+
 # Clean all build artifacts
 clean:
 	$(MAKE) -C c clean
 	$(MAKE) -C swift clean
 	$(MAKE) -C go clean
+	@if command -v cargo >/dev/null 2>&1; then $(MAKE) -C rust clean; fi
 	rm -rf python/src/mpc_designation/__pycache__
 	rm -rf python/test/__pycache__
 	rm -f test-data/prov_unpack_to_pack.csv
@@ -31,7 +39,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go test-js
+test-all: test-c test-python test-tcl test-swift test-perl test-go test-js test-rust
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -86,6 +94,15 @@ test-js: test-data/prov_unpack_to_pack.csv
 		echo "Node.js not installed, skipping JavaScript tests"; \
 	fi
 
+# Rust tests
+test-rust: test-data/prov_unpack_to_pack.csv
+	@echo "=== Rust Tests ==="
+	@if command -v cargo >/dev/null 2>&1; then \
+		$(MAKE) -C rust test; \
+	else \
+		echo "Rust not installed, skipping Rust tests"; \
+	fi
+
 # Error tests only (quick validation)
 test-errors: build-c build-swift build-go
 	@echo "=== Error Tests (All Languages) ==="
@@ -132,6 +149,7 @@ help:
 	@echo "  test-perl    Run Perl tests only"
 	@echo "  test-go      Run Go tests only"
 	@echo "  test-js      Run JavaScript tests only"
+	@echo "  test-rust    Run Rust tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"

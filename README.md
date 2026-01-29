@@ -13,6 +13,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **JavaScript** | [`js/`](js/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **Python** | [`python/`](python/) | Production |
+| **Rust** | [`rust/`](rust/) | Production |
 | **Swift** | [`swift/`](swift/) | Production |
 | **Tcl** | [`tcl/`](tcl/) | Production |
 
@@ -59,6 +60,17 @@ cd go && make
 ```go
 import "github.com/rlseaman/mpc_designations/go/mpc"
 result, _ := mpc.ConvertSimple("1995 XA")  // Returns "J95X00A"
+```
+
+### Rust
+```bash
+cd rust && cargo build --release
+./target/release/mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+```rust
+use mpc_designation::convert_simple;
+let result = convert_simple("1995 XA").unwrap();  // Returns "J95X00A"
 ```
 
 ### JavaScript (Node.js)
@@ -141,6 +153,10 @@ MPC_designations/
 │   ├── mpc/            # Library package
 │   ├── cmd/            # CLI
 │   └── test/           # Test runners
+├── rust/
+│   ├── Cargo.toml      # Rust package definition
+│   ├── Makefile
+│   └── src/            # Source code (lib.rs + binaries)
 └── js/
     ├── package.json    # npm package definition
     ├── Makefile
@@ -162,6 +178,7 @@ make test-go
 make test-js
 make test-perl
 make test-python
+make test-rust
 make test-swift
 make test-tcl
 
