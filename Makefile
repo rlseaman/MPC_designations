@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-js test-errors test-all validate version
 
 # Default: build all
 all: build-c build-swift build-go
@@ -31,7 +31,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go
+test-all: test-c test-python test-tcl test-swift test-perl test-go test-js
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -76,6 +76,15 @@ test-perl: test-data/prov_unpack_to_pack.csv
 test-go: build-go test-data/prov_unpack_to_pack.csv
 	@echo "=== Go Tests ==="
 	$(MAKE) -C go test-all
+
+# JavaScript tests
+test-js: test-data/prov_unpack_to_pack.csv
+	@echo "=== JavaScript Tests ==="
+	@if command -v node >/dev/null 2>&1; then \
+		cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv; \
+	else \
+		echo "Node.js not installed, skipping JavaScript tests"; \
+	fi
 
 # Error tests only (quick validation)
 test-errors: build-c build-swift build-go
@@ -122,6 +131,7 @@ help:
 	@echo "  test-swift   Run Swift tests only"
 	@echo "  test-perl    Run Perl tests only"
 	@echo "  test-go      Run Go tests only"
+	@echo "  test-js      Run JavaScript tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"

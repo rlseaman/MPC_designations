@@ -9,11 +9,12 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | Language | Directory | Status |
 |----------|-----------|--------|
 | **C** | [`c/`](c/) | Production |
-| **Python** | [`python/`](python/) | Production |
-| **Tcl** | [`tcl/`](tcl/) | Production |
-| **Swift** | [`swift/`](swift/) | Production |
-| **Perl** | [`perl/`](perl/) | Production |
 | **Go** | [`go/`](go/) | Production |
+| **JavaScript** | [`js/`](js/) | Production |
+| **Perl** | [`perl/`](perl/) | Production |
+| **Python** | [`python/`](python/) | Production |
+| **Swift** | [`swift/`](swift/) | Production |
+| **Tcl** | [`tcl/`](tcl/) | Production |
 
 All implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
 
@@ -58,6 +59,17 @@ cd go && make
 ```go
 import "github.com/rlseaman/mpc_designations/go/mpc"
 result, _ := mpc.ConvertSimple("1995 XA")  // Returns "J95X00A"
+```
+
+### JavaScript (Node.js)
+```javascript
+const { convertSimple } = require('./src/mpc_designation');
+convertSimple('1995 XA');  // Returns 'J95X00A'
+```
+
+```bash
+cd js
+node src/mpc_designation_cli.js '1995 XA'    # Output: J95X00A
 ```
 
 ## Examples
@@ -123,12 +135,17 @@ MPC_designations/
 ├── perl/
 │   ├── src/            # Source code (MPC/Designation.pm)
 │   └── test/           # Test files
-└── go/
-    ├── go.mod          # Go module definition
+├── go/
+│   ├── go.mod          # Go module definition
+│   ├── Makefile
+│   ├── mpc/            # Library package
+│   ├── cmd/            # CLI
+│   └── test/           # Test runners
+└── js/
+    ├── package.json    # npm package definition
     ├── Makefile
-    ├── mpc/            # Library package
-    ├── cmd/            # CLI
-    └── test/           # Test runners
+    ├── src/            # Source code
+    └── test/           # Test files
 ```
 
 ## Testing
@@ -141,10 +158,12 @@ make test-all
 
 # Run tests for a specific language
 make test-c
-make test-python
-make test-tcl
-make test-swift
+make test-go
+make test-js
 make test-perl
+make test-python
+make test-swift
+make test-tcl
 
 # Quick error tests only (faster)
 make test-errors
