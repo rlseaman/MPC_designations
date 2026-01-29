@@ -43,6 +43,11 @@ go/test_csv
 go/test_errors
 go/mpc_designation-*
 
+# Java build artifacts
+java/classes/
+*.class
+*.jar
+
 # Editor files
 *.swp
 *.swo

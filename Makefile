@@ -2,10 +2,10 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-js test-ruby test-rust test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-js test-ruby test-rust test-errors test-all validate version
 
 # Default: build all
-all: build-c build-swift build-go build-rust
+all: build-c build-swift build-go build-java build-rust
 
 # Build targets
 build-c:
@@ -16,6 +16,13 @@ build-swift:
 
 build-go:
 	$(MAKE) -C go
+
+build-java:
+	@if command -v javac >/dev/null 2>&1; then \
+		$(MAKE) -C java; \
+	else \
+		echo "Java not installed, skipping Java build"; \
+	fi
 
 build-rust:
 	@if command -v cargo >/dev/null 2>&1; then \
@@ -29,6 +36,7 @@ clean:
 	$(MAKE) -C c clean
 	$(MAKE) -C swift clean
 	$(MAKE) -C go clean
+	@if command -v javac >/dev/null 2>&1; then $(MAKE) -C java clean; fi
 	@if command -v cargo >/dev/null 2>&1; then $(MAKE) -C rust clean; fi
 	rm -rf python/src/mpc_designation/__pycache__
 	rm -rf python/test/__pycache__
@@ -39,7 +47,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go test-js test-ruby test-rust
+test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-js test-ruby test-rust
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -84,6 +92,15 @@ test-perl: test-data/prov_unpack_to_pack.csv
 test-go: build-go test-data/prov_unpack_to_pack.csv
 	@echo "=== Go Tests ==="
 	$(MAKE) -C go test-all
+
+# Java tests
+test-java: test-data/prov_unpack_to_pack.csv
+	@echo "=== Java Tests ==="
+	@if command -v javac >/dev/null 2>&1; then \
+		$(MAKE) -C java test-all; \
+	else \
+		echo "Java not installed, skipping Java tests"; \
+	fi
 
 # JavaScript tests
 test-js: test-data/prov_unpack_to_pack.csv
@@ -157,6 +174,7 @@ help:
 	@echo "  test-swift   Run Swift tests only"
 	@echo "  test-perl    Run Perl tests only"
 	@echo "  test-go      Run Go tests only"
+	@echo "  test-java    Run Java tests only"
 	@echo "  test-js      Run JavaScript tests only"
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"

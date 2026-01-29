@@ -10,6 +10,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 |----------|-----------|--------|
 | **C** | [`c/`](c/) | Production |
 | **Go** | [`go/`](go/) | Production |
+| **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **Python** | [`python/`](python/) | Production |
@@ -72,6 +73,17 @@ cd rust && cargo build --release
 ```rust
 use mpc_designation::convert_simple;
 let result = convert_simple("1995 XA").unwrap();  // Returns "J95X00A"
+```
+
+### Java
+```bash
+cd java && make
+java -cp classes mpc.MPCDesignationCLI '1995 XA'    # Output: J95X00A
+```
+
+```java
+import mpc.MPCDesignation;
+String result = MPCDesignation.convertSimple("1995 XA");  // Returns "J95X00A"
 ```
 
 ### Ruby
@@ -165,6 +177,10 @@ MPC_designations/
 │   ├── mpc/            # Library package
 │   ├── cmd/            # CLI
 │   └── test/           # Test runners
+├── java/
+│   ├── Makefile
+│   ├── src/            # Source code (mpc package)
+│   └── test/           # Test files
 ├── rust/
 │   ├── Cargo.toml      # Rust package definition
 │   ├── Makefile
@@ -190,6 +206,7 @@ make test-all
 # Run tests for a specific language
 make test-c
 make test-go
+make test-java
 make test-js
 make test-perl
 make test-python
