@@ -60,6 +60,28 @@ class MPCDesignationError(Exception):
     pass
 
 
+def validate_whitespace(s: str) -> None:
+    """
+    Validate whitespace in a designation string.
+    Raises MPCDesignationError if:
+    - Contains non-printing characters (except space)
+    - Contains tabs
+    - Contains consecutive spaces
+    """
+    prev_space = False
+    for c in s:
+        # Reject non-printing characters except space
+        if ord(c) < 32 or ord(c) > 126:
+            raise MPCDesignationError(f"Invalid character in designation: {repr(c)}")
+        # Reject consecutive spaces
+        if c == ' ':
+            if prev_space:
+                raise MPCDesignationError("Consecutive spaces in designation")
+            prev_space = True
+        else:
+            prev_space = False
+
+
 # =============================================================================
 # Base-62 encoding utilities
 # =============================================================================
@@ -362,14 +384,14 @@ def pack_provisional(unpacked: str) -> str:
     unpacked = unpacked.strip()
 
     # Check for survey designations
-    match = re.match(r'^(\d+)\s+(P-L|T-[123])$', unpacked)
+    match = re.match(r'^(\d+) (P-L|T-[123])$', unpacked)
     if match:
         number = int(match.group(1))
         survey = match.group(2)
         return f"{SURVEY_UNPACKED_TO_PACKED[survey]}{number:04d}"
 
     # Check for old-style designation: "A908 CJ" or "B842 FA"
-    match = re.match(r'^[AB](\d)(\d{2})\s+([A-Z])([A-Z])$', unpacked)
+    match = re.match(r'^[AB](\d)(\d{2}) ([A-Z])([A-Z])$', unpacked)
     if match:
         century_digit = match.group(1)
         year_short = match.group(2)
@@ -390,7 +412,7 @@ def pack_provisional(unpacked: str) -> str:
         return f"{century_code}{year_short}{half_month}00{second_letter}"
 
     # Match standard provisional: "1995 XA" or "1995 XA12"
-    match = re.match(r'^(\d{4})\s+([A-Z])([A-Z])(\d*)$', unpacked)
+    match = re.match(r'^(\d{4}) ([A-Z])([A-Z])(\d*)$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked provisional designation: {unpacked}")
 
@@ -468,7 +490,7 @@ def pack_comet_provisional(unpacked: str) -> str:
     unpacked = unpacked.strip()
 
     # Match provisional comet: "1995 O1" or "1995 O1-B" or "1930 J1-AA"
-    match = re.match(r'^(\d{4})\s+([A-Z])(\d+)(?:-([A-Z]{1,2}))?$', unpacked)
+    match = re.match(r'^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked comet provisional designation: {unpacked}")
 
@@ -578,7 +600,7 @@ def pack_satellite(unpacked: str) -> str:
     """
     unpacked = unpacked.strip()
 
-    match = re.match(r'^S/(\d{4})\s+([JSUN])\s+(\d+)$', unpacked)
+    match = re.match(r'^S/(\d{4}) ([JSUN]) (\d+)$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked satellite designation: {unpacked}")
 
@@ -724,7 +746,7 @@ def is_asteroid_style_unpacked(provisional: str) -> bool:
     """Check if an unpacked provisional uses asteroid-style (letter after half-month)."""
     # Comet-style: "1995 O1" - half-month followed by digit
     # Asteroid-style: "2006 AH2" - half-month followed by letter
-    match = re.match(r'^\d{4}\s+([A-Z])(.)', provisional)
+    match = re.match(r'^\d{4} ([A-Z])(.)', provisional)
     if match:
         second_char = match.group(2)
         return second_char.isalpha()
@@ -791,7 +813,7 @@ def pack_comet_full(unpacked: str) -> str:
     unpacked = unpacked.strip()
 
     # Match: optional number, type, slash, year, provisional
-    match = re.match(r'^(\d*)([PCDXAI])/(-?\d+)\s+(.+)$', unpacked)
+    match = re.match(r'^(\d*)([PCDXAI])/(-?\d+) (.+)$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked comet designation: {unpacked}")
 
@@ -888,6 +910,9 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     des = designation.strip()
 
+    # Validate whitespace (no tabs, no consecutive spaces, printable only)
+    validate_whitespace(des)
+
     # Check for packed satellite designation (8 chars starting with S)
     if len(des) == 8 and des[0] == 'S':
         if re.match(r'^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$', des):
@@ -956,7 +981,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
     # --- UNPACKED FORMATS ---
 
     # Check for unpacked satellite: "S/2019 S 22"
-    if re.match(r'^S/\d{4}\s+[JSUN]\s+\d+$', des):
+    if re.match(r'^S/\d{4} [JSUN] \d+$', des):
         result['format'] = 'unpacked'
         result['type'] = 'satellite'
         result['subtype'] = 'natural satellite provisional'
@@ -970,29 +995,29 @@ def detect_format(designation: str) -> Dict[str, Any]:
         return result
 
     # Check for unpacked survey designation: "2040 P-L" or "3138 T-1"
-    if re.match(r'^\d+\s+(P-L|T-[123])$', des):
+    if re.match(r'^\d+ (P-L|T-[123])$', des):
         result['format'] = 'unpacked'
         result['type'] = 'survey'
         result['subtype'] = 'survey designation'
         return result
 
     # Check for old-style asteroid designation: "A908 CJ"
-    if re.match(r'^[AB]\d{3}\s+[A-Z][A-Z]$', des):
+    if re.match(r'^[AB]\d{3} [A-Z][A-Z]$', des):
         result['format'] = 'unpacked'
         result['type'] = 'provisional'
         result['subtype'] = 'provisional (old-style pre-1925)'
         return result
 
     # Check for unpacked provisional asteroid: "1995 XA" or "2024 AB12"
-    if re.match(r'^\d{4}\s+[A-Z][A-Z]\d*$', des):
+    if re.match(r'^\d{4} [A-Z][A-Z]\d*$', des):
         result['format'] = 'unpacked'
         result['type'] = 'provisional'
         result['subtype'] = 'provisional'
         return result
 
     # Check for unpacked comet with type prefix
-    if re.match(r'^(\d*)([PCDXAI])/(-?\d+)\s+([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$', des):
-        match = re.match(r'^(\d*)([PCDXAI])/(-?\d+)\s+([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$', des)
+    if re.match(r'^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$', des):
+        match = re.match(r'^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$', des)
         num = match.group(1)
         ctype = match.group(2)
         year = int(match.group(3))

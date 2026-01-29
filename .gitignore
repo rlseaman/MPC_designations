@@ -1,6 +1,7 @@
 # Large uncompressed test data files
 *.csv
 !*.csv.gz
+!error_test_cases.csv
 
 # Claude Code settings
 .claude/
@@ -12,4 +13,5 @@ __pycache__/
 # C build artifacts
 mpc_designation_c
 test_csv_c
+test_errors_c
 *.o

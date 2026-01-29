@@ -1,0 +1,111 @@
+category,subcategory,input,expected_error,description
+# Whitespace Errors
+whitespace,double_space,1995  XA,format,Double space between year and letters
+whitespace,triple_space,1995   XA,format,Triple space between year and letters
+whitespace,missing_space,1995XA,format,Missing space between year and letters
+whitespace,tab_instead,1995	XA,format,Tab character instead of space
+whitespace,leading_tab,	1995 XA,format,Leading tab character
+whitespace,trailing_tab,1995 XA	,format,Trailing tab character
+whitespace,newline,1995\nXA,format,Newline in designation
+whitespace,carriage_return,1995\rXA,format,Carriage return in designation
+whitespace,form_feed,1995\fXA,format,Form feed in designation
+whitespace,vertical_tab,1995\vXA,format,Vertical tab character
+whitespace,double_space_survey,2040  P-L,format,Double space in survey designation
+whitespace,missing_space_survey,2040P-L,format,Missing space in survey designation
+whitespace,double_space_satellite,S/2019  S  22,format,Double spaces in satellite designation
+whitespace,double_space_comet,C/1995  O1,format,Double space in comet designation
+whitespace,double_space_old_style,A908  CJ,format,Double space in old-style designation
+# Invalid Characters - Non-printable ASCII
+invalid_char,null_byte,1995\x00XA,format,Null byte in designation
+invalid_char,bell,1995\x07XA,format,Bell character in designation
+invalid_char,backspace,1995\x08XA,format,Backspace character in designation
+invalid_char,escape,1995\x1bXA,format,Escape character in designation
+invalid_char,delete,1995\x7fXA,format,Delete character (127)
+invalid_char,control_char,1995\x01XA,format,Control character (SOH)
+invalid_char,control_z,1995\x1aXA,format,Control-Z (EOF marker)
+# Invalid Characters - Extended ASCII and Unicode
+invalid_char,extended_ascii,1995\x80XA,format,Extended ASCII character (128)
+invalid_char,high_ascii,1995\xffXA,format,High ASCII character (255)
+invalid_char,nbsp,1995\xa0XA,format,Non-breaking space (160)
+invalid_char,unicode_space,1995 XA,format,Unicode em space (U+2003)
+# Out of Bounds - Asteroid Numbers
+out_of_bounds,asteroid_zero,0,range,Asteroid number zero
+out_of_bounds,asteroid_negative,-1,range,Negative asteroid number
+out_of_bounds,asteroid_max_plus_one,15396336,range,Asteroid number above maximum (15396335)
+out_of_bounds,asteroid_huge,99999999,range,Very large asteroid number
+out_of_bounds,asteroid_overflow,12345678901234567890,range,Number causing overflow
+out_of_bounds,packed_above_max,~{000,range,Packed format above maximum (15396336)
+boundary,packed_at_max,~zzzz,valid,Packed format at maximum (15396335)
+# Out of Bounds - Years
+out_of_bounds,year_future,3000 XA,range,Year too far in future
+out_of_bounds,year_invalid_century,M00X00A,format,Invalid century code M
+out_of_bounds,year_zero,0000 XA,format,Year zero (invalid)
+# Out of Bounds - Cycle Counts
+out_of_bounds,cycle_huge,1995 XA999999,range,Cycle count too large
+out_of_bounds,cycle_overflow,1995 XA12345678901234567890,range,Cycle count overflow
+# Out of Bounds - Comet Order Numbers
+out_of_bounds,comet_order_huge,C/1995 A999999,range,Comet order number too large
+out_of_bounds,comet_order_zero,C/1995 A0,format,Comet order number zero
+# Format Errors - Invalid Patterns
+format,empty_string,,format,Empty string
+format,only_whitespace,   ,format,Only whitespace
+format,random_text,hello world,format,Random text not a designation
+format,partial_year,199 XA,format,Incomplete year
+format,year_too_long,19950 XA,format,Year with extra digit
+format,letters_lowercase,1995 xa,format,Lowercase letters in provisional
+format,mixed_case_letters,1995 Xa,format,Mixed case in second letter
+format,invalid_half_month,1995 IA,format,Letter I as half-month (not used)
+format,invalid_second_letter,1995 X1,format,Digit as second letter
+format,three_letters,1995 XAB,format,Three letters no cycle
+# Format Errors - Invalid Packed Formats
+format,packed_wrong_length,J95X00,format,Packed provisional wrong length
+format,packed_invalid_century,M95X00A,format,Invalid century code in packed
+format,packed_invalid_char,J95X0!A,format,Invalid character in packed
+format,packed_lowercase_century,j95X00A,format,Lowercase century code
+# Format Errors - Comet Designations
+format,comet_invalid_type,Q/1995 O1,format,Invalid comet type Q
+format,comet_missing_slash,C1995 O1,format,Missing slash in comet
+format,comet_double_slash,C//1995 O1,format,Double slash in comet
+format,comet_no_year,C/ O1,format,Comet missing year
+format,comet_no_provisional,C/1995,format,Comet missing provisional part
+format,comet_invalid_fragment,C/1995 O1-123,format,Invalid fragment (numeric)
+format,comet_long_fragment,C/1995 O1-ABC,format,Fragment too long
+# Format Errors - Satellite Designations
+format,satellite_invalid_planet,S/2019 X 1,format,Invalid planet code X
+format,satellite_missing_number,S/2019 J,format,Satellite missing number
+format,satellite_zero_number,S/2019 J 0,format,Satellite number zero
+format,satellite_negative,S/2019 J -1,format,Satellite negative number
+# Format Errors - Survey Designations
+format,survey_invalid_code,2040 X-L,format,Invalid survey code
+format,survey_invalid_number,2040 T-4,format,Invalid survey number (T-4)
+format,survey_zero,0 P-L,format,Survey number zero
+format,survey_negative,-1 P-L,format,Survey number negative
+# Format Errors - Old Style Designations
+format,old_style_invalid_prefix,C908 CJ,format,Invalid prefix (C instead of A/B)
+format,old_style_wrong_length,A90 CJ,format,Old style wrong length
+format,old_style_lowercase,a908 CJ,format,Lowercase prefix
+# Format Errors - Numbered Comets
+format,numbered_comet_zero,0P,format,Comet number zero
+format,numbered_comet_negative,-1P,format,Negative comet number
+format,numbered_comet_invalid_type,1Q,format,Invalid comet type in numbered
+# Edge Cases
+edge_case,very_long_string,1234567890123456789012345678901234567890,format,String too long to be valid
+edge_case,special_chars_only,!@#$%^&*(),format,Only special characters
+edge_case,sql_injection,1; DROP TABLE--,format,SQL injection attempt
+edge_case,path_traversal,../../../etc/passwd,format,Path traversal attempt
+edge_case,html_tags,<script>alert(1)</script>,format,HTML/JS injection
+edge_case,null_middle,1995\x00 XA,format,Null byte in middle
+edge_case,unicode_lookalike,１９９５ ＸＡ,format,Unicode fullwidth characters
+edge_case,mixed_encoding,1995 XА,format,Cyrillic A lookalike
+# Boundary Conditions
+boundary,min_asteroid,1,valid,Minimum valid asteroid number
+boundary,max_asteroid,15396335,valid,Maximum valid asteroid number
+boundary,max_simple,99999,valid,Maximum simple packed (5 digits)
+boundary,min_extended,100000,valid,Minimum extended (A0000)
+boundary,max_extended,619999,valid,Maximum extended before tilde
+boundary,min_tilde,620000,valid,Minimum tilde format
+boundary,max_tilde,15396335,valid,Maximum tilde format
+boundary,min_year,1000 AA,valid,Minimum standard year
+boundary,max_standard_year,2199 ZZ,valid,Maximum standard year (century L)
+boundary,ancient_comet,C/240 V1,valid,Ancient year comet (< 1000 CE)
+boundary,bce_comet,C/-146 P1,valid,BCE year comet

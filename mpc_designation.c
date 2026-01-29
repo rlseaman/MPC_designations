@@ -140,6 +140,32 @@ static void trim(char *s) {
     while (end >= s && isspace((unsigned char)*end)) *end-- = '\0';
 }
 
+/*
+ * Validate whitespace in a string:
+ * - Reject non-printing characters (except space)
+ * - Reject tabs
+ * - Reject consecutive spaces
+ * Returns MPC_OK if valid, MPC_ERR_FORMAT if invalid
+ */
+static int validate_whitespace(const char *s) {
+    int prev_space = 0;
+    for (const char *p = s; *p; p++) {
+        unsigned char c = (unsigned char)*p;
+        /* Reject non-printing characters except space */
+        if (c < 32 || c > 126) {
+            return MPC_ERR_FORMAT;
+        }
+        /* Reject consecutive spaces */
+        if (c == ' ') {
+            if (prev_space) return MPC_ERR_FORMAT;
+            prev_space = 1;
+        } else {
+            prev_space = 0;
+        }
+    }
+    return MPC_OK;
+}
+
 /* ========================================================================= */
 /* Permanent (numbered) asteroid designations                                */
 /* ========================================================================= */
@@ -949,6 +975,11 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     trim(buf);
     size_t len = strlen(buf);
 
+    /* Validate whitespace (no tabs, no consecutive spaces, printable only) */
+    if (validate_whitespace(buf) != MPC_OK) {
+        return MPC_ERR_FORMAT;
+    }
+
     /* Check for packed satellite */
     if (len == 8 && buf[0] == 'S' && buf[1] >= 'A' && buf[1] <= 'L') {
         info->format = MPC_FORMAT_PACKED;
@@ -1074,10 +1105,13 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Check for unpacked provisional asteroid */
+    /* Check for unpacked provisional asteroid: "1995 XA" or "2024 AB12" */
+    /* Must have exactly one space after 4-digit year */
     int year;
     char letters[16];
-    if (sscanf(buf, "%4d %15s", &year, letters) == 2) {
+    if (len >= 7 && isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
+        buf[4] == ' ' && isupper(buf[5]) &&
+        sscanf(buf, "%4d %15s", &year, letters) == 2) {
         if (strlen(letters) >= 2 && isupper(letters[0]) && isupper(letters[1])) {
             /* Could be provisional asteroid */
             int has_only_digits_after = 1;
@@ -1098,8 +1132,8 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     char comet_type;
     char prov[32];
 
-    /* Try with number: "1P/1982 U1" */
-    if (sscanf(buf, "%d%c/%d %31s", &comet_num, &comet_type, &year, prov) == 4) {
+    /* Try with number: "1P/1982 U1" - must have space before provisional */
+    if (strchr(buf, ' ') && sscanf(buf, "%d%c/%d %31s", &comet_num, &comet_type, &year, prov) == 4) {
         if (is_comet_type(comet_type)) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_FULL;
@@ -1108,8 +1142,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Try without number: "C/1995 O1" */
-    if (sscanf(buf, "%c/%d %31s", &comet_type, &year, prov) == 3) {
+    /* Try without number: "C/1995 O1" - must have space before provisional */
+    /* Find the space position to validate format */
+    const char *space_pos = strchr(buf, ' ');
+    if (space_pos && sscanf(buf, "%c/%d %31s", &comet_type, &year, prov) == 3) {
         if (is_comet_type(comet_type)) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_FULL;
