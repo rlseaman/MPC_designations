@@ -7,6 +7,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 Available implementations:
 - **TCL** (`mpc_designation.tcl`) - Original implementation
 - **Python** (`mpc_designation.py`) - Python 3 port
+- **C** (`mpc_designation.c/h`) - C99 library with CLI
 
 ## Usage
 
@@ -30,7 +31,26 @@ result = convert_simple('1995 XA')  # Returns 'J95X00A'
 result = convert('1995 XA')         # Returns dict with input, output, info
 ```
 
-Both programs auto-detect whether input is packed or unpacked and convert to the other format.
+### C
+```bash
+# Build
+make
+
+# CLI usage
+./mpc_designation_c <designation> [designation ...]
+./mpc_designation_c -v <designation>   # verbose output
+```
+
+```c
+// As a library
+#include "mpc_designation.h"
+
+char output[MPC_MAX_UNPACKED];
+int err = mpc_convert_simple("1995 XA", output, sizeof(output));
+// output now contains "J95X00A"
+```
+
+All implementations auto-detect whether input is packed or unpacked and convert to the other format.
 
 ## Examples
 
@@ -118,6 +138,10 @@ tclsh test_csv.tcl prov_unpack_to_pack.csv
 
 # Python (~8 seconds)
 python3 test_csv.py prov_unpack_to_pack.csv
+
+# C (~1.2 seconds)
+make test
+# or: ./test_csv_c prov_unpack_to_pack.csv
 ```
 
 Expected output:
