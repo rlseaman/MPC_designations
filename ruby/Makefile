@@ -1,0 +1,35 @@
+# Makefile for MPC Designation Converter (Ruby implementation)
+
+RUBY = ruby
+
+TEST_DATA = ../test-data
+
+.PHONY: all test test-csv test-roundtrip test-all
+
+# Default: run tests
+all: test
+
+# Run conversion tests
+test: test-csv
+
+test-csv:
+	@if [ ! -f $(TEST_DATA)/prov_unpack_to_pack.csv ]; then \
+		echo "Decompressing test data..."; \
+		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
+	fi
+	$(RUBY) test/test_csv.rb $(TEST_DATA)/prov_unpack_to_pack.csv
+
+# Run bidirectional and round-trip tests
+test-roundtrip:
+	@if [ ! -f $(TEST_DATA)/prov_unpack_to_pack.csv ]; then \
+		echo "Decompressing test data..."; \
+		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
+	fi
+	$(RUBY) test/test_roundtrip.rb $(TEST_DATA)/prov_unpack_to_pack.csv
+
+# Run all tests
+test-all: test test-roundtrip
+
+# Clean (nothing to clean for Ruby)
+clean:
+	@echo "Nothing to clean for Ruby implementation"
