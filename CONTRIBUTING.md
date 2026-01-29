@@ -1,108 +1,63 @@
 # Contributing to MPC Designations
 
-Thank you for your interest in contributing to MPC Designations!
+Thank you for your interest in MPC Designations!
 
-## Adding a New Language Implementation
+## How This Project Works
 
-We welcome implementations in new programming languages. Here's how to add one:
+This project provides MPC designation converters in multiple programming languages. Rather than accepting code contributions directly, the maintainer implements new languages and features based on community feedback.
 
-### 1. Create the Directory Structure
+**To suggest a new language implementation or feature:**
+1. Open a GitHub issue describing your needs
+2. Explain your use case and why the language/feature would be valuable
+3. The maintainer will evaluate and implement suitable suggestions
 
-```
-your-language/
-├── README.md           # Language-specific documentation
-├── src/                # Source code
-│   └── mpc_designation.*
-├── test/               # Test files
-│   ├── test_csv.*      # Conversion test runner
-│   └── test_errors.*   # Error handling test runner
-└── examples/           # Usage examples
-    └── example_usage.*
-```
+This approach ensures consistency across all implementations and maintains the test coverage and validation standards the project requires.
 
-### 2. Implement Core Functions
-
-Your implementation must provide these functions:
-
-#### `convert_simple(designation) -> string`
-- Takes a designation string (packed or unpacked)
-- Returns the converted designation (unpacked or packed)
-- Throws/raises an error for invalid input
-
-#### `convert(designation) -> info_dict`
-- Takes a designation string
-- Returns a dictionary/struct with:
-  - `input`: Original input
-  - `output`: Converted designation
-  - `format`: "packed" or "unpacked"
-  - `subtype`: Description (e.g., "provisional asteroid")
-
-### 3. Pass All Tests
-
-Your implementation must pass:
-
-1. **Conversion tests** (`test_csv`): All 2,021,090 test cases in `test-data/prov_unpack_to_pack.csv.gz`
-2. **Error tests** (`test_errors`): All error cases in `test-data/error_test_cases.csv`
-
-### 4. Document Your Implementation
-
-Create a `README.md` in your language directory with:
-
-1. **Quick Start** - Minimal steps to use
-2. **Installation** - How to set up
-3. **CLI Usage** - Command-line examples
-4. **Library/API Usage** - Integration examples
-5. **Building** - Compilation/setup steps
-6. **Testing** - How to run tests
-
-### 5. Add CI/CD
-
-Update `.github/workflows/test.yml` to include your language:
-
-```yaml
-test-your-language:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: actions/checkout@v4
-    - name: Set up your-language
-      # Add setup steps
-    - name: Test your-language
-      run: |
-        cd your-language
-        # Run your tests
-```
-
-## Reporting Issues
+## Reporting Bugs
 
 When reporting bugs, please include:
 
 1. The input designation that caused the problem
 2. Expected output
 3. Actual output or error message
-4. Which language implementation
+4. Which language implementation you're using
+5. Your environment (OS, language version)
 
-## Code Style
+## Suggesting New Languages
 
-- Follow the conventions of each language
-- Keep code readable and well-commented
-- Match the structure of existing implementations
-- Avoid dependencies where possible
+When suggesting a new language, it helps to explain:
 
-## Testing Locally
+1. Your use case (astronomy pipeline, database integration, web application, etc.)
+2. Whether you need the full implementation or just asteroid provisionals
+3. Any specific API requirements for your environment
 
-Before submitting, run all tests:
+## Suggesting Features
 
-```bash
-# C
-cd c && make test-all
+Feature suggestions are welcome! Some examples of useful suggestions:
 
-# Python
-cd python && python test/test_errors.py ../test-data/error_test_cases.csv
+- "I need a function that validates without converting"
+- "It would help to have batch processing for large files"
+- "A streaming API would work better for my use case"
 
-# TCL
-cd tcl && tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
-```
+## Using the Code
+
+All code is released under CC0 1.0 Universal (Public Domain). You may:
+
+- Use it in any project (commercial or otherwise)
+- Modify it for your needs
+- Include it in your own software
+- Use it without attribution (though attribution is appreciated)
+
+## Project Standards
+
+All implementations must:
+
+1. Pass all 2,021,090+ conversion test cases
+2. Pass all error handling test cases
+3. Provide consistent APIs across languages where idiomatic
+4. Include CLI tools for command-line use
+5. Support both packed and unpacked format detection
 
 ## Questions?
 
-Open an issue for questions about contributing.
+Open an issue for questions about using the library or suggestions for improvements.

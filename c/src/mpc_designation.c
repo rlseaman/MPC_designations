@@ -1396,3 +1396,224 @@ const char *mpc_strerror(int errcode) {
 const char *mpc_version(void) {
     return MPC_VERSION;
 }
+
+/* ========================================================================= */
+/* High-level pack/unpack functions                                          */
+/* ========================================================================= */
+
+int mpc_pack(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (info.format == MPC_FORMAT_PACKED) {
+        /* Already packed - copy and normalize */
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    /* Convert from unpacked to packed */
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_unpack(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        /* Already unpacked - copy and normalize */
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    /* Convert from packed to unpacked */
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+/* ========================================================================= */
+/* Category-specific pack/unpack functions                                   */
+/* ========================================================================= */
+
+static int is_asteroid_type(mpc_type_t type) {
+    return type == MPC_TYPE_PERMANENT ||
+           type == MPC_TYPE_PROVISIONAL ||
+           type == MPC_TYPE_PROVISIONAL_EXTENDED ||
+           type == MPC_TYPE_SURVEY;
+}
+
+static int is_comet_type_enum(mpc_type_t type) {
+    return type == MPC_TYPE_COMET_NUMBERED ||
+           type == MPC_TYPE_COMET_PROVISIONAL ||
+           type == MPC_TYPE_COMET_FULL ||
+           type == MPC_TYPE_COMET_ANCIENT ||
+           type == MPC_TYPE_COMET_BCE;
+}
+
+int mpc_pack_asteroid(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (!is_asteroid_type(info.type)) {
+        return MPC_ERR_FORMAT;  /* Not an asteroid */
+    }
+
+    if (info.format == MPC_FORMAT_PACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_unpack_asteroid(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (!is_asteroid_type(info.type)) {
+        return MPC_ERR_FORMAT;  /* Not an asteroid */
+    }
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_pack_comet(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (!is_comet_type_enum(info.type)) {
+        return MPC_ERR_FORMAT;  /* Not a comet */
+    }
+
+    if (info.format == MPC_FORMAT_PACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_unpack_comet(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (!is_comet_type_enum(info.type)) {
+        return MPC_ERR_FORMAT;  /* Not a comet */
+    }
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_pack_satellite(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (info.type != MPC_TYPE_SATELLITE) {
+        return MPC_ERR_FORMAT;  /* Not a satellite */
+    }
+
+    if (info.format == MPC_FORMAT_PACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_unpack_satellite(const char *input, char *output, size_t outlen) {
+    mpc_info_t info;
+    int err = mpc_detect_format(input, &info);
+    if (err != MPC_OK) return err;
+
+    if (info.type != MPC_TYPE_SATELLITE) {
+        return MPC_ERR_FORMAT;  /* Not a satellite */
+    }
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        char buf[MPC_MAX_UNPACKED];
+        strncpy(buf, input, sizeof(buf) - 1);
+        buf[sizeof(buf) - 1] = '\0';
+        trim(buf);
+        if (strlen(buf) >= outlen) return MPC_ERR_BUFFER;
+        strcpy(output, buf);
+        return MPC_OK;
+    }
+
+    return mpc_convert(input, output, outlen, NULL);
+}
+
+/* ========================================================================= */
+/* Validation functions                                                      */
+/* ========================================================================= */
+
+int mpc_is_valid(const char *input) {
+    if (input == NULL) return 0;
+    mpc_info_t info;
+    return mpc_detect_format(input, &info) == MPC_OK ? 1 : 0;
+}
+
+int mpc_is_valid_chars(const char *input) {
+    if (input == NULL) return 0;
+    for (const char *p = input; *p; p++) {
+        char c = *p;
+        /* Valid characters: A-Z, a-z, 0-9, space, /, -, ~, _, . */
+        if (!((c >= 'A' && c <= 'Z') ||
+              (c >= 'a' && c <= 'z') ||
+              (c >= '0' && c <= '9') ||
+              c == ' ' || c == '/' || c == '-' ||
+              c == '~' || c == '_' || c == '.')) {
+            return 0;
+        }
+    }
+    return 1;
+}

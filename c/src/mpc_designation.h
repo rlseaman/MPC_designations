@@ -5,6 +5,29 @@
  * https://www.minorplanetcenter.net/iau/info/PackedDes.html
  *
  * Supports asteroids, comets, and natural satellites.
+ *
+ * =============================================================================
+ * API OVERVIEW
+ * =============================================================================
+ *
+ * High-level (auto-detect type, idempotent):
+ *   mpc_pack()           - Ensure packed format
+ *   mpc_unpack()         - Ensure unpacked format
+ *   mpc_convert_simple() - Flip between formats
+ *
+ * Category-specific (for known input types):
+ *   mpc_pack_asteroid()   / mpc_unpack_asteroid()
+ *   mpc_pack_comet()      / mpc_unpack_comet()
+ *   mpc_pack_satellite()  / mpc_unpack_satellite()
+ *
+ * Validation:
+ *   mpc_is_valid()         - Check if valid (no error output)
+ *   mpc_is_valid_chars()   - Check character set only
+ *   mpc_detect_format()    - Full format detection
+ *
+ * Low-level (for advanced use):
+ *   mpc_pack_permanent()   / mpc_unpack_permanent()
+ *   mpc_pack_provisional() / mpc_unpack_provisional()
  */
 
 #ifndef MPC_DESIGNATION_H
@@ -61,6 +84,40 @@ typedef struct {
     char subtype[64];
 } mpc_info_t;
 
+/* =============================================================================
+ * HIGH-LEVEL FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * Ensure a designation is in packed format.
+ * If already packed, copies as-is (after validation).
+ * If unpacked, converts to packed format.
+ *
+ * Parameters:
+ *   input  - Input designation (packed or unpacked)
+ *   output - Buffer to receive packed designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_pack(const char *input, char *output, size_t outlen);
+
+/*
+ * Ensure a designation is in unpacked (human-readable) format.
+ * If already unpacked, copies as-is (after validation).
+ * If packed, converts to unpacked format.
+ *
+ * Parameters:
+ *   input  - Input designation (packed or unpacked)
+ *   output - Buffer to receive unpacked designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_unpack(const char *input, char *output, size_t outlen);
+
 /*
  * Convert a designation between packed and unpacked formats.
  * Auto-detects the input format and converts to the other.
@@ -90,6 +147,118 @@ int mpc_convert(const char *input, char *output, size_t outlen, mpc_info_t *info
  */
 int mpc_convert_simple(const char *input, char *output, size_t outlen);
 
+/* =============================================================================
+ * CATEGORY-SPECIFIC FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * Pack an asteroid designation (permanent or provisional).
+ * Use when you know the input is an asteroid (not comet/satellite).
+ *
+ * Parameters:
+ *   input  - Asteroid designation (e.g., "1", "1995 XA", "00001", "J95X00A")
+ *   output - Buffer to receive packed designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not an asteroid
+ */
+int mpc_pack_asteroid(const char *input, char *output, size_t outlen);
+
+/*
+ * Unpack an asteroid designation (permanent or provisional).
+ *
+ * Parameters:
+ *   input  - Packed asteroid designation
+ *   output - Buffer to receive unpacked designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not an asteroid
+ */
+int mpc_unpack_asteroid(const char *input, char *output, size_t outlen);
+
+/*
+ * Pack a comet designation (numbered, provisional, or full).
+ *
+ * Parameters:
+ *   input  - Comet designation (e.g., "1P", "C/1995 O1")
+ *   output - Buffer to receive packed designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not a comet
+ */
+int mpc_pack_comet(const char *input, char *output, size_t outlen);
+
+/*
+ * Unpack a comet designation.
+ *
+ * Parameters:
+ *   input  - Packed comet designation
+ *   output - Buffer to receive unpacked designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not a comet
+ */
+int mpc_unpack_comet(const char *input, char *output, size_t outlen);
+
+/*
+ * Pack a satellite designation.
+ *
+ * Parameters:
+ *   input  - Satellite designation (e.g., "S/2019 S 22")
+ *   output - Buffer to receive packed designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not a satellite
+ */
+int mpc_pack_satellite(const char *input, char *output, size_t outlen);
+
+/*
+ * Unpack a satellite designation.
+ *
+ * Parameters:
+ *   input  - Packed satellite designation
+ *   output - Buffer to receive unpacked designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if not a satellite
+ */
+int mpc_unpack_satellite(const char *input, char *output, size_t outlen);
+
+/* =============================================================================
+ * VALIDATION FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * Check if a string is a valid MPC designation.
+ * This function never produces error output - just returns 0 or 1.
+ *
+ * Parameters:
+ *   input - String to validate
+ *
+ * Returns:
+ *   1 if valid, 0 if invalid
+ */
+int mpc_is_valid(const char *input);
+
+/*
+ * Check if a string contains only valid MPC designation characters.
+ * Valid characters are: A-Z, a-z, 0-9, space, /, -, ~, _, .
+ * This is a fast pre-check before attempting conversion.
+ *
+ * Parameters:
+ *   input - String to check
+ *
+ * Returns:
+ *   1 if all characters are valid, 0 otherwise
+ */
+int mpc_is_valid_chars(const char *input);
+
 /*
  * Detect the format and type of a designation.
  *
@@ -101,6 +270,10 @@ int mpc_convert_simple(const char *input, char *output, size_t outlen);
  *   MPC_OK on success, MPC_ERR_FORMAT if unrecognized
  */
 int mpc_detect_format(const char *input, mpc_info_t *info);
+
+/* =============================================================================
+ * LOW-LEVEL FUNCTIONS
+ * ============================================================================= */
 
 /*
  * Pack a permanent (numbered) asteroid designation.
@@ -152,6 +325,10 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen);
  *   MPC_OK on success, error code on failure
  */
 int mpc_unpack_provisional(const char *packed, char *output, size_t outlen);
+
+/* =============================================================================
+ * UTILITY FUNCTIONS
+ * ============================================================================= */
 
 /*
  * Get a human-readable error message.

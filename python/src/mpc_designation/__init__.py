@@ -2,26 +2,109 @@
 MPC Designation Converter - Convert between packed and unpacked MPC designations
 
 Usage:
-    from mpc_designation import convert, convert_simple, MPCDesignationError
+    from mpc_designation import convert_simple, pack, unpack
 
+    # Auto-detect and flip format
     result = convert_simple('1995 XA')  # Returns 'J95X00A'
-    result = convert('1995 XA')         # Returns dict with input, output, info
+    result = convert_simple('J95X00A')  # Returns '1995 XA'
+
+    # Ensure specific format (idempotent)
+    packed = pack('1995 XA')     # Returns 'J95X00A'
+    packed = pack('J95X00A')     # Returns 'J95X00A' (already packed)
+    unpacked = unpack('J95X00A') # Returns '1995 XA'
+    unpacked = unpack('1995 XA') # Returns '1995 XA' (already unpacked)
+
+    # Validation without exceptions
+    if is_valid_designation(user_input):
+        result = convert_simple(user_input)
+
+    # Category-specific (for known input types)
+    packed = pack_asteroid('1995 XA')
+    packed = pack_comet('C/1995 O1')
 """
 
 import os as _os
 
 from .mpc_designation import (
+    # Core conversion functions
     convert,
     convert_simple,
-    MPCDesignationError,
+
+    # High-level pack/unpack (auto-detect, idempotent)
+    pack,
+    unpack,
+
+    # Category-specific pack/unpack
+    pack_asteroid,
+    unpack_asteroid,
+    pack_comet,
+    unpack_comet,
+    pack_satellite_designation,
+    unpack_satellite_designation,
+
+    # Validation and hygiene
     detect_format,
+    is_valid_designation,
+    is_valid_mpc_chars,
+    sanitize,
+
+    # Low-level functions (for advanced use)
+    pack_permanent,
+    unpack_permanent,
+    pack_provisional,
+    unpack_provisional,
+    pack_comet_numbered,
+    unpack_comet_numbered,
+    pack_comet_provisional,
+    unpack_comet_provisional,
+    pack_comet_full,
+    unpack_comet_full,
+    pack_satellite,
+    unpack_satellite,
+
+    # Exception class
+    MPCDesignationError,
 )
 
 __all__ = [
+    # Core
     'convert',
     'convert_simple',
-    'MPCDesignationError',
+
+    # High-level
+    'pack',
+    'unpack',
+
+    # Category-specific
+    'pack_asteroid',
+    'unpack_asteroid',
+    'pack_comet',
+    'unpack_comet',
+    'pack_satellite_designation',
+    'unpack_satellite_designation',
+
+    # Validation
     'detect_format',
+    'is_valid_designation',
+    'is_valid_mpc_chars',
+    'sanitize',
+
+    # Low-level
+    'pack_permanent',
+    'unpack_permanent',
+    'pack_provisional',
+    'unpack_provisional',
+    'pack_comet_numbered',
+    'unpack_comet_numbered',
+    'pack_comet_provisional',
+    'unpack_comet_provisional',
+    'pack_comet_full',
+    'unpack_comet_full',
+    'pack_satellite',
+    'unpack_satellite',
+
+    # Exception
+    'MPCDesignationError',
 ]
 
 # Read version from root VERSION file

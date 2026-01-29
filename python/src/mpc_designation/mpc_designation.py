@@ -6,6 +6,73 @@ Based on Minor Planet Center specifications:
 https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
 Supports asteroids, comets, and natural satellites.
+
+=============================================================================
+MPC DESIGNATION ENCODING - BACKGROUND
+=============================================================================
+
+The Minor Planet Center uses two formats for designations:
+
+UNPACKED (Human-readable):
+  - "1" through "15396335" for numbered asteroids
+  - "1995 XA", "2024 AB123" for provisional asteroids
+  - "C/1995 O1", "1P" for comets
+  - "S/2019 S 22" for satellites
+
+PACKED (7-12 characters, for data files):
+  - "00001" through "~zzzz" for numbered asteroids
+  - "J95X00A", "K24AC3B" for provisional asteroids
+  - "CJ95O010", "0001P" for comets
+  - "SK19S220" for satellites
+
+WHY THE COMPLEXITY?
+
+The MPC started encoding designations in the 1970s when storage was expensive.
+Over decades, they've extended the scheme multiple times:
+
+1. Original permanent numbers: 5 digits (00001-99999)
+2. Extended permanent: letter prefix (A0000-z9999 = 100000-619999)
+3. Further extended: tilde + base-62 (~0000-~zzzz = 620000-15396335)
+
+4. Original provisional: century code + year + half-month + order + letter
+   - Century codes: I=18xx, J=19xx, K=20xx, L=21xx
+   - Half-month: A-Y excluding I (24 letters for 24 half-months)
+   - Order encoded as 2 chars (00-z9 = 0-619)
+
+5. Extended provisional: underscore format for order >= 620
+   - _YHbbbb where Y=base-62 year digit, H=half-month, bbbb=base-62 sequence
+
+The encoding tries to pack maximum information into fixed-width fields while
+remaining sortable and avoiding ambiguity with existing designations.
+=============================================================================
+
+API OVERVIEW:
+
+High-level (auto-detect type):
+    pack(designation)       -> Always returns packed format
+    unpack(designation)     -> Always returns unpacked format
+    convert_simple(des)     -> Flips between formats
+
+Category-specific (for known input types):
+    pack_asteroid(des)      -> Pack asteroid (permanent or provisional)
+    unpack_asteroid(des)    -> Unpack asteroid
+    pack_comet(des)         -> Pack comet (any type)
+    unpack_comet(des)       -> Unpack comet
+    pack_satellite(des)     -> Pack satellite
+    unpack_satellite(des)   -> Unpack satellite
+
+Validation:
+    is_valid_designation(s) -> bool (no exceptions)
+    is_valid_mpc_chars(s)   -> bool (character set only)
+    sanitize(s)             -> Trimmed, normalized string
+    detect_format(s)        -> dict with format, type, subtype
+
+Low-level (internal, but accessible):
+    pack_permanent(number)
+    unpack_permanent(packed)
+    pack_provisional(unpacked)
+    unpack_provisional(packed)
+    ... etc.
 """
 
 import re
@@ -98,6 +165,73 @@ def validate_whitespace(s: str) -> None:
 def is_valid_half_month(letter: str) -> bool:
     """Check if a letter is a valid half-month letter (A-Y excluding I)."""
     return letter.isalpha() and 'A' <= letter <= 'Y' and letter != 'I'
+
+
+# =============================================================================
+# Input hygiene functions
+# =============================================================================
+
+# Valid characters in MPC designations (after trimming)
+VALID_MPC_CHARS = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 /-~_.')
+
+
+def is_valid_mpc_chars(s: str) -> bool:
+    """
+    Check if a string contains only valid MPC designation characters.
+
+    Valid characters are: A-Z, a-z, 0-9, space, /, -, ~, _, .
+
+    This is a fast pre-check before attempting conversion.
+    Returns True if all characters are valid, False otherwise.
+    """
+    return all(c in VALID_MPC_CHARS for c in s)
+
+
+def is_valid_designation(designation: str) -> bool:
+    """
+    Check if a string is a valid MPC designation (packed or unpacked).
+
+    This function never raises an exception - it returns False for any
+    invalid input. Use this for filtering or validation without try/except.
+
+    Args:
+        designation: The string to validate
+
+    Returns:
+        True if the designation is valid, False otherwise
+    """
+    if not designation or not isinstance(designation, str):
+        return False
+    try:
+        detect_format(designation)
+        return True
+    except (MPCDesignationError, Exception):
+        return False
+
+
+def sanitize(designation: str) -> str:
+    """
+    Sanitize a designation string for processing.
+
+    - Strips leading/trailing whitespace
+    - Validates character set
+    - Returns the cleaned string
+
+    Raises MPCDesignationError if the input contains invalid characters.
+    """
+    if not isinstance(designation, str):
+        raise MPCDesignationError(f"Designation must be a string, got {type(designation)}")
+
+    # Check for invalid characters before trimming
+    validate_raw_input(designation)
+
+    # Trim whitespace
+    result = designation.strip()
+
+    if not result:
+        raise MPCDesignationError("Empty designation")
+
+    return result
 
 
 # =============================================================================
@@ -1171,6 +1305,251 @@ def convert_simple(designation: str) -> str:
     Convert a designation between packed and unpacked formats.
     Returns just the converted string.
     """
+    return convert(designation)['output']
+
+
+# =============================================================================
+# High-level pack/unpack functions
+# =============================================================================
+
+def pack(designation: str) -> str:
+    """
+    Ensure a designation is in packed format.
+
+    If already packed, returns as-is (after validation).
+    If unpacked, converts to packed format.
+
+    This function auto-detects the designation type (asteroid, comet, satellite)
+    and handles it appropriately.
+
+    Args:
+        designation: Any valid MPC designation (packed or unpacked)
+
+    Returns:
+        The designation in packed format
+
+    Raises:
+        MPCDesignationError: If the designation is invalid
+    """
+    info = detect_format(designation)
+
+    if info['format'] == 'packed':
+        # Already packed - return normalized
+        return designation.strip()
+
+    # Convert from unpacked to packed
+    return convert(designation)['output']
+
+
+def unpack(designation: str) -> str:
+    """
+    Ensure a designation is in unpacked (human-readable) format.
+
+    If already unpacked, returns as-is (after validation).
+    If packed, converts to unpacked format.
+
+    This function auto-detects the designation type (asteroid, comet, satellite)
+    and handles it appropriately.
+
+    Args:
+        designation: Any valid MPC designation (packed or unpacked)
+
+    Returns:
+        The designation in unpacked format
+
+    Raises:
+        MPCDesignationError: If the designation is invalid
+    """
+    info = detect_format(designation)
+
+    if info['format'] == 'unpacked':
+        # Already unpacked - return normalized
+        return designation.strip()
+
+    # Convert from packed to unpacked
+    return convert(designation)['output']
+
+
+# =============================================================================
+# Category-specific pack/unpack functions
+# =============================================================================
+
+def pack_asteroid(designation: str) -> str:
+    """
+    Pack an asteroid designation (permanent or provisional).
+
+    Use this when you know the input is an asteroid (not comet/satellite).
+    Provides clearer error messages than the generic pack() function.
+
+    Args:
+        designation: An asteroid designation (e.g., "1", "1995 XA", "00001", "J95X00A")
+
+    Returns:
+        The packed asteroid designation
+
+    Raises:
+        MPCDesignationError: If not a valid asteroid designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] not in ('permanent', 'provisional', 'provisional_extended', 'survey'):
+        raise MPCDesignationError(
+            f"Not an asteroid designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'packed':
+        return designation.strip()
+
+    return convert(designation)['output']
+
+
+def unpack_asteroid(designation: str) -> str:
+    """
+    Unpack an asteroid designation (permanent or provisional).
+
+    Use this when you know the input is an asteroid (not comet/satellite).
+    Provides clearer error messages than the generic unpack() function.
+
+    Args:
+        designation: A packed asteroid designation (e.g., "00001", "J95X00A")
+
+    Returns:
+        The unpacked asteroid designation
+
+    Raises:
+        MPCDesignationError: If not a valid asteroid designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] not in ('permanent', 'provisional', 'provisional_extended', 'survey'):
+        raise MPCDesignationError(
+            f"Not an asteroid designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'unpacked':
+        return designation.strip()
+
+    return convert(designation)['output']
+
+
+def pack_comet(designation: str) -> str:
+    """
+    Pack a comet designation (numbered, provisional, or full).
+
+    Use this when you know the input is a comet (not asteroid/satellite).
+    Provides clearer error messages than the generic pack() function.
+
+    Args:
+        designation: A comet designation (e.g., "1P", "C/1995 O1")
+
+    Returns:
+        The packed comet designation
+
+    Raises:
+        MPCDesignationError: If not a valid comet designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] not in ('comet_numbered', 'comet_provisional', 'comet_full',
+                            'comet_ancient', 'comet_bce'):
+        raise MPCDesignationError(
+            f"Not a comet designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'packed':
+        return designation.strip()
+
+    return convert(designation)['output']
+
+
+def unpack_comet(designation: str) -> str:
+    """
+    Unpack a comet designation (numbered, provisional, or full).
+
+    Use this when you know the input is a comet (not asteroid/satellite).
+    Provides clearer error messages than the generic unpack() function.
+
+    Args:
+        designation: A packed comet designation (e.g., "0001P", "CJ95O010")
+
+    Returns:
+        The unpacked comet designation
+
+    Raises:
+        MPCDesignationError: If not a valid comet designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] not in ('comet_numbered', 'comet_provisional', 'comet_full',
+                            'comet_ancient', 'comet_bce'):
+        raise MPCDesignationError(
+            f"Not a comet designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'unpacked':
+        return designation.strip()
+
+    return convert(designation)['output']
+
+
+# Note: pack_satellite and unpack_satellite already exist as low-level functions.
+# We add these wrappers for API consistency:
+
+def pack_satellite_designation(designation: str) -> str:
+    """
+    Pack a natural satellite designation.
+
+    Use this when you know the input is a satellite (not asteroid/comet).
+    Provides clearer error messages than the generic pack() function.
+
+    Args:
+        designation: A satellite designation (e.g., "S/2019 S 22")
+
+    Returns:
+        The packed satellite designation
+
+    Raises:
+        MPCDesignationError: If not a valid satellite designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] != 'satellite':
+        raise MPCDesignationError(
+            f"Not a satellite designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'packed':
+        return designation.strip()
+
+    return convert(designation)['output']
+
+
+def unpack_satellite_designation(designation: str) -> str:
+    """
+    Unpack a natural satellite designation.
+
+    Use this when you know the input is a satellite (not asteroid/comet).
+    Provides clearer error messages than the generic unpack() function.
+
+    Args:
+        designation: A packed satellite designation (e.g., "SK19S220")
+
+    Returns:
+        The unpacked satellite designation
+
+    Raises:
+        MPCDesignationError: If not a valid satellite designation
+    """
+    info = detect_format(designation)
+
+    if info['type'] != 'satellite':
+        raise MPCDesignationError(
+            f"Not a satellite designation: {designation} (detected as {info['type']})"
+        )
+
+    if info['format'] == 'unpacked':
+        return designation.strip()
+
     return convert(designation)['output']
 
 

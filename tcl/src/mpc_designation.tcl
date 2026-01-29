@@ -1320,6 +1320,204 @@ namespace eval MPCDesignation {
         set result [convert $designation]
         return [dict get $result output]
     }
+
+    # ========================================================================
+    # HIGH-LEVEL PACK/UNPACK FUNCTIONS
+    # ========================================================================
+
+    #
+    # Ensure a designation is in packed format.
+    # If already packed, returns as-is (after validation).
+    # If unpacked, converts to packed format.
+    #
+    proc pack {designation} {
+        set info [detectFormat $designation]
+        if {[dict get $info format] eq "packed"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Ensure a designation is in unpacked format.
+    # If already unpacked, returns as-is (after validation).
+    # If packed, converts to unpacked format.
+    #
+    proc unpack {designation} {
+        set info [detectFormat $designation]
+        if {[dict get $info format] eq "unpacked"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    # ========================================================================
+    # CATEGORY-SPECIFIC PACK/UNPACK FUNCTIONS
+    # ========================================================================
+
+    #
+    # Check if a type is an asteroid type
+    #
+    proc isAsteroidType {type} {
+        return [expr {$type in {permanent provisional provisional_extended survey}}]
+    }
+
+    #
+    # Check if a type is a comet type
+    #
+    proc isCometType {type} {
+        return [expr {$type in {comet_numbered comet_provisional comet_full comet_ancient comet_bce}}]
+    }
+
+    #
+    # Pack an asteroid designation (permanent or provisional).
+    # Throws error if not an asteroid.
+    #
+    proc packAsteroid {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {![isAsteroidType $type]} {
+            error "Not an asteroid designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "packed"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Unpack an asteroid designation (permanent or provisional).
+    # Throws error if not an asteroid.
+    #
+    proc unpackAsteroid {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {![isAsteroidType $type]} {
+            error "Not an asteroid designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "unpacked"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Pack a comet designation.
+    # Throws error if not a comet.
+    #
+    proc packComet {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {![isCometType $type]} {
+            error "Not a comet designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "packed"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Unpack a comet designation.
+    # Throws error if not a comet.
+    #
+    proc unpackComet {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {![isCometType $type]} {
+            error "Not a comet designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "unpacked"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Pack a satellite designation.
+    # Throws error if not a satellite.
+    #
+    proc packSatelliteDesignation {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {$type ne "satellite"} {
+            error "Not a satellite designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "packed"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    #
+    # Unpack a satellite designation.
+    # Throws error if not a satellite.
+    #
+    proc unpackSatelliteDesignation {designation} {
+        set info [detectFormat $designation]
+        set type [dict get $info type]
+        if {$type ne "satellite"} {
+            error "Not a satellite designation: $designation (detected as $type)"
+        }
+        if {[dict get $info format] eq "unpacked"} {
+            return [string trim $designation]
+        }
+        return [convertSimple $designation]
+    }
+
+    # ========================================================================
+    # VALIDATION FUNCTIONS
+    # ========================================================================
+
+    #
+    # Check if a string is a valid MPC designation.
+    # Returns 1 if valid, 0 if invalid (never throws errors).
+    #
+    proc isValid {designation} {
+        if {$designation eq ""} {
+            return 0
+        }
+        if {[catch {detectFormat $designation}]} {
+            return 0
+        }
+        return 1
+    }
+
+    #
+    # Check if a string contains only valid MPC designation characters.
+    # Valid characters are: A-Z, a-z, 0-9, space, /, -, ~, _, .
+    # Returns 1 if all characters are valid, 0 otherwise.
+    #
+    proc isValidChars {designation} {
+        if {$designation eq ""} {
+            return 0
+        }
+        # Check each character
+        foreach char [split $designation ""] {
+            if {![string match {[A-Za-z0-9 /\-~_.]} $char]} {
+                return 0
+            }
+        }
+        return 1
+    }
+
+    #
+    # Sanitize a designation string for processing.
+    # - Validates character set
+    # - Strips leading/trailing whitespace
+    # Returns the cleaned string.
+    # Throws error if input contains invalid characters.
+    #
+    proc sanitize {designation} {
+        # Check for invalid characters
+        foreach char [split $designation ""] {
+            set code [scan $char %c]
+            if {$code < 32 || $code > 126} {
+                error "Invalid character in designation: [format %q $char]"
+            }
+        }
+        return [string trim $designation]
+    }
 }
 
 #
