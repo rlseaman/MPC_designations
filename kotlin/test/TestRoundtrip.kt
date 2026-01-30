@@ -1,9 +1,19 @@
+package mpc
+
 import mpc.MPCDesignation
 import java.io.File
 
 /**
- * Test MPC designation round-trip conversions (pack -> unpack -> pack).
+ * Test MPC designation with bidirectional timing and round-trip verification.
+ *
+ * Tests:
+ * 1. Pack direction (unpacked -> packed) with timing
+ * 2. Unpack direction (packed -> unpacked) with timing
+ * 3. Unpacked round-trip: unpack(pack(x)) = x
+ * 4. Packed round-trip: pack(unpack(y)) = y
  */
+data class TestCase(val unpacked: String, val packed: String)
+
 fun main(args: Array<String>) {
     if (args.isEmpty()) {
         System.err.println("Usage: TestRoundtrip <prov_unpack_to_pack.csv>")
@@ -11,66 +21,21 @@ fun main(args: Array<String>) {
     }
 
     val csvFile = args[0]
-    var totalTests = 0
-    var passedTests = 0
-    var failedTests = 0
 
-    println("=== MPC Designation Round-Trip Tests (Kotlin) ===")
-    println()
-
+    // Load test data
+    val testCases = mutableListOf<TestCase>()
     try {
         File(csvFile).useLines { lines ->
             var isFirstLine = true
             for (line in lines) {
-                // Skip empty lines
                 if (line.isEmpty()) continue
-
-                // Skip header row
                 if (isFirstLine) {
                     isFirstLine = false
-                    if (line.startsWith("unpacked") || line.contains("designation")) {
-                        continue
-                    }
+                    if (line.startsWith("unpacked") || line.contains("designation")) continue
                 }
-
-                // Parse CSV line
                 val parts = line.split(",", limit = 2)
-                if (parts.size != 2) continue
-
-                val unpacked = parts[0]
-                val packed = parts[1]
-
-                totalTests++
-
-                try {
-                    // Test round-trip: unpacked -> packed -> unpacked -> packed
-                    val packed1 = MPCDesignation.convertSimple(unpacked)
-                    val unpacked1 = MPCDesignation.convertSimple(packed1)
-                    val packed2 = MPCDesignation.convertSimple(unpacked1)
-
-                    if (packed1 != packed2) {
-                        failedTests++
-                        if (failedTests <= 10) {
-                            println("FAIL: roundtrip('$unpacked')")
-                            println("      unpacked -> '$packed1' -> '$unpacked1' -> '$packed2'")
-                            println("      packed1 != packed2")
-                        }
-                    } else if (packed1 != packed) {
-                        failedTests++
-                        if (failedTests <= 10) {
-                            println("FAIL: roundtrip('$unpacked')")
-                            println("      Expected packed: '$packed'")
-                            println("      Got packed:      '$packed1'")
-                        }
-                    } else {
-                        passedTests++
-                    }
-                } catch (e: MPCDesignation.MPCDesignationException) {
-                    failedTests++
-                    if (failedTests <= 10) {
-                        println("FAIL: roundtrip('$unpacked')")
-                        println("      Error: ${e.message}")
-                    }
+                if (parts.size == 2) {
+                    testCases.add(TestCase(parts[0], parts[1]))
                 }
             }
         }
@@ -79,17 +44,108 @@ fun main(args: Array<String>) {
         System.exit(1)
     }
 
+    println("Loaded ${testCases.size} test cases")
     println()
-    println("=== Round-Trip Test Results ===")
-    println("Total:  $totalTests")
-    println("Passed: $passedTests")
-    println("Failed: $failedTests")
 
-    if (failedTests > 10) {
-        println("(Showing first 10 failures only)")
+    var packPassed = 0L
+    var packFailed = 0L
+    var unpackPassed = 0L
+    var unpackFailed = 0L
+    var rtUnpackedPassed = 0L
+    var rtUnpackedFailed = 0L
+    var rtPackedPassed = 0L
+    var rtPackedFailed = 0L
+
+    // Phase 1: Pack (unpacked -> packed)
+    println("=== Phase 1: Pack (unpacked -> packed) ===")
+    var startTime = System.currentTimeMillis()
+
+    for (tc in testCases) {
+        try {
+            val got = MPCDesignation.pack(tc.unpacked)
+            if (got == tc.packed) packPassed++ else packFailed++
+        } catch (e: Exception) {
+            packFailed++
+        }
     }
 
-    if (failedTests > 0) {
+    var elapsed = System.currentTimeMillis() - startTime
+    var rate = testCases.size * 1000.0 / elapsed
+    println("Passed: $packPassed")
+    println("Failed: $packFailed")
+    println("Time:   ${elapsed}ms (${"%.1f".format(rate)} entries/sec)")
+    println()
+
+    // Phase 2: Unpack (packed -> unpacked)
+    println("=== Phase 2: Unpack (packed -> unpacked) ===")
+    startTime = System.currentTimeMillis()
+
+    for (tc in testCases) {
+        try {
+            val got = MPCDesignation.unpack(tc.packed)
+            if (got == tc.unpacked) unpackPassed++ else unpackFailed++
+        } catch (e: Exception) {
+            unpackFailed++
+        }
+    }
+
+    elapsed = System.currentTimeMillis() - startTime
+    rate = testCases.size * 1000.0 / elapsed
+    println("Passed: $unpackPassed")
+    println("Failed: $unpackFailed")
+    println("Time:   ${elapsed}ms (${"%.1f".format(rate)} entries/sec)")
+    println()
+
+    // Phase 3: Unpacked round-trip: unpack(pack(x)) = x
+    println("=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===")
+    startTime = System.currentTimeMillis()
+
+    for (tc in testCases) {
+        try {
+            val packed = MPCDesignation.pack(tc.unpacked)
+            val backToUnpacked = MPCDesignation.unpack(packed)
+            if (backToUnpacked == tc.unpacked) rtUnpackedPassed++ else rtUnpackedFailed++
+        } catch (e: Exception) {
+            rtUnpackedFailed++
+        }
+    }
+
+    elapsed = System.currentTimeMillis() - startTime
+    rate = testCases.size * 1000.0 / elapsed
+    println("Passed: $rtUnpackedPassed")
+    println("Failed: $rtUnpackedFailed")
+    println("Time:   ${elapsed}ms (${"%.1f".format(rate)} entries/sec)")
+    println()
+
+    // Phase 4: Packed round-trip: pack(unpack(y)) = y
+    println("=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===")
+    startTime = System.currentTimeMillis()
+
+    for (tc in testCases) {
+        try {
+            val unpacked = MPCDesignation.unpack(tc.packed)
+            val backToPacked = MPCDesignation.pack(unpacked)
+            if (backToPacked == tc.packed) rtPackedPassed++ else rtPackedFailed++
+        } catch (e: Exception) {
+            rtPackedFailed++
+        }
+    }
+
+    elapsed = System.currentTimeMillis() - startTime
+    rate = testCases.size * 1000.0 / elapsed
+    println("Passed: $rtPackedPassed")
+    println("Failed: $rtPackedFailed")
+    println("Time:   ${elapsed}ms (${"%.1f".format(rate)} entries/sec)")
+    println()
+
+    // Summary
+    println("=== Summary ===")
+    println("Pack:       ${if (packFailed == 0L) "PASS" else "FAIL ($packFailed)"}")
+    println("Unpack:     ${if (unpackFailed == 0L) "PASS" else "FAIL ($unpackFailed)"}")
+    println("Unpacked RT: ${if (rtUnpackedFailed == 0L) "PASS" else "FAIL ($rtUnpackedFailed)"}")
+    println("Packed RT:   ${if (rtPackedFailed == 0L) "PASS" else "FAIL ($rtPackedFailed)"}")
+
+    if (packFailed > 0 || rtPackedFailed > 0) {
         System.exit(1)
     }
 }

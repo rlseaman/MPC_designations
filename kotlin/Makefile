@@ -18,10 +18,10 @@ CLASSES = $(BUILD)/classes
 # Default: build all
 all: build
 
-# Build the library and CLI
+# Build the library, CLI, and tests
 build:
 	@mkdir -p $(BUILD)
-	$(KOTLINC) -d $(BUILD)/mpc_designation.jar $(KFLAGS) src/mpc/*.kt
+	$(KOTLINC) -d $(BUILD)/mpc_designation.jar $(KFLAGS) src/mpc/*.kt test/*.kt
 
 # Build tests (compile to classes for faster execution)
 build-tests: build

@@ -1,3 +1,5 @@
+package mpc;
+
 import mpc.MPCDesignation;
 
 import java.io.BufferedReader;
@@ -7,8 +9,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Test MPC designation round-trip conversions.
- * Tests: unpacked -> packed -> unpacked and packed -> unpacked -> packed
+ * Test MPC designation with bidirectional timing and round-trip verification.
+ *
+ * Tests:
+ * 1. Pack direction (unpacked -> packed) with timing
+ * 2. Unpack direction (packed -> unpacked) with timing
+ * 3. Unpacked round-trip: unpack(pack(x)) = x
+ * 4. Packed round-trip: pack(unpack(y)) = y
  */
 public class TestRoundtrip {
 
@@ -55,149 +62,112 @@ public class TestRoundtrip {
             System.exit(1);
         }
 
-        System.out.println("=== MPC Designation Round-trip Tests (Java) ===");
         System.out.println("Loaded " + testCases.size() + " test cases");
         System.out.println();
 
-        int passed, failed;
-        List<String> errors = new ArrayList<>();
+        long packPassed = 0, packFailed = 0;
+        long unpackPassed = 0, unpackFailed = 0;
+        long rtUnpackedPassed = 0, rtUnpackedFailed = 0;
+        long rtPackedPassed = 0, rtPackedFailed = 0;
 
         // Phase 1: Pack (unpacked -> packed)
         System.out.println("=== Phase 1: Pack (unpacked -> packed) ===");
-        passed = 0;
-        failed = 0;
-        errors.clear();
         long startTime = System.currentTimeMillis();
         for (TestCase tc : testCases) {
             try {
-                String result = MPCDesignation.convertSimple(tc.unpacked);
+                String result = MPCDesignation.pack(tc.unpacked);
                 if (result.equals(tc.packed)) {
-                    passed++;
+                    packPassed++;
                 } else {
-                    failed++;
-                    if (errors.size() < 5) {
-                        errors.add("pack('" + tc.unpacked + "'): expected '" + tc.packed + "', got '" + result + "'");
-                    }
+                    packFailed++;
                 }
             } catch (MPCDesignation.MPCDesignationException e) {
-                failed++;
-                if (errors.size() < 5) {
-                    errors.add("pack('" + tc.unpacked + "'): " + e.getMessage());
-                }
+                packFailed++;
             }
         }
-        long phase1Time = System.currentTimeMillis() - startTime;
-        System.out.println("Passed: " + passed);
-        System.out.println("Failed: " + failed);
-        for (String err : errors) System.out.println("  " + err);
+        long elapsed = System.currentTimeMillis() - startTime;
+        double rate = testCases.size() * 1000.0 / elapsed;
+        System.out.println("Passed: " + packPassed);
+        System.out.println("Failed: " + packFailed);
+        System.out.printf("Time:   %dms (%.1f entries/sec)%n", elapsed, rate);
         System.out.println();
-
-        boolean phase1Pass = failed == 0;
 
         // Phase 2: Unpack (packed -> unpacked)
         System.out.println("=== Phase 2: Unpack (packed -> unpacked) ===");
-        passed = 0;
-        failed = 0;
-        errors.clear();
         startTime = System.currentTimeMillis();
         for (TestCase tc : testCases) {
             try {
-                String result = MPCDesignation.convertSimple(tc.packed);
+                String result = MPCDesignation.unpack(tc.packed);
                 if (result.equals(tc.unpacked)) {
-                    passed++;
+                    unpackPassed++;
                 } else {
-                    failed++;
-                    if (errors.size() < 5) {
-                        errors.add("unpack('" + tc.packed + "'): expected '" + tc.unpacked + "', got '" + result + "'");
-                    }
+                    unpackFailed++;
                 }
             } catch (MPCDesignation.MPCDesignationException e) {
-                failed++;
-                if (errors.size() < 5) {
-                    errors.add("unpack('" + tc.packed + "'): " + e.getMessage());
-                }
+                unpackFailed++;
             }
         }
-        long phase2Time = System.currentTimeMillis() - startTime;
-        System.out.println("Passed: " + passed);
-        System.out.println("Failed: " + failed + " (old-style designations convert to modern format)");
-        for (String err : errors) System.out.println("  " + err);
+        elapsed = System.currentTimeMillis() - startTime;
+        rate = testCases.size() * 1000.0 / elapsed;
+        System.out.println("Passed: " + unpackPassed);
+        System.out.println("Failed: " + unpackFailed);
+        System.out.printf("Time:   %dms (%.1f entries/sec)%n", elapsed, rate);
         System.out.println();
 
         // Phase 3: Unpacked round-trip: unpack(pack(x)) = x
         System.out.println("=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===");
-        passed = 0;
-        failed = 0;
-        errors.clear();
         startTime = System.currentTimeMillis();
         for (TestCase tc : testCases) {
             try {
-                String packed = MPCDesignation.convertSimple(tc.unpacked);
-                String back = MPCDesignation.convertSimple(packed);
+                String packed = MPCDesignation.pack(tc.unpacked);
+                String back = MPCDesignation.unpack(packed);
                 if (back.equals(tc.unpacked)) {
-                    passed++;
+                    rtUnpackedPassed++;
                 } else {
-                    failed++;
-                    if (errors.size() < 5) {
-                        errors.add("'" + tc.unpacked + "' -> '" + packed + "' -> '" + back + "'");
-                    }
+                    rtUnpackedFailed++;
                 }
             } catch (MPCDesignation.MPCDesignationException e) {
-                failed++;
-                if (errors.size() < 5) {
-                    errors.add("'" + tc.unpacked + "': " + e.getMessage());
-                }
+                rtUnpackedFailed++;
             }
         }
-        long phase3Time = System.currentTimeMillis() - startTime;
-        System.out.println("Passed: " + passed);
-        System.out.println("Failed: " + failed + " (old-style designations convert to modern format)");
-        for (String err : errors) System.out.println("  " + err);
+        elapsed = System.currentTimeMillis() - startTime;
+        rate = testCases.size() * 1000.0 / elapsed;
+        System.out.println("Passed: " + rtUnpackedPassed);
+        System.out.println("Failed: " + rtUnpackedFailed);
+        System.out.printf("Time:   %dms (%.1f entries/sec)%n", elapsed, rate);
         System.out.println();
 
         // Phase 4: Packed round-trip: pack(unpack(y)) = y
         System.out.println("=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===");
-        passed = 0;
-        failed = 0;
-        errors.clear();
         startTime = System.currentTimeMillis();
         for (TestCase tc : testCases) {
             try {
-                String unpacked = MPCDesignation.convertSimple(tc.packed);
-                String back = MPCDesignation.convertSimple(unpacked);
+                String unpacked = MPCDesignation.unpack(tc.packed);
+                String back = MPCDesignation.pack(unpacked);
                 if (back.equals(tc.packed)) {
-                    passed++;
+                    rtPackedPassed++;
                 } else {
-                    failed++;
-                    if (errors.size() < 5) {
-                        errors.add("'" + tc.packed + "' -> '" + unpacked + "' -> '" + back + "'");
-                    }
+                    rtPackedFailed++;
                 }
             } catch (MPCDesignation.MPCDesignationException e) {
-                failed++;
-                if (errors.size() < 5) {
-                    errors.add("'" + tc.packed + "': " + e.getMessage());
-                }
+                rtPackedFailed++;
             }
         }
-        long phase4Time = System.currentTimeMillis() - startTime;
-        System.out.println("Passed: " + passed);
-        System.out.println("Failed: " + failed);
-        for (String err : errors) System.out.println("  " + err);
+        elapsed = System.currentTimeMillis() - startTime;
+        rate = testCases.size() * 1000.0 / elapsed;
+        System.out.println("Passed: " + rtPackedPassed);
+        System.out.println("Failed: " + rtPackedFailed);
+        System.out.printf("Time:   %dms (%.1f entries/sec)%n", elapsed, rate);
         System.out.println();
-
-        boolean phase4Pass = failed == 0;
 
         // Summary
         System.out.println("=== Summary ===");
-        System.out.printf("Phase 1 (pack):           %s%n", phase1Pass ? "PASS" : "FAIL");
-        System.out.printf("Phase 4 (packed RT):      %s%n", phase4Pass ? "PASS" : "FAIL");
-        System.out.println();
-        System.out.println("Note: Phases 2 and 3 have expected failures for old-style");
-        System.out.println("      designations (A908 CJ -> 1908 CJ) which is correct behavior.");
+        System.out.println("Pack:       " + (packFailed == 0 ? "PASS" : "FAIL (" + packFailed + ")"));
+        System.out.println("Unpack:     " + (unpackFailed == 0 ? "PASS" : "FAIL (" + unpackFailed + ")"));
+        System.out.println("Unpacked RT: " + (rtUnpackedFailed == 0 ? "PASS" : "FAIL (" + rtUnpackedFailed + ")"));
+        System.out.println("Packed RT:   " + (rtPackedFailed == 0 ? "PASS" : "FAIL (" + rtPackedFailed + ")"));
 
-        // Only fail if phases 1 or 4 fail
-        if (!phase1Pass || !phase4Pass) {
+        if (packFailed > 0 || rtPackedFailed > 0) {
             System.exit(1);
         }
     }

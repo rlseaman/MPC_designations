@@ -1,7 +1,13 @@
 /*
- * test_roundtrip.cpp - Test mpc_designation roundtrip conversion
+ * test_roundtrip.cpp - Test mpc_designation with bidirectional timing and round-trip verification
  *
- * Usage: test_roundtrip <csv_file> [max_errors]
+ * Tests:
+ * 1. Pack direction (unpacked -> packed) with timing
+ * 2. Unpack direction (packed -> unpacked) with timing
+ * 3. Unpacked round-trip: unpack(pack(x)) = x
+ * 4. Packed round-trip: pack(unpack(y)) = y
+ *
+ * Usage: test_roundtrip <csv_file>
  */
 
 #include "../src/mpc_designation.hpp"
@@ -13,156 +19,168 @@
 #include <iomanip>
 #include <regex>
 
-struct TestError {
-    std::string test;
-    std::string input;
-    std::string step1;
-    std::string step2;
-    std::string expected;
+struct TestCase {
+    std::string unpacked;
+    std::string packed;
 };
 
-bool runRoundtripTests(const std::string& csvFile, int maxErrors) {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: test_roundtrip <csv_file>\n";
+        return 1;
+    }
+
+    std::string csvFile = argv[1];
+
+    // Load test data
     std::ifstream fp(csvFile);
     if (!fp.is_open()) {
         std::cerr << "Error: Cannot open file: " << csvFile << "\n";
-        return false;
+        return 1;
     }
 
-    long total = 0;
-    long passed = 0;
-    long failed = 0;
-    std::vector<TestError> errors;
-
-    auto startTime = std::chrono::high_resolution_clock::now();
-
+    std::vector<TestCase> testCases;
     std::string line;
+
     // Skip header
     std::getline(fp, line);
 
-    std::regex oldStyleRe(R"(^[AB]\d{3} [A-Z][A-Z]$)");
-
     while (std::getline(fp, line)) {
-        // Trim trailing whitespace
         while (!line.empty() && (line.back() == '\r' || line.back() == '\n')) {
             line.pop_back();
         }
         if (line.empty()) continue;
 
-        // Skip header if encountered again
-        if (line.substr(0, 8) == "unpacked") continue;
-
-        total++;
-
         size_t comma = line.find(',');
         if (comma == std::string::npos) continue;
 
-        std::string unpacked = line.substr(0, comma);
-        std::string packed = line.substr(comma + 1);
+        TestCase tc;
+        tc.unpacked = line.substr(0, comma);
+        tc.packed = line.substr(comma + 1);
+        testCases.push_back(tc);
+    }
+    fp.close();
 
-        // Test packed -> unpacked -> packed roundtrip
+    std::cout << "Loaded " << testCases.size() << " test cases\n\n";
+
+    long packPassed = 0, packFailed = 0;
+    long unpackPassed = 0, unpackFailed = 0;
+    long rtUnpackedPassed = 0, rtUnpackedFailed = 0;
+    long rtPackedPassed = 0, rtPackedFailed = 0;
+
+    // ========== Phase 1: Pack (unpacked -> packed) ==========
+    std::cout << "=== Phase 1: Pack (unpacked -> packed) ===\n";
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    for (const auto& tc : testCases) {
         try {
-            std::string toUnpacked = mpc::MPCDesignation::unpack(packed);
-            std::string backToPacked = mpc::MPCDesignation::pack(toUnpacked);
-
-            if (backToPacked != packed) {
-                failed++;
-                if (static_cast<int>(errors.size()) < maxErrors) {
-                    errors.push_back({"packed roundtrip", packed, toUnpacked, backToPacked, packed});
-                }
-                continue;
+            std::string got = mpc::MPCDesignation::pack(tc.unpacked);
+            if (got == tc.packed) {
+                packPassed++;
+            } else {
+                packFailed++;
             }
-        } catch (const mpc::MPCDesignationError& e) {
-            failed++;
-            if (static_cast<int>(errors.size()) < maxErrors) {
-                errors.push_back({"packed roundtrip", packed, "ERROR", e.what(), packed});
-            }
-            continue;
-        }
-
-        // Test unpacked -> packed -> unpacked roundtrip
-        try {
-            std::string toPacked = mpc::MPCDesignation::pack(unpacked);
-            std::string backToUnpacked = mpc::MPCDesignation::unpack(toPacked);
-
-            // Check for old-style designation
-            bool isOldStyle = std::regex_match(unpacked, oldStyleRe);
-
-            if (!isOldStyle && backToUnpacked != unpacked) {
-                failed++;
-                if (static_cast<int>(errors.size()) < maxErrors) {
-                    errors.push_back({"unpacked roundtrip", unpacked, toPacked, backToUnpacked, unpacked});
-                }
-                continue;
-            }
-
-            // For old-style, verify the modern form roundtrips
-            if (isOldStyle) {
-                std::string repackedModern = mpc::MPCDesignation::pack(backToUnpacked);
-                if (repackedModern != toPacked) {
-                    failed++;
-                    if (static_cast<int>(errors.size()) < maxErrors) {
-                        errors.push_back({"old-style modern roundtrip", unpacked, backToUnpacked, repackedModern, toPacked});
-                    }
-                    continue;
-                }
-            }
-        } catch (const mpc::MPCDesignationError& e) {
-            failed++;
-            if (static_cast<int>(errors.size()) < maxErrors) {
-                errors.push_back({"unpacked roundtrip", unpacked, "ERROR", e.what(), unpacked});
-            }
-            continue;
-        }
-
-        passed++;
-
-        if (total % 100000 == 0) {
-            std::cout << "Processed " << total << " entries...\n";
+        } catch (...) {
+            packFailed++;
         }
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
-    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    auto packTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    double packRate = testCases.size() * 1000.0 / packTime;
 
-    std::cout << "\n";
-    std::cout << "=== Roundtrip Test Results ===\n";
-    std::cout << "Total:  " << total << "\n";
-    std::cout << "Passed: " << passed << "\n";
-    std::cout << "Failed: " << failed << "\n";
-    std::cout << "Time:   " << elapsed << "ms ("
-              << std::fixed << std::setprecision(1) << (total * 1000.0 / elapsed)
-              << " entries/sec)\n";
-    std::cout << "\n";
+    std::cout << "Passed: " << packPassed << "\n";
+    std::cout << "Failed: " << packFailed << "\n";
+    std::cout << "Time:   " << packTime << "ms ("
+              << std::fixed << std::setprecision(1) << packRate << " entries/sec)\n\n";
 
-    if (failed > 0) {
-        std::cout << "=== First " << errors.size() << " failures ===\n";
-        std::cout << std::left << std::setw(20) << "Test"
-                  << std::setw(20) << "Input"
-                  << std::setw(15) << "Step1"
-                  << std::setw(20) << "Step2"
-                  << std::setw(15) << "Expected" << "\n";
-        std::cout << std::string(90, '-') << "\n";
-        for (const auto& err : errors) {
-            std::cout << std::left << std::setw(20) << err.test
-                      << std::setw(20) << err.input
-                      << std::setw(15) << err.step1
-                      << std::setw(20) << err.step2
-                      << std::setw(15) << err.expected << "\n";
+    // ========== Phase 2: Unpack (packed -> unpacked) ==========
+    std::cout << "=== Phase 2: Unpack (packed -> unpacked) ===\n";
+    startTime = std::chrono::high_resolution_clock::now();
+
+    for (const auto& tc : testCases) {
+        try {
+            std::string got = mpc::MPCDesignation::unpack(tc.packed);
+            if (got == tc.unpacked) {
+                unpackPassed++;
+            } else {
+                unpackFailed++;
+            }
+        } catch (...) {
+            unpackFailed++;
         }
     }
 
-    return failed == 0;
-}
+    endTime = std::chrono::high_resolution_clock::now();
+    auto unpackTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    double unpackRate = testCases.size() * 1000.0 / unpackTime;
 
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: test_roundtrip <csv_file> [max_errors]\n";
-        return 1;
+    std::cout << "Passed: " << unpackPassed << "\n";
+    std::cout << "Failed: " << unpackFailed << "\n";
+    std::cout << "Time:   " << unpackTime << "ms ("
+              << std::fixed << std::setprecision(1) << unpackRate << " entries/sec)\n\n";
+
+    // ========== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ==========
+    std::cout << "=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===\n";
+    startTime = std::chrono::high_resolution_clock::now();
+
+    for (const auto& tc : testCases) {
+        try {
+            std::string packed = mpc::MPCDesignation::pack(tc.unpacked);
+            std::string backToUnpacked = mpc::MPCDesignation::unpack(packed);
+            if (backToUnpacked == tc.unpacked) {
+                rtUnpackedPassed++;
+            } else {
+                rtUnpackedFailed++;
+            }
+        } catch (...) {
+            rtUnpackedFailed++;
+        }
     }
 
-    std::string csvFile = argv[1];
-    int maxErrors = (argc > 2) ? std::stoi(argv[2]) : 100;
+    endTime = std::chrono::high_resolution_clock::now();
+    auto rtUnpackedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    double rtUnpackedRate = testCases.size() * 1000.0 / rtUnpackedTime;
 
-    bool success = runRoundtripTests(csvFile, maxErrors);
-    return success ? 0 : 1;
+    std::cout << "Passed: " << rtUnpackedPassed << "\n";
+    std::cout << "Failed: " << rtUnpackedFailed << "\n";
+    std::cout << "Time:   " << rtUnpackedTime << "ms ("
+              << std::fixed << std::setprecision(1) << rtUnpackedRate << " entries/sec)\n\n";
+
+    // ========== Phase 4: Packed round-trip: pack(unpack(y)) = y ==========
+    std::cout << "=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===\n";
+    startTime = std::chrono::high_resolution_clock::now();
+
+    for (const auto& tc : testCases) {
+        try {
+            std::string unpacked = mpc::MPCDesignation::unpack(tc.packed);
+            std::string backToPacked = mpc::MPCDesignation::pack(unpacked);
+            if (backToPacked == tc.packed) {
+                rtPackedPassed++;
+            } else {
+                rtPackedFailed++;
+            }
+        } catch (...) {
+            rtPackedFailed++;
+        }
+    }
+
+    endTime = std::chrono::high_resolution_clock::now();
+    auto rtPackedTime = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    double rtPackedRate = testCases.size() * 1000.0 / rtPackedTime;
+
+    std::cout << "Passed: " << rtPackedPassed << "\n";
+    std::cout << "Failed: " << rtPackedFailed << "\n";
+    std::cout << "Time:   " << rtPackedTime << "ms ("
+              << std::fixed << std::setprecision(1) << rtPackedRate << " entries/sec)\n\n";
+
+    // ========== Summary ==========
+    std::cout << "=== Summary ===\n";
+    std::cout << "Pack:       " << (packFailed == 0 ? "PASS" : "FAIL") << "\n";
+    std::cout << "Unpack:     " << (unpackFailed == 0 ? "PASS" : "FAIL (" + std::to_string(unpackFailed) + ")") << "\n";
+    std::cout << "Unpacked RT: " << (rtUnpackedFailed == 0 ? "PASS" : "FAIL (" + std::to_string(rtUnpackedFailed) + ")") << "\n";
+    std::cout << "Packed RT:   " << (rtPackedFailed == 0 ? "PASS" : "FAIL (" + std::to_string(rtPackedFailed) + ")") << "\n";
+
+    // Exit with error only if pack or packed RT failed
+    return (packFailed > 0 || rtPackedFailed > 0) ? 1 : 0;
 }

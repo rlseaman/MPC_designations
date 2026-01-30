@@ -1,3 +1,5 @@
+package mpc
+
 import mpc.MPCDesignation
 import java.io.File
 
