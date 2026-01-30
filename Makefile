@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-errors test-all validate version
+.PHONY: all clean test test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php
+test-all: test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -181,6 +181,15 @@ test-php: test-data/prov_unpack_to_pack.csv
 		echo "PHP not installed, skipping PHP tests"; \
 	fi
 
+# TypeScript tests
+test-typescript: test-data/prov_unpack_to_pack.csv
+	@echo "=== TypeScript Tests ==="
+	@if command -v npm >/dev/null 2>&1; then \
+		$(MAKE) -C typescript test-all; \
+	else \
+		echo "npm not installed, skipping TypeScript tests"; \
+	fi
+
 # Error tests only (quick validation)
 test-errors: build-c build-swift build-go
 	@echo "=== Error Tests (All Languages) ==="
@@ -235,6 +244,7 @@ help:
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"
 	@echo "  test-php     Run PHP tests only"
+	@echo "  test-typescript Run TypeScript tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"

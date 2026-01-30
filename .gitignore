@@ -70,6 +70,10 @@ kotlin/build/
 # Rust target directory
 rust/target/
 
+# TypeScript build artifacts
+typescript/dist/
+typescript/node_modules/
+
 # Editor files
 *.swp
 *.swo

@@ -1,0 +1,40 @@
+{
+  "name": "mpc-designation-ts",
+  "version": "1.0.0",
+  "description": "Convert between packed and unpacked MPC (Minor Planet Center) designations - TypeScript",
+  "main": "dist/mpc_designation.js",
+  "types": "dist/mpc_designation.d.ts",
+  "bin": {
+    "mpc_designation": "./dist/mpc_designation_cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "test": "npm run build && node dist/test/test_csv.js ../test-data/prov_unpack_to_pack.csv",
+    "test:errors": "npm run build && node dist/test/test_errors.js ../test-data/error_test_cases.csv",
+    "test:roundtrip": "npm run build && node dist/test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv",
+    "test:all": "npm run test:errors && npm run test"
+  },
+  "keywords": [
+    "astronomy",
+    "minor-planet",
+    "mpc",
+    "asteroid",
+    "comet",
+    "designation",
+    "typescript"
+  ],
+  "author": "",
+  "license": "CC0-1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rlseaman/MPC_designations.git"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

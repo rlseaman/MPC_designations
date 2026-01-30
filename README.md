@@ -23,6 +23,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Rust** | [`rust/`](rust/) | Production |
 | **Swift** | [`swift/`](swift/) | Production |
 | **Tcl** | [`tcl/`](tcl/) | Production |
+| **TypeScript** | [`typescript/`](typescript/) | Production |
 
 All implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
 
@@ -170,6 +171,17 @@ cd js
 node src/mpc_designation_cli.js '1995 XA'    # Output: J95X00A
 ```
 
+### TypeScript
+```typescript
+import { convertSimple } from 'mpc-designation-ts';
+const result: string = convertSimple('1995 XA');  // Returns 'J95X00A'
+```
+
+```bash
+cd typescript && npm install && npm run build
+node dist/src/mpc_designation_cli.js '1995 XA'    # Output: J95X00A
+```
+
 ## Examples
 
 ```bash
@@ -269,8 +281,14 @@ MPC_designations/
 ├── ruby/
 │   ├── Makefile
 │   └── src/            # Source code
-└── js/
+├── js/
+│   ├── package.json    # npm package definition
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
+└── typescript/
     ├── package.json    # npm package definition
+    ├── tsconfig.json   # TypeScript configuration
     ├── Makefile
     ├── src/            # Source code
     └── test/           # Test files
@@ -300,6 +318,7 @@ make test-ruby
 make test-rust
 make test-swift
 make test-tcl
+make test-typescript
 
 # Quick error tests only (faster)
 make test-errors
