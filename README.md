@@ -13,6 +13,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **C#** | [`csharp/`](csharp/) | Production |
 | **Fortran** | [`fortran/`](fortran/) | Production |
 | **Go** | [`go/`](go/) | Production |
+| **Haskell** | [`haskell/`](haskell/) | Production |
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
 | **Julia** | [`julia/`](julia/) | Production |
@@ -115,6 +116,19 @@ cd go && make
 ```go
 import "github.com/rlseaman/mpc_designations/go/mpc"
 result, _ := mpc.ConvertSimple("1995 XA")  // Returns "J95X00A"
+```
+
+### Haskell
+```bash
+cd haskell && make
+./build/mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+```haskell
+import MPCDesignation
+case convertSimple "1995 XA" of
+    Right result -> putStrLn result  -- "J95X00A"
+    Left err -> print err
 ```
 
 ### Rust
@@ -280,6 +294,11 @@ MPC_designations/
 │   ├── mpc/            # Library package
 │   ├── cmd/            # CLI
 │   └── test/           # Test runners
+├── haskell/
+│   ├── README.md       # Haskell documentation
+│   ├── Makefile
+│   ├── src/            # Source code (MPCDesignation module)
+│   └── test/           # Test files
 ├── java/
 │   ├── Makefile
 │   ├── src/            # Source code (mpc package)
@@ -326,6 +345,7 @@ make test-cpp
 make test-csharp
 make test-fortran
 make test-go
+make test-haskell
 make test-java
 make test-julia
 make test-js

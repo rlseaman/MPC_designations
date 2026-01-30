@@ -44,6 +44,9 @@ make -C cpp test_csv test_roundtrip >/dev/null 2>&1 || true
 make -C swift test_csv test_roundtrip >/dev/null 2>&1 || true
 make -C go test_csv test_roundtrip >/dev/null 2>&1 || true
 make -C fortran build/test_csv build/test_roundtrip >/dev/null 2>&1 || true
+if command -v ghc >/dev/null 2>&1; then
+    make -C haskell build >/dev/null 2>&1 || true
+fi
 if command -v cargo >/dev/null 2>&1; then
     (cd rust && cargo build --release -q 2>/dev/null) || true
 fi
@@ -128,6 +131,9 @@ if [ "$ROUNDTRIP" = true ]; then
     run_roundtrip_benchmark "Go" "cd go && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Swift" "cd swift && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Fortran" "cd fortran && ./build/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    if command -v ghc >/dev/null 2>&1 && [ -f haskell/build/test_roundtrip ]; then
+        run_roundtrip_benchmark "Haskell" "cd haskell && ./build/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
     if command -v cargo >/dev/null 2>&1; then
         run_roundtrip_benchmark "Rust" "cd rust && ./target/release/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
@@ -262,6 +268,9 @@ else
     run_benchmark "Go" "cd go && ./test_csv ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Swift" "cd swift && ./test_csv ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Fortran" "cd fortran && ./build/test_csv ../test-data/prov_unpack_to_pack.csv"
+    if command -v ghc >/dev/null 2>&1 && [ -f haskell/build/test_csv ]; then
+        run_benchmark "Haskell" "cd haskell && ./build/test_csv ../test-data/prov_unpack_to_pack.csv"
+    fi
     if command -v cargo >/dev/null 2>&1; then
         run_benchmark "Rust" "cd rust && ./target/release/test_csv ../test-data/prov_unpack_to_pack.csv"
     fi
