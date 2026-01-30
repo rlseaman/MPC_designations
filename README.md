@@ -465,6 +465,9 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | C++ | 21,907 | 92,258 | 0.02x |
 | Ruby | 22,389 | 90,272 | 0.02x |
 | Tcl | 41,976 | 48,149 | 0.01x |
+| Bash | 6,049,000* | 334* | 0.00x |
+
+*Bash time extrapolated from 50k sample (full run would take ~100 minutes)
 
 ### Unpack Direction (packed → unpacked)
 
@@ -488,10 +491,15 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | Ruby | 11,896 | 169,897 | 0.02x |
 | Perl | 12,601 | 160,391 | 0.02x |
 | Tcl | 27,477 | 73,556 | 0.01x |
+| Bash | 7,221,000* | 280* | 0.00x |
+
+*Bash time extrapolated from 50k sample (full run would take ~120 minutes)
 
 ### Round-trip Verification
 
-All implementations pass the packed round-trip test: `pack(unpack(y)) = y`.
+All production implementations pass the packed round-trip test: `pack(unpack(y)) = y`.
+
+**Note:** Bash has minor issues with comet fragment designations (~0.02% of test cases).
 
 Run benchmarks with: `./scripts/benchmark.sh --roundtrip`
 
