@@ -385,6 +385,8 @@ git sparse-checkout set python test-data docs
 
 Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
 
+**Note:** Languages not shown require specific compilers/runtimes (e.g., `kotlinc`, `dotnet`, `julia`) that may not be installed. Run `./scripts/benchmark.sh` to benchmark all available implementations.
+
 ### Pack Direction (unpacked → packed)
 
 | Language | Time (ms) | Rate (entries/sec) | Relative |

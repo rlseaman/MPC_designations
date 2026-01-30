@@ -5,7 +5,7 @@ CARGO_FLAGS = --release
 
 TEST_DATA = ../test-data
 
-.PHONY: all clean build test test-csv test-roundtrip test-all
+.PHONY: all clean build test test-csv test-errors test-roundtrip test-all
 
 # Default: build all
 all: build
@@ -28,6 +28,10 @@ test-csv: build
 	fi
 	./target/release/test_csv $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run error handling tests
+test-errors: build
+	./target/release/test_errors $(TEST_DATA)/error_test_cases.csv
+
 # Run bidirectional and round-trip tests
 test-roundtrip: build
 	@if [ ! -f $(TEST_DATA)/prov_unpack_to_pack.csv ]; then \
@@ -37,7 +41,7 @@ test-roundtrip: build
 	./target/release/test_roundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
 
 # Run all tests
-test-all: test test-roundtrip
+test-all: test-errors test-csv test-roundtrip
 
 # Run cargo tests (unit tests)
 test-unit:

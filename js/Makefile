@@ -21,7 +21,7 @@ test-csv:
 
 # Run error handling tests
 test-errors:
-	@echo "Error tests not yet implemented for JavaScript"
+	$(NODE) test/test_errors.js $(TEST_DATA)/error_test_cases.csv
 
 # Run bidirectional and round-trip tests
 test-roundtrip:
@@ -32,7 +32,7 @@ test-roundtrip:
 	$(NODE) test/test_roundtrip.js $(TEST_DATA)/prov_unpack_to_pack.csv
 
 # Run all tests
-test-all: test test-roundtrip
+test-all: test-errors test-csv test-roundtrip
 
 # Clean (nothing to clean for JS)
 clean:

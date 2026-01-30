@@ -25,6 +25,10 @@ path = "src/bin/test_csv.rs"
 name = "test_roundtrip"
 path = "src/bin/test_roundtrip.rs"
 
+[[bin]]
+name = "test_errors"
+path = "src/bin/test_errors.rs"
+
 [dependencies]
 regex = "1"
 lazy_static = "1"
