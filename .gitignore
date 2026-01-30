@@ -49,6 +49,12 @@ go/test_csv
 go/test_errors
 go/mpc_designation-*
 
+# C# / .NET build artifacts
+csharp/bin/
+csharp/obj/
+csharp/test/bin/
+csharp/test/obj/
+
 # Java build artifacts
 java/classes/
 *.class

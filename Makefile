@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-cpp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
+.PHONY: all clean test test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -51,7 +51,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-cpp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
+test-all: test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -64,6 +64,15 @@ test-c: build-c
 test-cpp: build-cpp test-data/prov_unpack_to_pack.csv
 	@echo "=== C++ Tests ==="
 	$(MAKE) -C cpp test
+
+# C# tests
+test-csharp: test-data/prov_unpack_to_pack.csv
+	@echo "=== C# Tests ==="
+	@if command -v dotnet >/dev/null 2>&1; then \
+		$(MAKE) -C csharp test; \
+	else \
+		echo ".NET not installed, skipping C# tests"; \
+	fi
 
 # Python tests
 test-python: test-data/prov_unpack_to_pack.csv
@@ -197,6 +206,7 @@ help:
 	@echo "  test-all     Run all tests for all languages"
 	@echo "  test-c       Run C tests only"
 	@echo "  test-cpp     Run C++ tests only"
+	@echo "  test-csharp  Run C# tests only"
 	@echo "  test-python  Run Python tests only"
 	@echo "  test-tcl     Run TCL tests only"
 	@echo "  test-swift   Run Swift tests only"

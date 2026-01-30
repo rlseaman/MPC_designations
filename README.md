@@ -10,6 +10,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 |----------|-----------|--------|
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
+| **C#** | [`csharp/`](csharp/) | Production |
 | **Go** | [`go/`](go/) | Production |
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
@@ -41,6 +42,17 @@ cd cpp && make
 ```cpp
 #include "mpc_designation.hpp"
 std::string result = mpc::MPCDesignation::convertSimple("1995 XA");  // Returns "J95X00A"
+```
+
+### C#
+```bash
+cd csharp && dotnet build
+dotnet run -- '1995 XA'    # Output: J95X00A
+```
+
+```csharp
+using MPC;
+string result = MPCDesignation.ConvertSimple("1995 XA");  // Returns "J95X00A"
 ```
 
 ### Python
@@ -195,6 +207,10 @@ MPC_designations/
 │   ├── README.md       # C++ documentation
 │   ├── Makefile
 │   └── src/            # Source code
+├── csharp/
+│   ├── README.md       # C# documentation
+│   ├── Makefile
+│   └── src/            # Source code
 ├── python/
 │   ├── README.md       # Python documentation
 │   ├── pyproject.toml
@@ -255,6 +271,7 @@ make test-all
 # Run tests for a specific language
 make test-c
 make test-cpp
+make test-csharp
 make test-go
 make test-java
 make test-julia
