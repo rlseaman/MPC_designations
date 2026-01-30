@@ -8,6 +8,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 
 | Language | Directory | Status |
 |----------|-----------|--------|
+| **Bash** | [`bash/`](bash/) | Production |
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
 | **C#** | [`csharp/`](csharp/) | Production |
@@ -33,6 +34,17 @@ All production implementations pass the same test suite (2M+ conversions, 94 err
 **Note:** The Forth implementation is minimal, supporting only numbered asteroids and basic provisional designations. See [forth/README.md](forth/README.md) for details.
 
 ## Quick Start
+
+### Bash
+```bash
+cd bash
+./src/mpc_designation.sh '1995 XA'    # Output: J95X00A
+```
+
+```bash
+source src/mpc_designation.sh
+result=$(convert_simple "1995 XA")    # Returns "J95X00A"
+```
 
 ### C
 ```bash
@@ -262,6 +274,11 @@ MPC_designations/
 ├── test-data/
 │   ├── prov_unpack_to_pack.csv.gz  # 2M+ test cases
 │   └── error_test_cases.csv         # Error handling tests
+├── bash/
+│   ├── README.md       # Bash documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
 ├── c/
 │   ├── README.md       # C documentation
 │   ├── Makefile
@@ -359,6 +376,7 @@ Each implementation includes tests against 2+ million known-good conversions and
 make test-all
 
 # Run tests for a specific language
+make test-bash
 make test-c
 make test-cpp
 make test-csharp
