@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-errors test-all validate version
+.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
 
 # Default: build all
 all: build-c build-swift build-go build-java build-rust
@@ -47,7 +47,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust
+test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -138,6 +138,15 @@ test-rust: test-data/prov_unpack_to_pack.csv
 		echo "Rust not installed, skipping Rust tests"; \
 	fi
 
+# PHP tests
+test-php: test-data/prov_unpack_to_pack.csv
+	@echo "=== PHP Tests ==="
+	@if command -v php >/dev/null 2>&1; then \
+		$(MAKE) -C php test; \
+	else \
+		echo "PHP not installed, skipping PHP tests"; \
+	fi
+
 # Error tests only (quick validation)
 test-errors: build-c build-swift build-go
 	@echo "=== Error Tests (All Languages) ==="
@@ -188,6 +197,7 @@ help:
 	@echo "  test-js      Run JavaScript tests only"
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"
+	@echo "  test-php     Run PHP tests only"
 	@echo "  test-errors  Run error tests only (quick)"
 	@echo "  validate     Cross-language consistency check"
 	@echo "  version      Show current version"

@@ -14,6 +14,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **JavaScript** | [`js/`](js/) | Production |
 | **Julia** | [`julia/`](julia/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
+| **PHP** | [`php/`](php/) | Production |
 | **Python** | [`python/`](python/) | Production |
 | **Ruby** | [`ruby/`](ruby/) | Production |
 | **Rust** | [`rust/`](rust/) | Production |
@@ -52,6 +53,18 @@ cd swift && make
 ```perl
 use MPC::Designation qw(convert_simple);
 convert_simple('1995 XA');  # Returns 'J95X00A'
+```
+
+### PHP
+```php
+require_once 'src/MPCDesignation.php';
+use MPC\MPCDesignation;
+MPCDesignation::convertSimple('1995 XA');  // Returns 'J95X00A'
+```
+
+```bash
+cd php
+php src/mpc_designation_cli.php '1995 XA'    # Output: J95X00A
 ```
 
 ### Go
@@ -184,6 +197,9 @@ MPC_designations/
 ├── perl/
 │   ├── src/            # Source code (MPC/Designation.pm)
 │   └── test/           # Test files
+├── php/
+│   ├── Makefile
+│   └── src/            # Source code
 ├── go/
 │   ├── go.mod          # Go module definition
 │   ├── Makefile
@@ -227,6 +243,7 @@ make test-java
 make test-julia
 make test-js
 make test-perl
+make test-php
 make test-python
 make test-ruby
 make test-rust
