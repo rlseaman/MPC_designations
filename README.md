@@ -11,6 +11,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
 | **C#** | [`csharp/`](csharp/) | Production |
+| **Forth** | [`forth/`](forth/) | Minimal |
 | **Fortran** | [`fortran/`](fortran/) | Production |
 | **Go** | [`go/`](go/) | Production |
 | **Haskell** | [`haskell/`](haskell/) | Production |
@@ -27,7 +28,9 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Tcl** | [`tcl/`](tcl/) | Production |
 | **TypeScript** | [`typescript/`](typescript/) | Production |
 
-All implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
+All production implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
+
+**Note:** The Forth implementation is minimal, supporting only numbered asteroids and basic provisional designations. See [forth/README.md](forth/README.md) for details.
 
 ## Quick Start
 
@@ -57,6 +60,17 @@ dotnet run -- '1995 XA'    # Output: J95X00A
 ```csharp
 using MPC;
 string result = MPCDesignation.ConvertSimple("1995 XA");  // Returns "J95X00A"
+```
+
+### Forth
+```bash
+cd forth
+gforth src/mpc_designation_cli.fs '1995 XA'    # Output: J95X00A
+```
+
+```forth
+require src/mpc_designation.fs
+s" 1995 XA" convert-simple type  \ Prints: J95X00A
 ```
 
 ### Python
@@ -262,6 +276,11 @@ MPC_designations/
 │   ├── README.md       # C# documentation
 │   ├── Makefile
 │   └── src/            # Source code
+├── forth/
+│   ├── README.md       # Forth documentation
+│   ├── Makefile
+│   ├── src/            # Source code (gforth)
+│   └── test/           # Test files
 ├── fortran/
 │   ├── README.md       # Fortran documentation
 │   ├── Makefile
@@ -343,6 +362,7 @@ make test-all
 make test-c
 make test-cpp
 make test-csharp
+make test-forth
 make test-fortran
 make test-go
 make test-haskell

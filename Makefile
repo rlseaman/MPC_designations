@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-cpp test-csharp test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
+.PHONY: all clean test test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-cpp test-csharp test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
+test-all: test-c test-cpp test-csharp test-forth test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -79,6 +79,15 @@ test-csharp: test-data/prov_unpack_to_pack.csv
 		$(MAKE) -C csharp test; \
 	else \
 		echo ".NET not installed, skipping C# tests"; \
+	fi
+
+# Forth (gforth) tests
+test-forth test-gforth:
+	@echo "=== Forth Tests ==="
+	@if command -v gforth >/dev/null 2>&1; then \
+		$(MAKE) -C forth test; \
+	else \
+		echo "gforth not installed, skipping Forth tests"; \
 	fi
 
 # Fortran tests
@@ -250,6 +259,7 @@ help:
 	@echo "  test-c       Run C tests only"
 	@echo "  test-cpp     Run C++ tests only"
 	@echo "  test-csharp  Run C# tests only"
+	@echo "  test-forth   Run Forth (gforth) tests only"
 	@echo "  test-fortran Run Fortran tests only"
 	@echo "  test-haskell Run Haskell tests only"
 	@echo "  test-python  Run Python tests only"
