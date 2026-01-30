@@ -1,6 +1,6 @@
 #!/usr/bin/env julia
 
-# Test MPC designation round-trip conversions
+# Test MPC designation with bidirectional timing and round-trip verification
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
@@ -40,147 +40,116 @@ function main()
         end
     end
 
-    println("=== MPC Designation Round-trip Tests (Julia) ===")
     println("Loaded $(length(test_cases)) test cases")
     println()
 
+    pack_passed = 0
+    pack_failed = 0
+    unpack_passed = 0
+    unpack_failed = 0
+    rt_unpacked_passed = 0
+    rt_unpacked_failed = 0
+    rt_packed_passed = 0
+    rt_packed_failed = 0
+
     # Phase 1: Pack (unpacked -> packed)
     println("=== Phase 1: Pack (unpacked -> packed) ===")
-    passed = 0
-    failed = 0
-    errors = String[]
+    start_time = time()
     for tc in test_cases
         try
-            result = convert_simple(tc.unpacked)
+            result = pack(tc.unpacked)
             if result == tc.packed
-                passed += 1
+                pack_passed += 1
             else
-                failed += 1
-                if length(errors) < 5
-                    push!(errors, "pack('$(tc.unpacked)'): expected '$(tc.packed)', got '$result'")
-                end
+                pack_failed += 1
             end
-        catch e
-            failed += 1
-            if length(errors) < 5
-                msg = e isa MPCDesignationError ? e.msg : string(e)
-                push!(errors, "pack('$(tc.unpacked)'): $msg")
-            end
+        catch
+            pack_failed += 1
         end
     end
-    println("Passed: $passed")
-    println("Failed: $failed")
-    for err in errors
-        println("  $err")
-    end
+    elapsed = (time() - start_time) * 1000
+    rate = length(test_cases) / (elapsed / 1000)
+    println("Passed: $pack_passed")
+    println("Failed: $pack_failed")
+    println("Time:   $(round(Int, elapsed))ms ($(round(rate, digits=1)) entries/sec)")
     println()
-    phase1_pass = failed == 0
 
     # Phase 2: Unpack (packed -> unpacked)
     println("=== Phase 2: Unpack (packed -> unpacked) ===")
-    passed = 0
-    failed = 0
-    errors = String[]
+    start_time = time()
     for tc in test_cases
         try
-            result = convert_simple(tc.packed)
+            result = unpack(tc.packed)
             if result == tc.unpacked
-                passed += 1
+                unpack_passed += 1
             else
-                failed += 1
-                if length(errors) < 5
-                    push!(errors, "unpack('$(tc.packed)'): expected '$(tc.unpacked)', got '$result'")
-                end
+                unpack_failed += 1
             end
-        catch e
-            failed += 1
-            if length(errors) < 5
-                msg = e isa MPCDesignationError ? e.msg : string(e)
-                push!(errors, "unpack('$(tc.packed)'): $msg")
-            end
+        catch
+            unpack_failed += 1
         end
     end
-    println("Passed: $passed")
-    println("Failed: $failed (old-style designations convert to modern format)")
-    for err in errors
-        println("  $err")
-    end
+    elapsed = (time() - start_time) * 1000
+    rate = length(test_cases) / (elapsed / 1000)
+    println("Passed: $unpack_passed")
+    println("Failed: $unpack_failed")
+    println("Time:   $(round(Int, elapsed))ms ($(round(rate, digits=1)) entries/sec)")
     println()
 
     # Phase 3: Unpacked round-trip: unpack(pack(x)) = x
     println("=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===")
-    passed = 0
-    failed = 0
-    errors = String[]
+    start_time = time()
     for tc in test_cases
         try
-            packed = convert_simple(tc.unpacked)
-            back = convert_simple(packed)
+            packed = pack(tc.unpacked)
+            back = unpack(packed)
             if back == tc.unpacked
-                passed += 1
+                rt_unpacked_passed += 1
             else
-                failed += 1
-                if length(errors) < 5
-                    push!(errors, "'$(tc.unpacked)' -> '$packed' -> '$back'")
-                end
+                rt_unpacked_failed += 1
             end
-        catch e
-            failed += 1
-            if length(errors) < 5
-                msg = e isa MPCDesignationError ? e.msg : string(e)
-                push!(errors, "'$(tc.unpacked)': $msg")
-            end
+        catch
+            rt_unpacked_failed += 1
         end
     end
-    println("Passed: $passed")
-    println("Failed: $failed (old-style designations convert to modern format)")
-    for err in errors
-        println("  $err")
-    end
+    elapsed = (time() - start_time) * 1000
+    rate = length(test_cases) / (elapsed / 1000)
+    println("Passed: $rt_unpacked_passed")
+    println("Failed: $rt_unpacked_failed")
+    println("Time:   $(round(Int, elapsed))ms ($(round(rate, digits=1)) entries/sec)")
     println()
 
     # Phase 4: Packed round-trip: pack(unpack(y)) = y
     println("=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===")
-    passed = 0
-    failed = 0
-    errors = String[]
+    start_time = time()
     for tc in test_cases
         try
-            unpacked = convert_simple(tc.packed)
-            back = convert_simple(unpacked)
+            unpacked_result = unpack(tc.packed)
+            back = pack(unpacked_result)
             if back == tc.packed
-                passed += 1
+                rt_packed_passed += 1
             else
-                failed += 1
-                if length(errors) < 5
-                    push!(errors, "'$(tc.packed)' -> '$unpacked' -> '$back'")
-                end
+                rt_packed_failed += 1
             end
-        catch e
-            failed += 1
-            if length(errors) < 5
-                msg = e isa MPCDesignationError ? e.msg : string(e)
-                push!(errors, "'$(tc.packed)': $msg")
-            end
+        catch
+            rt_packed_failed += 1
         end
     end
-    println("Passed: $passed")
-    println("Failed: $failed")
-    for err in errors
-        println("  $err")
-    end
+    elapsed = (time() - start_time) * 1000
+    rate = length(test_cases) / (elapsed / 1000)
+    println("Passed: $rt_packed_passed")
+    println("Failed: $rt_packed_failed")
+    println("Time:   $(round(Int, elapsed))ms ($(round(rate, digits=1)) entries/sec)")
     println()
-    phase4_pass = failed == 0
 
     # Summary
     println("=== Summary ===")
-    println("Phase 1 (pack):           $(phase1_pass ? "PASS" : "FAIL")")
-    println("Phase 4 (packed RT):      $(phase4_pass ? "PASS" : "FAIL")")
-    println()
-    println("Note: Phases 2 and 3 have expected failures for old-style")
-    println("      designations (A908 CJ -> 1908 CJ) which is correct behavior.")
+    println("Pack:       $(pack_failed == 0 ? "PASS" : "FAIL ($pack_failed)")")
+    println("Unpack:     $(unpack_failed == 0 ? "PASS" : "FAIL ($unpack_failed)")")
+    println("Unpacked RT: $(rt_unpacked_failed == 0 ? "PASS" : "FAIL ($rt_unpacked_failed)")")
+    println("Packed RT:   $(rt_packed_failed == 0 ? "PASS" : "FAIL ($rt_packed_failed)")")
 
-    if !phase1_pass || !phase4_pass
+    if pack_failed > 0 || rt_packed_failed > 0
         exit(1)
     end
 end

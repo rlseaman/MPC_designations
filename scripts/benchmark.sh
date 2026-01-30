@@ -138,7 +138,7 @@ if [ "$ROUNDTRIP" = true ]; then
         run_roundtrip_benchmark "Kotlin" "cd kotlin && kotlin -cp build/mpc_designation.jar mpc.TestRoundtripKt ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
     if command -v dotnet >/dev/null 2>&1; then
-        run_roundtrip_benchmark "C#" "cd csharp/test && dotnet run -c Release -- ../../test-data/prov_unpack_to_pack.csv roundtrip 2>&1"
+        run_roundtrip_benchmark "C#" "cd csharp/test && dotnet run -c Release --project TestRoundtrip.csproj -- ../../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
     if command -v node >/dev/null 2>&1; then
         run_roundtrip_benchmark "JavaScript" "cd js && node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
@@ -272,7 +272,7 @@ else
         run_benchmark "Kotlin" "cd kotlin && kotlin -cp build/mpc_designation.jar mpc.TestCsvKt ../test-data/prov_unpack_to_pack.csv"
     fi
     if command -v dotnet >/dev/null 2>&1; then
-        run_benchmark "C#" "cd csharp/test && dotnet run -c Release -- ../../test-data/prov_unpack_to_pack.csv"
+        run_benchmark "C#" "cd csharp/test && dotnet run -c Release --project TestCsv.csproj -- ../../test-data/prov_unpack_to_pack.csv"
     fi
     if command -v node >/dev/null 2>&1; then
         run_benchmark "JavaScript" "cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
