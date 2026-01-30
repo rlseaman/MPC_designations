@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
+.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,9 +58,14 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
+test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
+
+# AWK tests
+test-awk:
+	@echo "=== AWK Tests ==="
+	$(MAKE) -C awk test
 
 # Bash tests
 test-bash:
@@ -261,6 +266,7 @@ help:
 	@echo "  all          Build all implementations (default)"
 	@echo "  clean        Remove all build artifacts"
 	@echo "  test-all     Run all tests for all languages"
+	@echo "  test-awk     Run AWK tests only"
 	@echo "  test-bash    Run Bash tests only"
 	@echo "  test-c       Run C tests only"
 	@echo "  test-cpp     Run C++ tests only"

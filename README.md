@@ -8,6 +8,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 
 | Language | Directory | Status |
 |----------|-----------|--------|
+| **AWK** | [`awk/`](awk/) | Production |
 | **Bash** | [`bash/`](bash/) | Production |
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
@@ -34,6 +35,13 @@ All production implementations pass the same test suite (2M+ conversions, 94 err
 **Note:** The Forth implementation is minimal, supporting only numbered asteroids and basic provisional designations. See [forth/README.md](forth/README.md) for details.
 
 ## Quick Start
+
+### AWK
+```bash
+cd awk
+echo "1995 XA" | awk -f src/mpc_designation.awk -f src/mpc_designation_main.awk
+# Output: J95X00A
+```
 
 ### Bash
 ```bash
@@ -274,6 +282,11 @@ MPC_designations/
 ├── test-data/
 │   ├── prov_unpack_to_pack.csv.gz  # 2M+ test cases
 │   └── error_test_cases.csv         # Error handling tests
+├── awk/
+│   ├── README.md       # AWK documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
 ├── bash/
 │   ├── README.md       # Bash documentation
 │   ├── Makefile
@@ -376,6 +389,7 @@ Each implementation includes tests against 2+ million known-good conversions and
 make test-all
 
 # Run tests for a specific language
+make test-awk
 make test-bash
 make test-c
 make test-cpp
@@ -458,6 +472,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | Kotlin | 5,775 | 349,972 | 0.09x |
 | PHP | 6,399 | 315,821 | 0.08x |
 | Haskell | 7,558 | 267,394 | 0.07x |
+| AWK | 8,734 | 231,405 | 0.06x |
 | Swift | 8,637 | 234,004 | 0.06x |
 | Java | 10,524 | 192,046 | 0.05x |
 | Python | 10,612 | 190,449 | 0.05x |
@@ -487,6 +502,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | Julia | 2,658 | 760,351 | 0.10x |
 | Swift | 4,182 | 483,283 | 0.06x |
 | PHP | 4,370 | 462,449 | 0.06x |
+| AWK | 9,254 | 218,402 | 0.03x |
 | Python | 4,972 | 406,526 | 0.05x |
 | Ruby | 11,896 | 169,897 | 0.02x |
 | Perl | 12,601 | 160,391 | 0.02x |
