@@ -403,7 +403,7 @@ git sparse-checkout set python test-data docs
 
 ## Performance
 
-Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
+Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 
 ### Pack Direction (unpacked → packed)
 
@@ -419,6 +419,7 @@ Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
 | C# | 3,257 | 620,537 | 0.17x |
 | Kotlin | 5,775 | 349,972 | 0.09x |
 | PHP | 6,399 | 315,821 | 0.08x |
+| Haskell | 7,558 | 267,394 | 0.07x |
 | Swift | 8,637 | 234,004 | 0.06x |
 | Java | 10,524 | 192,046 | 0.05x |
 | Python | 10,612 | 190,449 | 0.05x |
@@ -438,6 +439,7 @@ Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
 | Go | 465 | 4,340,646 | 0.60x |
 | TypeScript | 577 | 3,502,756 | 0.49x |
 | Rust | 790 | 2,558,342 | 0.35x |
+| Haskell | 1,180 | 1,713,433 | 0.24x |
 | Kotlin | 1,341 | 1,507,151 | 0.21x |
 | Fortran | 1,909 | 1,058,717 | 0.14x |
 | Java | 2,356 | 857,848 | 0.12x |
