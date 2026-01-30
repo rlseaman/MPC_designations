@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
+.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-nim test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
+test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-nim test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -189,6 +189,15 @@ test-kotlin: test-data/prov_unpack_to_pack.csv
 		$(MAKE) -C kotlin test-all; \
 	else \
 		echo "Kotlin not installed, skipping Kotlin tests"; \
+	fi
+
+# Nim tests
+test-nim: test-data/prov_unpack_to_pack.csv
+	@echo "=== Nim Tests ==="
+	@if command -v nim >/dev/null 2>&1; then \
+		$(MAKE) -C nim test-all; \
+	else \
+		echo "Nim not installed, skipping Nim tests"; \
 	fi
 
 # Ruby tests

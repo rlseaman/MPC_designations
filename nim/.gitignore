@@ -1,0 +1,7 @@
+# Build artifacts
+mpc_designation
+test_errors
+test_csv
+test_roundtrip
+nimcache/
+tmp/

@@ -21,6 +21,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **JavaScript** | [`js/`](js/) | Production |
 | **Julia** | [`julia/`](julia/) | Production |
 | **Kotlin** | [`kotlin/`](kotlin/) | Production |
+| **Nim** | [`nim/`](nim/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **PHP** | [`php/`](php/) | Production |
 | **Python** | [`python/`](python/) | Production |
@@ -208,6 +209,17 @@ kotlin -cp build/mpc_designation.jar mpc.MainKt '1995 XA'    # Output: J95X00A
 ```kotlin
 import mpc.MPCDesignation
 val result = MPCDesignation.convertSimple("1995 XA")  // Returns "J95X00A"
+```
+
+### Nim
+```bash
+cd nim && make
+./mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+```nim
+import mpc_designation
+let result = convertSimple("1995 XA")  # Returns "J95X00A"
 ```
 
 ### Ruby
@@ -462,6 +474,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | Language | Time (ms) | Rate (entries/sec) | Relative |
 |----------|----------:|-------------------:|---------:|
 | Go | 558 | 3,618,747 | 1.00x |
+| Nim | 634 | 3,187,839 | 0.88x |
 | JavaScript | 849 | 2,380,554 | 0.65x |
 | C | 962 | 2,100,925 | 0.58x |
 | TypeScript | 1,137 | 1,777,564 | 0.49x |
@@ -488,8 +501,9 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 
 | Language | Time (ms) | Rate (entries/sec) | Relative |
 |----------|----------:|-------------------:|---------:|
-| C | 283 | 7,141,661 | 1.00x |
-| C# | 296 | 6,828,007 | 0.95x |
+| Nim | 261 | 7,743,640 | 1.00x |
+| C | 283 | 7,141,661 | 0.92x |
+| C# | 296 | 6,828,007 | 0.88x |
 | JavaScript | 450 | 4,491,311 | 0.62x |
 | C++ | 455 | 4,441,956 | 0.62x |
 | Go | 465 | 4,340,646 | 0.60x |
