@@ -917,7 +917,7 @@ contains
                 info%dtype = 'provisional_extended'
                 info%subtype = 'provisional (extended format, cycle >=620)'
                 return
-            else if (index(CENTURY_LETTERS, first) > 0 .and. is_upper(des(7:7)) .and. index(des, ' ') == 0) then
+            else if (index(CENTURY_LETTERS, first) > 0 .and. is_upper(des(7:7)) .and. index(des(1:dlen), ' ') == 0) then
                 info%format = 'packed'
                 info%dtype = 'provisional'
                 info%subtype = 'provisional'
@@ -936,7 +936,7 @@ contains
         end if
 
         ! Packed satellite (8 chars starting with S, no spaces)
-        if (dlen == 8 .and. first == 'S' .and. index(des, ' ') == 0) then
+        if (dlen == 8 .and. first == 'S' .and. index(des(1:dlen), ' ') == 0) then
             info%format = 'packed'
             info%dtype = 'satellite'
             info%subtype = 'natural satellite'
@@ -944,7 +944,7 @@ contains
         end if
 
         ! Packed comet full (8 chars with comet type prefix, no spaces)
-        if (dlen == 8 .and. index(COMET_TYPES, first) > 0 .and. index(des, ' ') == 0) then
+        if (dlen == 8 .and. index(COMET_TYPES, first) > 0 .and. index(des(1:dlen), ' ') == 0) then
             ! Check if it's asteroid-style or comet-style provisional
             if (is_upper(des(8:8))) then
                 info%format = 'packed'

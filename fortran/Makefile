@@ -9,7 +9,7 @@ TEST_DATA = ../test-data
 # Output directory
 BUILD = build
 
-.PHONY: all clean test test-csv test-errors test-all build
+.PHONY: all clean test test-csv test-errors test-roundtrip test-all build
 
 # Default: build all
 all: $(BUILD)/mpc_designation_cli
@@ -35,6 +35,9 @@ $(BUILD)/test_csv: test/test_csv.f90 $(BUILD)/mpc_designation.o
 $(BUILD)/test_errors: test/test_errors.f90 $(BUILD)/mpc_designation.o
 	$(FC) $(FFLAGS) -I$(BUILD) $^ -o $@
 
+$(BUILD)/test_roundtrip: test/test_roundtrip.f90 $(BUILD)/mpc_designation.o
+	$(FC) $(FFLAGS) -I$(BUILD) $^ -o $@
+
 # Run the CLI (for manual testing)
 run: $(BUILD)/mpc_designation_cli
 	$(BUILD)/mpc_designation_cli $(ARGS)
@@ -53,8 +56,16 @@ test-csv: $(BUILD)/test_csv
 test-errors: $(BUILD)/test_errors
 	$(BUILD)/test_errors $(TEST_DATA)/error_test_cases.csv
 
+# Run roundtrip tests
+test-roundtrip: $(BUILD)/test_roundtrip
+	@if [ ! -f $(TEST_DATA)/prov_unpack_to_pack.csv ]; then \
+		echo "Decompressing test data..."; \
+		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
+	fi
+	$(BUILD)/test_roundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
+
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-csv test-roundtrip
 
 # Clean build artifacts
 clean:

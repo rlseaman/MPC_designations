@@ -381,6 +381,46 @@ git sparse-checkout set python test-data docs
 |----------|--------|
 | S/2019 S 22 | SK19S220 |
 
+## Performance
+
+Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
+
+### Pack Direction (unpacked → packed)
+
+| Language | Time (ms) | Rate (entries/sec) | Relative |
+|----------|----------:|-------------------:|---------:|
+| Go | 567 | 3,561,952 | 1.00x |
+| JavaScript | 825 | 2,449,806 | 0.69x |
+| C | 966 | 2,092,226 | 0.59x |
+| Rust | 1,341 | 1,507,151 | 0.42x |
+| Fortran | 2,500 | 808,436 | 0.23x |
+| Swift | 8,709 | 232,069 | 0.07x |
+| Python | 10,156 | 199,009 | 0.06x |
+| Perl | 16,291 | 124,062 | 0.03x |
+| Ruby | 22,162 | 91,196 | 0.03x |
+| Tcl | 43,044 | 46,954 | 0.01x |
+
+### Unpack Direction (packed → unpacked)
+
+| Language | Time (ms) | Rate (entries/sec) | Relative |
+|----------|----------:|-------------------:|---------:|
+| C | 282 | 7,166,986 | 1.00x |
+| JavaScript | 448 | 4,511,362 | 0.63x |
+| Go | 473 | 4,268,279 | 0.60x |
+| Rust | 790 | 2,558,342 | 0.36x |
+| Fortran | 1,916 | 1,054,849 | 0.15x |
+| Swift | 4,202 | 480,983 | 0.07x |
+| Python | 4,899 | 412,576 | 0.06x |
+| Ruby | 11,720 | 172,448 | 0.02x |
+| Perl | 12,971 | 155,816 | 0.02x |
+| Tcl | 28,087 | 71,958 | 0.01x |
+
+### Round-trip Verification
+
+All implementations pass the packed round-trip test: `pack(unpack(y)) = y`.
+
+Run benchmarks with: `./scripts/benchmark.sh --roundtrip`
+
 ## Documentation
 
 - [Specification](docs/SPECIFICATION.md) - MPC format specification reference

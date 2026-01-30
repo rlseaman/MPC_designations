@@ -39,14 +39,25 @@ fi
 
 # Build compiled languages
 echo "Building compiled implementations..."
-if [ "$ROUNDTRIP" = true ]; then
-    make -C c test_roundtrip >/dev/null 2>&1
-    make -C swift test_roundtrip >/dev/null 2>&1
-    make -C go test_roundtrip >/dev/null 2>&1
-else
-    make -C c test_csv >/dev/null 2>&1
-    make -C swift test_csv >/dev/null 2>&1
-    make -C go test_csv >/dev/null 2>&1
+make -C c test_csv test_roundtrip >/dev/null 2>&1 || true
+make -C cpp test_csv test_roundtrip >/dev/null 2>&1 || true
+make -C swift test_csv test_roundtrip >/dev/null 2>&1 || true
+make -C go test_csv test_roundtrip >/dev/null 2>&1 || true
+make -C fortran build/test_csv build/test_roundtrip >/dev/null 2>&1 || true
+if command -v cargo >/dev/null 2>&1; then
+    (cd rust && cargo build --release -q 2>/dev/null) || true
+fi
+if command -v javac >/dev/null 2>&1; then
+    make -C java build >/dev/null 2>&1 || true
+fi
+if command -v kotlinc >/dev/null 2>&1; then
+    make -C kotlin build >/dev/null 2>&1 || true
+fi
+if command -v dotnet >/dev/null 2>&1; then
+    (cd csharp && dotnet build -c Release -v q 2>/dev/null) || true
+fi
+if command -v npm >/dev/null 2>&1; then
+    (cd typescript && npm run build 2>/dev/null) || true
 fi
 echo ""
 
@@ -68,7 +79,7 @@ if [ "$ROUNDTRIP" = true ]; then
         # Extract timing from specific phase section
         local section=$(echo "$output" | grep -A3 "=== $phase")
         local time_ms=$(echo "$section" | grep "Time:" | sed -E 's/.*Time:[[:space:]]*([0-9]+)ms.*/\1/')
-        local rate=$(echo "$section" | grep "Time:" | sed -E 's/.*\(([0-9.]+) entries\/sec\).*/\1/')
+        local rate=$(echo "$section" | grep "Time:" | sed -E 's/.*\([[:space:]]*([0-9.]+) entries\/sec\).*/\1/')
         echo "$time_ms $rate"
     }
 
@@ -76,7 +87,7 @@ if [ "$ROUNDTRIP" = true ]; then
         local lang="$1"
         local cmd="$2"
 
-        printf "Testing %-8s " "$lang..."
+        printf "Testing %-12s " "$lang..."
 
         local output
         output=$(eval "$cmd" 2>&1 || true)
@@ -94,35 +105,59 @@ if [ "$ROUNDTRIP" = true ]; then
             rt_status="FAIL"
         fi
 
-        LANGUAGES+=("$lang")
-        PACK_TIMES+=("$pack_time")
-        PACK_RATES+=("$pack_rate")
-        UNPACK_TIMES+=("$unpack_time")
-        UNPACK_RATES+=("$unpack_rate")
-        RT_PACKED_STATUS+=("$rt_status")
+        if [ -n "$pack_time" ] && [ -n "$pack_rate" ]; then
+            LANGUAGES+=("$lang")
+            PACK_TIMES+=("$pack_time")
+            PACK_RATES+=("$pack_rate")
+            UNPACK_TIMES+=("$unpack_time")
+            UNPACK_RATES+=("$unpack_rate")
+            RT_PACKED_STATUS+=("$rt_status")
 
-        printf "Pack: %5dms (%8.0f/s)  Unpack: %5dms (%8.0f/s)  RT: %s\n" \
-            "$pack_time" "$pack_rate" "$unpack_time" "$unpack_rate" "$rt_status"
+            printf "Pack: %5dms (%8.0f/s)  Unpack: %5dms (%8.0f/s)  RT: %s\n" \
+                "$pack_time" "$pack_rate" "$unpack_time" "$unpack_rate" "$rt_status"
+        else
+            printf "SKIPPED (not available)\n"
+        fi
     }
 
     echo "Running bidirectional benchmarks..."
     echo ""
 
     run_roundtrip_benchmark "C" "cd c && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    run_roundtrip_benchmark "C++" "cd cpp && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Go" "cd go && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     run_roundtrip_benchmark "Swift" "cd swift && ./test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
-    run_roundtrip_benchmark "Perl" "cd perl && perl test/test_roundtrip.pl ../test-data/prov_unpack_to_pack.csv 2>&1"
-    run_roundtrip_benchmark "Python" "cd python && python3 test/test_roundtrip.py ../test-data/prov_unpack_to_pack.csv 2>&1"
-    run_roundtrip_benchmark "Tcl" "cd tcl && tclsh test/test_roundtrip.tcl ../test-data/prov_unpack_to_pack.csv 2>&1"
-    if command -v node >/dev/null 2>&1; then
-        run_roundtrip_benchmark "JS" "cd js && node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
-    fi
+    run_roundtrip_benchmark "Fortran" "cd fortran && ./build/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
     if command -v cargo >/dev/null 2>&1; then
-        run_roundtrip_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+        run_roundtrip_benchmark "Rust" "cd rust && ./target/release/test_roundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    if command -v java >/dev/null 2>&1 && [ -f java/classes/mpc/TestRoundtrip.class ]; then
+        run_roundtrip_benchmark "Java" "cd java && java -cp classes mpc.TestRoundtrip ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    if command -v kotlin >/dev/null 2>&1 && [ -f kotlin/build/mpc_designation.jar ]; then
+        run_roundtrip_benchmark "Kotlin" "cd kotlin && kotlin -cp build/mpc_designation.jar mpc.TestRoundtripKt ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    if command -v dotnet >/dev/null 2>&1; then
+        run_roundtrip_benchmark "C#" "cd csharp/test && dotnet run -c Release -- ../../test-data/prov_unpack_to_pack.csv roundtrip 2>&1"
+    fi
+    if command -v node >/dev/null 2>&1; then
+        run_roundtrip_benchmark "JavaScript" "cd js && node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    if command -v node >/dev/null 2>&1 && [ -f typescript/dist/test/test_roundtrip.js ]; then
+        run_roundtrip_benchmark "TypeScript" "cd typescript && node dist/test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    if command -v julia >/dev/null 2>&1; then
+        run_roundtrip_benchmark "Julia" "cd julia && julia test/test_roundtrip.jl ../test-data/prov_unpack_to_pack.csv 2>&1"
+    fi
+    run_roundtrip_benchmark "Python" "cd python && python3 test/test_roundtrip.py ../test-data/prov_unpack_to_pack.csv 2>&1"
+    if command -v php >/dev/null 2>&1; then
+        run_roundtrip_benchmark "PHP" "cd php && php test/test_roundtrip.php ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
     if command -v ruby >/dev/null 2>&1; then
         run_roundtrip_benchmark "Ruby" "cd ruby && ruby test/test_roundtrip.rb ../test-data/prov_unpack_to_pack.csv 2>&1"
     fi
+    run_roundtrip_benchmark "Perl" "cd perl && perl test/test_roundtrip.pl ../test-data/prov_unpack_to_pack.csv 2>&1"
+    run_roundtrip_benchmark "Tcl" "cd tcl && tclsh test/test_roundtrip.tcl ../test-data/prov_unpack_to_pack.csv 2>&1"
 
     echo ""
     echo "=== Summary: Pack Direction (unpacked → packed) ==="
@@ -136,16 +171,16 @@ if [ "$ROUNDTRIP" = true ]; then
     IFS=$'\n' SORTED=($(sort -t: -k1 -rn <<<"${INDEXED[*]}"))
     unset IFS
 
-    printf "%-10s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
-    printf "%-10s %10s %18s %11s\n" "--------" "---------" "------------------" "--------"
+    printf "%-12s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
+    printf "%-12s %10s %18s %11s\n" "----------" "---------" "------------------" "--------"
 
     FASTEST_RATE=$(echo "${SORTED[0]}" | cut -d: -f1)
     for item in "${SORTED[@]}"; do
         rate=$(echo "$item" | cut -d: -f1)
         lang=$(echo "$item" | cut -d: -f2)
         time_ms=$(echo "$item" | cut -d: -f3)
-        relative=$(echo "scale=4; $rate / $FASTEST_RATE" | bc)
-        printf "%-10s %10d %18.1f %10.4fx\n" "$lang" "$time_ms" "$rate" "$relative"
+        relative=$(echo "scale=2; $rate / $FASTEST_RATE" | bc)
+        printf "%-12s %10d %18.0f %10.2fx\n" "$lang" "$time_ms" "$rate" "$relative"
     done
 
     echo ""
@@ -160,23 +195,23 @@ if [ "$ROUNDTRIP" = true ]; then
     IFS=$'\n' SORTED_U=($(sort -t: -k1 -rn <<<"${INDEXED_U[*]}"))
     unset IFS
 
-    printf "%-10s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
-    printf "%-10s %10s %18s %11s\n" "--------" "---------" "------------------" "--------"
+    printf "%-12s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
+    printf "%-12s %10s %18s %11s\n" "----------" "---------" "------------------" "--------"
 
     FASTEST_RATE_U=$(echo "${SORTED_U[0]}" | cut -d: -f1)
     for item in "${SORTED_U[@]}"; do
         rate=$(echo "$item" | cut -d: -f1)
         lang=$(echo "$item" | cut -d: -f2)
         time_ms=$(echo "$item" | cut -d: -f3)
-        relative=$(echo "scale=4; $rate / $FASTEST_RATE_U" | bc)
-        printf "%-10s %10d %18.1f %10.4fx\n" "$lang" "$time_ms" "$rate" "$relative"
+        relative=$(echo "scale=2; $rate / $FASTEST_RATE_U" | bc)
+        printf "%-12s %10d %18.0f %10.2fx\n" "$lang" "$time_ms" "$rate" "$relative"
     done
 
     echo ""
     echo "=== Round-trip Verification: pack(unpack(y)) = y ==="
     echo ""
     for i in "${!LANGUAGES[@]}"; do
-        printf "%-10s %s\n" "${LANGUAGES[$i]}" "${RT_PACKED_STATUS[$i]}"
+        printf "%-12s %s\n" "${LANGUAGES[$i]}" "${RT_PACKED_STATUS[$i]}"
     done
 
 else
@@ -188,8 +223,8 @@ else
 
     extract_timing() {
         local output="$1"
-        local time_ms=$(echo "$output" | grep "Time:" | sed -E 's/.*Time:[[:space:]]*([0-9]+)ms.*/\1/')
-        local rate=$(echo "$output" | grep "Time:" | sed -E 's/.*\(([0-9.]+) entries\/sec\).*/\1/')
+        local time_ms=$(echo "$output" | grep "Time:" | head -1 | sed -E 's/.*Time:[[:space:]]*([0-9]+)ms.*/\1/')
+        local rate=$(echo "$output" | grep "Time:" | head -1 | sed -E 's/.*\([[:space:]]*([0-9.]+) entries\/sec\).*/\1/')
         echo "$time_ms $rate"
     }
 
@@ -197,10 +232,10 @@ else
         local lang="$1"
         local cmd="$2"
 
-        printf "Testing %-8s " "$lang..."
+        printf "Testing %-12s " "$lang..."
 
         local output
-        output=$(eval "$cmd" 2>&1)
+        output=$(eval "$cmd" 2>&1 || true)
 
         if echo "$output" | grep -q "Failed: [1-9]"; then
             echo -e "${RED}FAILED${NC}"
@@ -209,31 +244,54 @@ else
 
         read time_ms rate <<< $(extract_timing "$output")
 
-        LANGUAGES+=("$lang")
-        TIMES_MS+=("$time_ms")
-        RATES+=("$rate")
-
-        printf "%6dms  %12.1f entries/sec\n" "$time_ms" "$rate"
+        if [ -n "$time_ms" ] && [ -n "$rate" ]; then
+            LANGUAGES+=("$lang")
+            TIMES_MS+=("$time_ms")
+            RATES+=("$rate")
+            printf "%6dms  %12.0f entries/sec\n" "$time_ms" "$rate"
+        else
+            printf "SKIPPED (not available)\n"
+        fi
     }
 
     echo "Running pack benchmarks..."
     echo ""
 
     run_benchmark "C" "cd c && ./test_csv ../test-data/prov_unpack_to_pack.csv"
+    run_benchmark "C++" "cd cpp && ./test_csv ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Go" "cd go && ./test_csv ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Swift" "cd swift && ./test_csv ../test-data/prov_unpack_to_pack.csv"
-    run_benchmark "Perl" "cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv"
-    run_benchmark "Python" "cd python && python3 test/test_csv.py ../test-data/prov_unpack_to_pack.csv"
-    run_benchmark "Tcl" "cd tcl && tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv"
-    if command -v node >/dev/null 2>&1; then
-        run_benchmark "JS" "cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
-    fi
+    run_benchmark "Fortran" "cd fortran && ./build/test_csv ../test-data/prov_unpack_to_pack.csv"
     if command -v cargo >/dev/null 2>&1; then
-        run_benchmark "Rust" "cd rust && cargo build --release -q 2>/dev/null && ./target/release/test_csv ../test-data/prov_unpack_to_pack.csv"
+        run_benchmark "Rust" "cd rust && ./target/release/test_csv ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v java >/dev/null 2>&1 && [ -f java/classes/mpc/TestCSV.class ]; then
+        run_benchmark "Java" "cd java && java -cp classes mpc.TestCSV ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v kotlin >/dev/null 2>&1 && [ -f kotlin/build/mpc_designation.jar ]; then
+        run_benchmark "Kotlin" "cd kotlin && kotlin -cp build/mpc_designation.jar mpc.TestCsvKt ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v dotnet >/dev/null 2>&1; then
+        run_benchmark "C#" "cd csharp/test && dotnet run -c Release -- ../../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v node >/dev/null 2>&1; then
+        run_benchmark "JavaScript" "cd js && node test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v node >/dev/null 2>&1 && [ -f typescript/dist/test/test_csv.js ]; then
+        run_benchmark "TypeScript" "cd typescript && node dist/test/test_csv.js ../test-data/prov_unpack_to_pack.csv"
+    fi
+    if command -v julia >/dev/null 2>&1; then
+        run_benchmark "Julia" "cd julia && julia test/test_csv.jl ../test-data/prov_unpack_to_pack.csv"
+    fi
+    run_benchmark "Python" "cd python && python3 test/test_csv.py ../test-data/prov_unpack_to_pack.csv"
+    if command -v php >/dev/null 2>&1; then
+        run_benchmark "PHP" "cd php && php test/test_csv.php ../test-data/prov_unpack_to_pack.csv"
     fi
     if command -v ruby >/dev/null 2>&1; then
         run_benchmark "Ruby" "cd ruby && ruby test/test_csv.rb ../test-data/prov_unpack_to_pack.csv"
     fi
+    run_benchmark "Perl" "cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv"
+    run_benchmark "Tcl" "cd tcl && tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv"
 
     echo ""
     echo "=== Summary ==="
@@ -246,21 +304,21 @@ else
     IFS=$'\n' SORTED=($(sort -t: -k1 -rn <<<"${INDEXED[*]}"))
     unset IFS
 
-    printf "%-10s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
-    printf "%-10s %10s %18s %11s\n" "--------" "---------" "------------------" "--------"
+    printf "%-12s %10s %18s %11s\n" "Language" "Time (ms)" "Rate (entries/sec)" "Relative"
+    printf "%-12s %10s %18s %11s\n" "----------" "---------" "------------------" "--------"
 
     FASTEST_RATE=$(echo "${SORTED[0]}" | cut -d: -f1)
     for item in "${SORTED[@]}"; do
         rate=$(echo "$item" | cut -d: -f1)
         lang=$(echo "$item" | cut -d: -f2)
         time_ms=$(echo "$item" | cut -d: -f3)
-        relative=$(echo "scale=4; $rate / $FASTEST_RATE" | bc)
-        printf "%-10s %10d %18.1f %10.4fx\n" "$lang" "$time_ms" "$rate" "$relative"
+        relative=$(echo "scale=2; $rate / $FASTEST_RATE" | bc)
+        printf "%-12s %10d %18.0f %10.2fx\n" "$lang" "$time_ms" "$rate" "$relative"
     done
 fi
 
 echo ""
 echo "Test data: 2,021,090 designation conversions"
 echo ""
-echo "Note: Unpack has 2,625 'failures' which are old-style format normalizations (expected)."
+echo "Note: Unpack has ~2,625 'failures' which are old-style format normalizations (expected)."
 echo "      pack(unpack(y)) = y should PASS for all implementations (confirms lossless packed round-trip)."
