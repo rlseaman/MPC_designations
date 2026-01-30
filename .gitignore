@@ -18,6 +18,7 @@ build/
 c/mpc_designation
 c/test_csv
 c/test_errors
+c/test_roundtrip
 c/examples/example_usage
 c/build/
 *.o
@@ -34,6 +35,8 @@ swift/mpc_designation
 swift/test_csv
 swift/test_errors
 swift/test_errors_debug
+swift/test_roundtrip
+swift/test_roundtrip_debug
 swift/.build/
 *.dSYM/
 
@@ -47,6 +50,7 @@ cpp/test_roundtrip
 go/mpc_designation
 go/test_csv
 go/test_errors
+go/test_roundtrip
 go/mpc_designation-*
 
 # C# / .NET build artifacts
@@ -59,6 +63,12 @@ csharp/test/obj/
 java/classes/
 *.class
 *.jar
+
+# Kotlin build artifacts
+kotlin/build/
+
+# Rust target directory
+rust/target/
 
 # Editor files
 *.swp

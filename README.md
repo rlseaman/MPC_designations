@@ -15,6 +15,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
 | **Julia** | [`julia/`](julia/) | Production |
+| **Kotlin** | [`kotlin/`](kotlin/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **PHP** | [`php/`](php/) | Production |
 | **Python** | [`python/`](python/) | Production |
@@ -136,6 +137,17 @@ using MPCDesignation
 result = convert_simple("1995 XA")  # Returns "J95X00A"
 ```
 
+### Kotlin
+```bash
+cd kotlin && make
+kotlin -cp build/mpc_designation.jar mpc.MainKt '1995 XA'    # Output: J95X00A
+```
+
+```kotlin
+import mpc.MPCDesignation
+val result = MPCDesignation.convertSimple("1995 XA")  // Returns "J95X00A"
+```
+
 ### Ruby
 ```ruby
 require_relative 'src/mpc_designation'
@@ -246,6 +258,10 @@ MPC_designations/
 │   ├── Makefile
 │   ├── src/            # Source code (MPCDesignation module)
 │   └── test/           # Test files
+├── kotlin/
+│   ├── Makefile
+│   ├── src/            # Source code (mpc package)
+│   └── test/           # Test files
 ├── rust/
 │   ├── Cargo.toml      # Rust package definition
 │   ├── Makefile
@@ -276,6 +292,7 @@ make test-go
 make test-java
 make test-julia
 make test-js
+make test-kotlin
 make test-perl
 make test-php
 make test-python

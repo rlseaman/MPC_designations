@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
+.PHONY: all clean test test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -34,6 +34,13 @@ build-rust:
 		echo "Rust not installed, skipping Rust build"; \
 	fi
 
+build-kotlin:
+	@if command -v kotlinc >/dev/null 2>&1; then \
+		$(MAKE) -C kotlin; \
+	else \
+		echo "Kotlin not installed, skipping Kotlin build"; \
+	fi
+
 # Clean all build artifacts
 clean:
 	$(MAKE) -C c clean
@@ -51,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
+test-all: test-c test-cpp test-csharp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -138,6 +145,15 @@ test-js: test-data/prov_unpack_to_pack.csv
 		echo "Node.js not installed, skipping JavaScript tests"; \
 	fi
 
+# Kotlin tests
+test-kotlin: test-data/prov_unpack_to_pack.csv
+	@echo "=== Kotlin Tests ==="
+	@if command -v kotlinc >/dev/null 2>&1; then \
+		$(MAKE) -C kotlin test-all; \
+	else \
+		echo "Kotlin not installed, skipping Kotlin tests"; \
+	fi
+
 # Ruby tests
 test-ruby: test-data/prov_unpack_to_pack.csv
 	@echo "=== Ruby Tests ==="
@@ -215,6 +231,7 @@ help:
 	@echo "  test-java    Run Java tests only"
 	@echo "  test-julia   Run Julia tests only"
 	@echo "  test-js      Run JavaScript tests only"
+	@echo "  test-kotlin  Run Kotlin tests only"
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"
 	@echo "  test-php     Run PHP tests only"
