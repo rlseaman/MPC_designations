@@ -692,7 +692,7 @@ contains
         character(len=30) :: unpacked
         character(len=20) :: p
         character(len=1) :: ctype
-        character(len=7) :: prov_part
+        character(len=8) :: prov_part
         integer :: plen
 
         call clear_error()
@@ -713,8 +713,24 @@ contains
             if (is_upper(prov_part(7:7))) then
                 unpacked = ctype // '/' // trim(unpack_provisional(prov_part))
             else
-                unpacked = ctype // '/' // trim(unpack_comet_provisional(prov_part))
+                unpacked = ctype // '/' // trim(unpack_comet_provisional(prov_part(1:7)))
             end if
+            return
+        end if
+
+        ! 9-char format: comet type + 8-char provisional with 2-letter fragment
+        if (plen == 9) then
+            ctype = p(1:1)
+            prov_part = p(2:9)
+
+            if (index(COMET_TYPES, ctype) == 0) then
+                call set_error('Invalid comet type')
+                unpacked = ''
+                return
+            end if
+
+            ! 9-char always uses comet-style provisional with 2-letter fragment
+            unpacked = ctype // '/' // trim(unpack_comet_provisional(prov_part))
             return
         end if
 
@@ -965,6 +981,17 @@ contains
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
+                return
+            end if
+        end if
+
+        ! Packed comet with 2-letter fragment (9 chars)
+        if (dlen == 9 .and. index(COMET_TYPES, first) > 0 .and. index(des(1:dlen), ' ') == 0) then
+            ! Check for format: comet type + century letter + 2-digit year + halfmonth + 2-char order + 2-char fragment
+            if (is_upper(des(2:2)) .and. is_lower(des(8:8)) .and. is_lower(des(9:9))) then
+                info%format = 'packed'
+                info%dtype = 'comet_full'
+                info%subtype = 'comet with provisional designation (9-char, fragment)'
                 return
             end if
         end if
