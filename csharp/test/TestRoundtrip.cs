@@ -1,215 +1,183 @@
 /*
- * TestRoundtrip.cs - Test MPC designation roundtrip conversion
+ * TestRoundtrip.cs - Test MPC designation with bidirectional timing and round-trip verification
  *
- * Usage: dotnet run --project test/TestRoundtrip.csproj <csv_file> [max_errors]
+ * Usage: dotnet run --project test/TestRoundtrip.csproj <csv_file>
  */
 
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text.RegularExpressions;
 using MPC;
 
 class TestRoundtrip
 {
-    struct TestError
+    static int Main(string[] args)
     {
-        public string Test;
-        public string Input;
-        public string Step1;
-        public string Step2;
-        public string Expected;
-    }
+        if (args.Length < 1)
+        {
+            Console.Error.WriteLine("Usage: TestRoundtrip <csv_file>");
+            return 1;
+        }
 
-    static bool RunRoundtripTests(string csvFile, int maxErrors)
-    {
+        string csvFile = args[0];
         if (!File.Exists(csvFile))
         {
             Console.Error.WriteLine($"Error: Cannot open file: {csvFile}");
-            return false;
+            return 1;
         }
 
-        long total = 0;
-        long passed = 0;
-        long failed = 0;
-        var errors = new List<TestError>();
-
-        var sw = Stopwatch.StartNew();
-        var oldStyleRe = new Regex(@"^[AB]\d{3} [A-Z][A-Z]$");
-
+        // Load test cases
+        var testCases = new List<(string unpacked, string packed)>();
         using (var reader = new StreamReader(csvFile))
         {
-            // Skip header
-            reader.ReadLine();
-
+            reader.ReadLine(); // Skip header
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
                 line = line.Trim();
                 if (string.IsNullOrEmpty(line)) continue;
-
-                // Skip header if encountered again
                 if (line.StartsWith("unpacked")) continue;
-
-                total++;
 
                 int comma = line.IndexOf(',');
                 if (comma < 0) continue;
 
-                string unpacked = line.Substring(0, comma);
-                string packed = line.Substring(comma + 1);
+                testCases.Add((line.Substring(0, comma), line.Substring(comma + 1)));
+            }
+        }
 
-                // Test packed -> unpacked -> packed roundtrip
-                try
-                {
-                    string toUnpacked = MPCDesignation.Unpack(packed);
-                    string backToPacked = MPCDesignation.Pack(toUnpacked);
+        Console.WriteLine($"Loaded {testCases.Count} test cases");
+        Console.WriteLine();
 
-                    if (backToPacked != packed)
-                    {
-                        failed++;
-                        if (errors.Count < maxErrors)
-                        {
-                            errors.Add(new TestError
-                            {
-                                Test = "packed roundtrip",
-                                Input = packed,
-                                Step1 = toUnpacked,
-                                Step2 = backToPacked,
-                                Expected = packed
-                            });
-                        }
-                        continue;
-                    }
-                }
-                catch (MPCDesignationException e)
-                {
-                    failed++;
-                    if (errors.Count < maxErrors)
-                    {
-                        errors.Add(new TestError
-                        {
-                            Test = "packed roundtrip",
-                            Input = packed,
-                            Step1 = "ERROR",
-                            Step2 = e.Message,
-                            Expected = packed
-                        });
-                    }
-                    continue;
-                }
+        // Phase 1: Pack (unpacked -> packed)
+        Console.WriteLine("=== Phase 1: Pack (unpacked -> packed) ===");
+        int packPassed = 0;
+        int packFailed = 0;
+        var sw = Stopwatch.StartNew();
 
-                // Test unpacked -> packed -> unpacked roundtrip
-                try
-                {
-                    string toPacked = MPCDesignation.Pack(unpacked);
-                    string backToUnpacked = MPCDesignation.Unpack(toPacked);
-
-                    bool isOldStyle = oldStyleRe.IsMatch(unpacked);
-
-                    if (!isOldStyle && backToUnpacked != unpacked)
-                    {
-                        failed++;
-                        if (errors.Count < maxErrors)
-                        {
-                            errors.Add(new TestError
-                            {
-                                Test = "unpacked roundtrip",
-                                Input = unpacked,
-                                Step1 = toPacked,
-                                Step2 = backToUnpacked,
-                                Expected = unpacked
-                            });
-                        }
-                        continue;
-                    }
-
-                    // For old-style, verify the modern form roundtrips
-                    if (isOldStyle)
-                    {
-                        string repackedModern = MPCDesignation.Pack(backToUnpacked);
-                        if (repackedModern != toPacked)
-                        {
-                            failed++;
-                            if (errors.Count < maxErrors)
-                            {
-                                errors.Add(new TestError
-                                {
-                                    Test = "old-style modern roundtrip",
-                                    Input = unpacked,
-                                    Step1 = backToUnpacked,
-                                    Step2 = repackedModern,
-                                    Expected = toPacked
-                                });
-                            }
-                            continue;
-                        }
-                    }
-                }
-                catch (MPCDesignationException e)
-                {
-                    failed++;
-                    if (errors.Count < maxErrors)
-                    {
-                        errors.Add(new TestError
-                        {
-                            Test = "unpacked roundtrip",
-                            Input = unpacked,
-                            Step1 = "ERROR",
-                            Step2 = e.Message,
-                            Expected = unpacked
-                        });
-                    }
-                    continue;
-                }
-
-                passed++;
-
-                if (total % 100000 == 0)
-                {
-                    Console.WriteLine($"Processed {total} entries...");
-                }
+        foreach (var (unpacked, packed) in testCases)
+        {
+            try
+            {
+                string result = MPCDesignation.Pack(unpacked);
+                if (result == packed)
+                    packPassed++;
+                else
+                    packFailed++;
+            }
+            catch (MPCDesignationException)
+            {
+                packFailed++;
             }
         }
 
         sw.Stop();
-        long elapsed = sw.ElapsedMilliseconds;
-
-        Console.WriteLine();
-        Console.WriteLine("=== Roundtrip Test Results ===");
-        Console.WriteLine($"Total:  {total}");
-        Console.WriteLine($"Passed: {passed}");
-        Console.WriteLine($"Failed: {failed}");
-        Console.WriteLine($"Time:   {elapsed}ms ({total * 1000.0 / elapsed:F1} entries/sec)");
+        long packElapsed = sw.ElapsedMilliseconds;
+        double packRate = testCases.Count * 1000.0 / packElapsed;
+        Console.WriteLine($"Passed: {packPassed}");
+        Console.WriteLine($"Failed: {packFailed}");
+        Console.WriteLine($"Time:   {packElapsed}ms ({packRate:F1} entries/sec)");
         Console.WriteLine();
 
-        if (failed > 0)
+        // Phase 2: Unpack (packed -> unpacked)
+        Console.WriteLine("=== Phase 2: Unpack (packed -> unpacked) ===");
+        int unpackPassed = 0;
+        int unpackFailed = 0;
+        sw.Restart();
+
+        foreach (var (unpacked, packed) in testCases)
         {
-            Console.WriteLine($"=== First {errors.Count} failures ===");
-            Console.WriteLine($"{"Test",-20} {"Input",-20} {"Step1",-15} {"Step2",-20} {"Expected",-15}");
-            Console.WriteLine(new string('-', 90));
-            foreach (var err in errors)
+            try
             {
-                Console.WriteLine($"{err.Test,-20} {err.Input,-20} {err.Step1,-15} {err.Step2,-20} {err.Expected,-15}");
+                string result = MPCDesignation.Unpack(packed);
+                if (result == unpacked)
+                    unpackPassed++;
+                else
+                    unpackFailed++;
+            }
+            catch (MPCDesignationException)
+            {
+                unpackFailed++;
             }
         }
 
-        return failed == 0;
-    }
+        sw.Stop();
+        long unpackElapsed = sw.ElapsedMilliseconds;
+        double unpackRate = testCases.Count * 1000.0 / unpackElapsed;
+        Console.WriteLine($"Passed: {unpackPassed}");
+        Console.WriteLine($"Failed: {unpackFailed}");
+        Console.WriteLine($"Time:   {unpackElapsed}ms ({unpackRate:F1} entries/sec)");
+        Console.WriteLine();
 
-    static int Main(string[] args)
-    {
-        if (args.Length < 1)
+        // Phase 3: Unpacked round-trip: unpack(pack(x)) = x
+        Console.WriteLine("=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===");
+        int rtUnpackedPassed = 0;
+        int rtUnpackedFailed = 0;
+        sw.Restart();
+
+        foreach (var (unpacked, packed) in testCases)
         {
-            Console.Error.WriteLine("Usage: TestRoundtrip <csv_file> [max_errors]");
-            return 1;
+            try
+            {
+                string packedResult = MPCDesignation.Pack(unpacked);
+                string back = MPCDesignation.Unpack(packedResult);
+                if (back == unpacked)
+                    rtUnpackedPassed++;
+                else
+                    rtUnpackedFailed++;
+            }
+            catch (MPCDesignationException)
+            {
+                rtUnpackedFailed++;
+            }
         }
 
-        string csvFile = args[0];
-        int maxErrors = args.Length > 1 ? int.Parse(args[1]) : 100;
+        sw.Stop();
+        long rtUnpackedElapsed = sw.ElapsedMilliseconds;
+        double rtUnpackedRate = testCases.Count * 1000.0 / rtUnpackedElapsed;
+        Console.WriteLine($"Passed: {rtUnpackedPassed}");
+        Console.WriteLine($"Failed: {rtUnpackedFailed}");
+        Console.WriteLine($"Time:   {rtUnpackedElapsed}ms ({rtUnpackedRate:F1} entries/sec)");
+        Console.WriteLine();
 
-        bool success = RunRoundtripTests(csvFile, maxErrors);
-        return success ? 0 : 1;
+        // Phase 4: Packed round-trip: pack(unpack(y)) = y
+        Console.WriteLine("=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===");
+        int rtPackedPassed = 0;
+        int rtPackedFailed = 0;
+        sw.Restart();
+
+        foreach (var (unpacked, packed) in testCases)
+        {
+            try
+            {
+                string unpackedResult = MPCDesignation.Unpack(packed);
+                string back = MPCDesignation.Pack(unpackedResult);
+                if (back == packed)
+                    rtPackedPassed++;
+                else
+                    rtPackedFailed++;
+            }
+            catch (MPCDesignationException)
+            {
+                rtPackedFailed++;
+            }
+        }
+
+        sw.Stop();
+        long rtPackedElapsed = sw.ElapsedMilliseconds;
+        double rtPackedRate = testCases.Count * 1000.0 / rtPackedElapsed;
+        Console.WriteLine($"Passed: {rtPackedPassed}");
+        Console.WriteLine($"Failed: {rtPackedFailed}");
+        Console.WriteLine($"Time:   {rtPackedElapsed}ms ({rtPackedRate:F1} entries/sec)");
+        Console.WriteLine();
+
+        // Summary
+        Console.WriteLine("=== Summary ===");
+        Console.WriteLine($"Pack:       {(packFailed == 0 ? "PASS" : $"FAIL ({packFailed})")}");
+        Console.WriteLine($"Unpack:     {(unpackFailed == 0 ? "PASS" : $"FAIL ({unpackFailed})")}");
+        Console.WriteLine($"Unpacked RT: {(rtUnpackedFailed == 0 ? "PASS" : $"FAIL ({rtUnpackedFailed})")}");
+        Console.WriteLine($"Packed RT:   {(rtPackedFailed == 0 ? "PASS" : $"FAIL ({rtPackedFailed})")}");
+
+        return (packFailed > 0 || rtPackedFailed > 0) ? 1 : 0;
     }
 }

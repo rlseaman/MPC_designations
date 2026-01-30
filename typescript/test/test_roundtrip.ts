@@ -1,28 +1,19 @@
 #!/usr/bin/env node
 /**
- * Test MPC designation round-trip conversions (pack -> unpack -> pack).
+ * Test MPC designation with bidirectional timing and round-trip verification.
  */
 
 import * as fs from 'fs';
 import * as readline from 'readline';
-import { convertSimple } from '../src/mpc_designation';
+import { pack, unpack } from '../src/mpc_designation';
 
-interface TestError {
-    input: string;
-    message: string;
+interface TestCase {
+    unpacked: string;
+    packed: string;
 }
 
-async function runTests(csvFile: string, maxErrors: number = 100): Promise<boolean> {
-    let total = 0;
-    let passed = 0;
-    let failed = 0;
-    const errors: TestError[] = [];
-
-    const startTime = Date.now();
-
-    console.log('=== MPC Designation Round-Trip Tests (TypeScript) ===');
-    console.log();
-
+async function loadTestCases(csvFile: string): Promise<TestCase[]> {
+    const testCases: TestCase[] = [];
     const fileStream = fs.createReadStream(csvFile);
     const rl = readline.createInterface({
         input: fileStream,
@@ -34,92 +25,153 @@ async function runTests(csvFile: string, maxErrors: number = 100): Promise<boole
     for await (const line of rl) {
         if (isFirstLine) {
             isFirstLine = false;
-            continue; // Skip header
-        }
-
-        const trimmedLine = line.trim();
-        if (!trimmedLine) {
             continue;
         }
 
-        total++;
-        const parts = trimmedLine.split(',');
-        const unpacked = parts[0];
-        const packed = parts[1];
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
 
-        try {
-            // Test round-trip: unpacked -> packed -> unpacked -> packed
-            const packed1 = convertSimple(unpacked);
-            const unpacked1 = convertSimple(packed1);
-            const packed2 = convertSimple(unpacked1);
+        const comma = trimmedLine.indexOf(',');
+        if (comma < 0) continue;
 
-            if (packed1 !== packed2) {
-                failed++;
-                if (errors.length < maxErrors) {
-                    errors.push({
-                        input: unpacked,
-                        message: `unpacked -> '${packed1}' -> '${unpacked1}' -> '${packed2}' (packed1 != packed2)`
-                    });
-                }
-            } else if (packed1 !== packed) {
-                failed++;
-                if (errors.length < maxErrors) {
-                    errors.push({
-                        input: unpacked,
-                        message: `Expected packed: '${packed}', Got: '${packed1}'`
-                    });
-                }
-            } else {
-                passed++;
-            }
-        } catch (e) {
-            failed++;
-            if (errors.length < maxErrors) {
-                const message = e instanceof Error ? e.message : String(e);
-                errors.push({ input: unpacked, message: `Error: ${message}` });
-            }
-        }
-
-        // Progress indicator every 100,000 entries
-        if (total % 100000 === 0) {
-            process.stdout.write(`Processed ${total} entries...\n`);
-        }
+        testCases.push({
+            unpacked: trimmedLine.substring(0, comma),
+            packed: trimmedLine.substring(comma + 1)
+        });
     }
 
-    const elapsed = Date.now() - startTime;
-
-    console.log();
-    console.log('=== Round-Trip Test Results ===');
-    console.log(`Total:  ${total}`);
-    console.log(`Passed: ${passed}`);
-    console.log(`Failed: ${failed}`);
-    console.log(`Time:   ${elapsed}ms (${(total / (elapsed / 1000)).toFixed(1)} entries/sec)`);
-    console.log();
-
-    if (failed > 0) {
-        console.log(`=== First ${errors.length} failures ===`);
-        for (const { input, message } of errors) {
-            console.log(`FAIL: roundtrip('${input}')`);
-            console.log(`      ${message}`);
-        }
-    }
-
-    return failed === 0;
+    return testCases;
 }
 
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
 
     if (args.length < 1) {
-        console.error('Usage: test_roundtrip <csv_file> [max_errors]');
+        console.error('Usage: test_roundtrip <csv_file>');
         process.exit(1);
     }
 
     const csvFile = args[0];
-    const maxErrors = args.length > 1 ? parseInt(args[1], 10) : 100;
+    const testCases = await loadTestCases(csvFile);
+    console.log(`Loaded ${testCases.length} test cases`);
+    console.log();
 
-    const success = await runTests(csvFile, maxErrors);
-    process.exit(success ? 0 : 1);
+    // Phase 1: Pack (unpacked -> packed)
+    console.log('=== Phase 1: Pack (unpacked -> packed) ===');
+    let packPassed = 0;
+    let packFailed = 0;
+    let startTime = Date.now();
+
+    for (const tc of testCases) {
+        try {
+            const result = pack(tc.unpacked);
+            if (result === tc.packed) {
+                packPassed++;
+            } else {
+                packFailed++;
+            }
+        } catch {
+            packFailed++;
+        }
+    }
+
+    let elapsed = Date.now() - startTime;
+    let rate = testCases.length / (elapsed / 1000);
+    console.log(`Passed: ${packPassed}`);
+    console.log(`Failed: ${packFailed}`);
+    console.log(`Time:   ${elapsed}ms (${rate.toFixed(1)} entries/sec)`);
+    console.log();
+
+    // Phase 2: Unpack (packed -> unpacked)
+    console.log('=== Phase 2: Unpack (packed -> unpacked) ===');
+    let unpackPassed = 0;
+    let unpackFailed = 0;
+    startTime = Date.now();
+
+    for (const tc of testCases) {
+        try {
+            const result = unpack(tc.packed);
+            if (result === tc.unpacked) {
+                unpackPassed++;
+            } else {
+                unpackFailed++;
+            }
+        } catch {
+            unpackFailed++;
+        }
+    }
+
+    elapsed = Date.now() - startTime;
+    rate = testCases.length / (elapsed / 1000);
+    console.log(`Passed: ${unpackPassed}`);
+    console.log(`Failed: ${unpackFailed}`);
+    console.log(`Time:   ${elapsed}ms (${rate.toFixed(1)} entries/sec)`);
+    console.log();
+
+    // Phase 3: Unpacked round-trip: unpack(pack(x)) = x
+    console.log('=== Phase 3: Unpacked round-trip: unpack(pack(x)) = x ===');
+    let rtUnpackedPassed = 0;
+    let rtUnpackedFailed = 0;
+    startTime = Date.now();
+
+    for (const tc of testCases) {
+        try {
+            const packed = pack(tc.unpacked);
+            const back = unpack(packed);
+            if (back === tc.unpacked) {
+                rtUnpackedPassed++;
+            } else {
+                rtUnpackedFailed++;
+            }
+        } catch {
+            rtUnpackedFailed++;
+        }
+    }
+
+    elapsed = Date.now() - startTime;
+    rate = testCases.length / (elapsed / 1000);
+    console.log(`Passed: ${rtUnpackedPassed}`);
+    console.log(`Failed: ${rtUnpackedFailed}`);
+    console.log(`Time:   ${elapsed}ms (${rate.toFixed(1)} entries/sec)`);
+    console.log();
+
+    // Phase 4: Packed round-trip: pack(unpack(y)) = y
+    console.log('=== Phase 4: Packed round-trip: pack(unpack(y)) = y ===');
+    let rtPackedPassed = 0;
+    let rtPackedFailed = 0;
+    startTime = Date.now();
+
+    for (const tc of testCases) {
+        try {
+            const unpacked = unpack(tc.packed);
+            const back = pack(unpacked);
+            if (back === tc.packed) {
+                rtPackedPassed++;
+            } else {
+                rtPackedFailed++;
+            }
+        } catch {
+            rtPackedFailed++;
+        }
+    }
+
+    elapsed = Date.now() - startTime;
+    rate = testCases.length / (elapsed / 1000);
+    console.log(`Passed: ${rtPackedPassed}`);
+    console.log(`Failed: ${rtPackedFailed}`);
+    console.log(`Time:   ${elapsed}ms (${rate.toFixed(1)} entries/sec)`);
+    console.log();
+
+    // Summary
+    console.log('=== Summary ===');
+    console.log(`Pack:       ${packFailed === 0 ? 'PASS' : `FAIL (${packFailed})`}`);
+    console.log(`Unpack:     ${unpackFailed === 0 ? 'PASS' : `FAIL (${unpackFailed})`}`);
+    console.log(`Unpacked RT: ${rtUnpackedFailed === 0 ? 'PASS' : `FAIL (${rtUnpackedFailed})`}`);
+    console.log(`Packed RT:   ${rtPackedFailed === 0 ? 'PASS' : `FAIL (${rtPackedFailed})`}`);
+
+    if (packFailed > 0 || rtPackedFailed > 0) {
+        process.exit(1);
+    }
 }
 
 main().catch(err => {

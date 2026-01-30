@@ -385,47 +385,49 @@ git sparse-checkout set python test-data docs
 
 Benchmark results on Apple M3 Pro, processing 2,021,090 designation conversions.
 
-**Note:** Languages not shown require specific compilers/runtimes (e.g., `kotlinc`, `dotnet`, `julia`) that may not be installed. Run `./scripts/benchmark.sh` to benchmark all available implementations.
-
 ### Pack Direction (unpacked → packed)
 
 | Language | Time (ms) | Rate (entries/sec) | Relative |
 |----------|----------:|-------------------:|---------:|
-| Go | 576 | 3,505,992 | 1.00x |
-| JavaScript | 843 | 2,397,497 | 0.68x |
-| C | 966 | 2,092,226 | 0.59x |
-| Rust | 1,416 | 1,427,323 | 0.40x |
-| Fortran | 2,509 | 805,536 | 0.22x |
-| Julia | 2,997 | 674,288 | 0.19x |
-| Kotlin | 5,891 | 343,081 | 0.09x |
-| PHP | 6,429 | 314,369 | 0.08x |
-| Swift | 8,770 | 230,455 | 0.06x |
-| Python | 10,577 | 191,077 | 0.05x |
-| Java | 11,241 | 179,796 | 0.05x |
-| Perl | 16,189 | 124,843 | 0.03x |
-| C++ | 22,234 | 90,901 | 0.02x |
-| Ruby | 22,473 | 89,934 | 0.02x |
-| Tcl | 42,248 | 47,839 | 0.01x |
+| Go | 558 | 3,618,747 | 1.00x |
+| JavaScript | 849 | 2,380,554 | 0.65x |
+| C | 962 | 2,100,925 | 0.58x |
+| TypeScript | 1,137 | 1,777,564 | 0.49x |
+| Rust | 1,339 | 1,509,402 | 0.41x |
+| Fortran | 2,531 | 798,534 | 0.22x |
+| Julia | 2,994 | 675,128 | 0.18x |
+| C# | 3,257 | 620,537 | 0.17x |
+| Kotlin | 5,775 | 349,972 | 0.09x |
+| PHP | 6,399 | 315,821 | 0.08x |
+| Swift | 8,637 | 234,004 | 0.06x |
+| Java | 10,524 | 192,046 | 0.05x |
+| Python | 10,612 | 190,449 | 0.05x |
+| Perl | 15,718 | 128,584 | 0.03x |
+| C++ | 21,907 | 92,258 | 0.02x |
+| Ruby | 22,389 | 90,272 | 0.02x |
+| Tcl | 41,976 | 48,149 | 0.01x |
 
 ### Unpack Direction (packed → unpacked)
 
 | Language | Time (ms) | Rate (entries/sec) | Relative |
 |----------|----------:|-------------------:|---------:|
-| C | 285 | 7,091,544 | 1.00x |
-| JavaScript | 454 | 4,451,740 | 0.62x |
-| C++ | 456 | 4,432,215 | 0.62x |
-| Go | 476 | 4,240,651 | 0.59x |
-| Rust | 797 | 2,535,872 | 0.35x |
-| Kotlin | 1,319 | 1,532,290 | 0.21x |
-| Fortran | 1,939 | 1,042,336 | 0.14x |
-| Java | 2,355 | 858,212 | 0.12x |
-| Julia | 2,490 | 811,700 | 0.11x |
-| Swift | 4,236 | 477,122 | 0.06x |
-| PHP | 4,338 | 465,896 | 0.06x |
-| Python | 5,065 | 399,000 | 0.05x |
-| Ruby | 11,831 | 170,830 | 0.02x |
-| Perl | 12,588 | 160,557 | 0.02x |
-| Tcl | 27,846 | 72,581 | 0.01x |
+| C | 283 | 7,141,661 | 1.00x |
+| C# | 296 | 6,828,007 | 0.95x |
+| JavaScript | 450 | 4,491,311 | 0.62x |
+| C++ | 455 | 4,441,956 | 0.62x |
+| Go | 465 | 4,340,646 | 0.60x |
+| TypeScript | 577 | 3,502,756 | 0.49x |
+| Rust | 790 | 2,558,342 | 0.35x |
+| Kotlin | 1,341 | 1,507,151 | 0.21x |
+| Fortran | 1,909 | 1,058,717 | 0.14x |
+| Java | 2,356 | 857,848 | 0.12x |
+| Julia | 2,658 | 760,351 | 0.10x |
+| Swift | 4,182 | 483,283 | 0.06x |
+| PHP | 4,370 | 462,449 | 0.06x |
+| Python | 4,972 | 406,526 | 0.05x |
+| Ruby | 11,896 | 169,897 | 0.02x |
+| Perl | 12,601 | 160,391 | 0.02x |
+| Tcl | 27,477 | 73,556 | 0.01x |
 
 ### Round-trip Verification
 
