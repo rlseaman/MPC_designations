@@ -59,6 +59,10 @@ csharp/obj/
 csharp/test/bin/
 csharp/test/obj/
 
+# Fortran build artifacts
+fortran/build/
+*.mod
+
 # Java build artifacts
 java/classes/
 *.class

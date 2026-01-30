@@ -11,6 +11,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
 | **C#** | [`csharp/`](csharp/) | Production |
+| **Fortran** | [`fortran/`](fortran/) | Production |
 | **Go** | [`go/`](go/) | Production |
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
@@ -91,6 +92,18 @@ MPCDesignation::convertSimple('1995 XA');  // Returns 'J95X00A'
 ```bash
 cd php
 php src/mpc_designation_cli.php '1995 XA'    # Output: J95X00A
+```
+
+### Fortran
+```bash
+cd fortran && make
+./build/mpc_designation_cli '1995 XA'    # Output: J95X00A
+```
+
+```fortran
+use mpc_designation
+character(len=80) :: result
+result = convert_simple('1995 XA')  ! Returns 'J95X00A'
 ```
 
 ### Go
@@ -235,6 +248,11 @@ MPC_designations/
 │   ├── README.md       # C# documentation
 │   ├── Makefile
 │   └── src/            # Source code
+├── fortran/
+│   ├── README.md       # Fortran documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
 ├── python/
 │   ├── README.md       # Python documentation
 │   ├── pyproject.toml
@@ -306,6 +324,7 @@ make test-all
 make test-c
 make test-cpp
 make test-csharp
+make test-fortran
 make test-go
 make test-java
 make test-julia
