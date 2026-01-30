@@ -9,6 +9,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | Language | Directory | Status |
 |----------|-----------|--------|
 | **C** | [`c/`](c/) | Production |
+| **C++** | [`cpp/`](cpp/) | Production |
 | **Go** | [`go/`](go/) | Production |
 | **Java** | [`java/`](java/) | Production |
 | **JavaScript** | [`js/`](js/) | Production |
@@ -29,6 +30,17 @@ All implementations pass the same test suite (2M+ conversions, 94 error cases) a
 ```bash
 cd c && make
 ./mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+### C++
+```bash
+cd cpp && make
+./mpc_designation '1995 XA'    # Output: J95X00A
+```
+
+```cpp
+#include "mpc_designation.hpp"
+std::string result = mpc::MPCDesignation::convertSimple("1995 XA");  // Returns "J95X00A"
 ```
 
 ### Python
@@ -179,6 +191,10 @@ MPC_designations/
 │   ├── src/            # Source code
 │   ├── test/           # Test files
 │   └── examples/       # Usage examples
+├── cpp/
+│   ├── README.md       # C++ documentation
+│   ├── Makefile
+│   └── src/            # Source code
 ├── python/
 │   ├── README.md       # Python documentation
 │   ├── pyproject.toml
@@ -238,6 +254,7 @@ make test-all
 
 # Run tests for a specific language
 make test-c
+make test-cpp
 make test-go
 make test-java
 make test-julia

@@ -2,14 +2,17 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
+.PHONY: all clean test test-c test-cpp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php test-errors test-all validate version
 
 # Default: build all
-all: build-c build-swift build-go build-java build-rust
+all: build-c build-cpp build-swift build-go build-java build-rust
 
 # Build targets
 build-c:
 	$(MAKE) -C c
+
+build-cpp:
+	$(MAKE) -C cpp
 
 build-swift:
 	$(MAKE) -C swift
@@ -34,6 +37,7 @@ build-rust:
 # Clean all build artifacts
 clean:
 	$(MAKE) -C c clean
+	$(MAKE) -C cpp clean
 	$(MAKE) -C swift clean
 	$(MAKE) -C go clean
 	@if command -v javac >/dev/null 2>&1; then $(MAKE) -C java clean; fi
@@ -47,7 +51,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-c test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
+test-all: test-c test-cpp test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-ruby test-rust test-php
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -55,6 +59,11 @@ test-all: test-c test-python test-tcl test-swift test-perl test-go test-java tes
 test-c: build-c
 	@echo "=== C Tests ==="
 	$(MAKE) -C c test-all
+
+# C++ tests
+test-cpp: build-cpp test-data/prov_unpack_to_pack.csv
+	@echo "=== C++ Tests ==="
+	$(MAKE) -C cpp test
 
 # Python tests
 test-python: test-data/prov_unpack_to_pack.csv
@@ -187,6 +196,7 @@ help:
 	@echo "  clean        Remove all build artifacts"
 	@echo "  test-all     Run all tests for all languages"
 	@echo "  test-c       Run C tests only"
+	@echo "  test-cpp     Run C++ tests only"
 	@echo "  test-python  Run Python tests only"
 	@echo "  test-tcl     Run TCL tests only"
 	@echo "  test-swift   Run Swift tests only"

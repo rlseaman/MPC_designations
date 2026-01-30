@@ -37,6 +37,12 @@ swift/test_errors_debug
 swift/.build/
 *.dSYM/
 
+# C++ build artifacts
+cpp/mpc_designation
+cpp/test_csv
+cpp/test_errors
+cpp/test_roundtrip
+
 # Go build artifacts
 go/mpc_designation
 go/test_csv
