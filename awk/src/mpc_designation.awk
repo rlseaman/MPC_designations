@@ -50,6 +50,23 @@ function base62_value(c) {
     return BASE62_VAL[c]
 }
 
+# Convert number to base-62 string with specified width
+function num_to_base62(num, width,    result, i) {
+    result = ""
+    for (i = 0; i < width; i++) {
+        result = base62_char(num % 62) result
+        num = int(num / 62)
+    }
+    return result
+}
+
+# Get letter position (A=0, B=1, ..., H=7, J=8, ..., Z=24)
+# Skips I
+function letter_position(c,    pos) {
+    pos = index("ABCDEFGHJKLMNOPQRSTUVWXYZ", c) - 1
+    return pos
+}
+
 # Check if string is all digits
 function is_numeric(s) {
     return s ~ /^[0-9]+$/
@@ -122,13 +139,21 @@ function decode_cycle(encoded,    v1, v2) {
     return v1 * 10 + v2
 }
 
-function pack_provisional(desig,    year, half, second, cycle, century, century_char, yy) {
+function pack_provisional(desig,    year, half, second, cycle, century, century_char, yy, second_pos, encoded_val) {
     # Parse: "1995 XA" or "1995 XA123"
-    year = substr(desig, 1, 4)
+    year = int(substr(desig, 1, 4))
     half = substr(desig, 6, 1)
     second = substr(desig, 7, 1)
     cycle = substr(desig, 8)
     if (cycle == "") cycle = 0
+    cycle = int(cycle)
+
+    # Extended format for cycle >= 620
+    if (cycle >= 620) {
+        second_pos = letter_position(second)
+        encoded_val = (cycle - 620) * 25 + second_pos
+        return "_" base62_char(year - 2000) half num_to_base62(encoded_val, 4)
+    }
 
     century = int(year / 100)
     century_char = NUM_TO_CENTURY[century]
@@ -193,43 +218,82 @@ function unpack_numbered_comet(packed,    num, type) {
     return num type
 }
 
-function pack_provisional_comet(desig,    type, year, half, order, fragment, century, century_char, yy, base_desig) {
-    # Handle fragment: "C/1995 O1-b"
+function pack_provisional_comet(desig,    type, year, half, order, fragment, century, century_char, yy, base_desig, second, cycle, space_pos, desig_part, char9) {
+    # Handle fragment: "C/1995 O1-b" or "C/1995 O1-B" (1 or 2 letter)
     fragment = ""
     base_desig = desig
-    if (match(desig, /-[a-z]$/)) {
-        fragment = substr(desig, RSTART + 1, 1)
+    if (match(desig, /-[A-Za-z][A-Za-z]$/)) {
+        # 2-letter fragment
+        fragment = tolower(substr(desig, RSTART + 1, 2))
+        base_desig = substr(desig, 1, RSTART - 1)
+    } else if (match(desig, /-[A-Za-z]$/)) {
+        # 1-letter fragment
+        fragment = tolower(substr(desig, RSTART + 1, 1))
         base_desig = substr(desig, 1, RSTART - 1)
     }
 
     type = substr(base_desig, 1, 1)
-    year = substr(base_desig, 3, 4)
-    half = substr(base_desig, 8, 1)
-    order = substr(base_desig, 9)
-    if (order == "") order = 0
+
+    # Find the space to handle variable-length years
+    space_pos = index(base_desig, " ")
+    year = substr(base_desig, 3, space_pos - 3)
+    desig_part = substr(base_desig, space_pos + 1)  # "O1" or "AH2"
+    half = substr(desig_part, 1, 1)
 
     century = int(year / 100)
-    century_char = NUM_TO_CENTURY[century]
     yy = year % 100
 
-    if (fragment == "") fragment = "0"
-    return type century_char sprintf("%02d", yy) half sprintf("%02d", order) fragment
+    # Get century character (A-H for 10-17, I-L for 18-21)
+    if (century >= 10 && century <= 17) {
+        century_char = substr("ABCDEFGH", century - 9, 1)
+    } else {
+        century_char = NUM_TO_CENTURY[century]
+    }
+
+    # Check if asteroid-style format: "AH2" (half + second letter + cycle)
+    # vs simple format: "O1" (half + order number)
+    char9 = substr(desig_part, 2, 1)
+    if (length(desig_part) > 1 && char9 ~ /[A-Z]/) {
+        # Asteroid-style format
+        second = char9
+        cycle = substr(desig_part, 3)
+        if (cycle == "") cycle = 0
+        return type century_char sprintf("%02d", yy) half encode_cycle(int(cycle)) second
+    } else {
+        # Simple format - order number only
+        order = substr(desig_part, 2)
+        if (order == "") order = 0
+        if (fragment == "") fragment = "0"
+        return type century_char sprintf("%02d", yy) half sprintf("%02d", order) fragment
+    }
 }
 
-function unpack_provisional_comet(packed,    type, century_char, yy, half, order, fragment, century, year, result) {
+function unpack_provisional_comet(packed,    type, century_char, yy, half, pos67, char8, century, year, result, cycle, second, order, fragment) {
     type = substr(packed, 1, 1)
     century_char = substr(packed, 2, 1)
     yy = substr(packed, 3, 2)
     half = substr(packed, 5, 1)
-    order = int(substr(packed, 6, 2))
-    fragment = substr(packed, 8, 1)
+    pos67 = substr(packed, 6, 2)
+    char8 = substr(packed, 8, 1)
 
     century = CENTURY_TO_NUM[century_char]
     year = century * 100 + int(yy)
 
-    result = type "/" year " " half
-    if (order > 0) result = result order
-    if (fragment != "0" && fragment != "") result = result "-" fragment
+    # Check if asteroid-style format (position 8 is uppercase letter)
+    if (char8 ~ /[A-Z]/) {
+        # Asteroid-style: positions 6-7 are cycle encoded, position 8 is second letter
+        cycle = decode_cycle(pos67)
+        second = char8
+        result = type "/" year " " half second
+        if (cycle > 0) result = result cycle
+    } else {
+        # Simple format: positions 6-7 are order number, position 8 is fragment
+        order = int(pos67)
+        fragment = char8
+        result = type "/" year " " half
+        if (order > 0) result = result order
+        if (fragment != "0" && fragment != "") result = result "-" fragment
+    }
 
     return result
 }
@@ -261,6 +325,88 @@ function unpack_satellite(packed,    century_char, yy, planet, num, century, yea
     year = century * 100 + int(yy)
 
     return "S/" year " " planet " " num
+}
+
+#==============================================================================
+# Old-style provisional encoding (A908 CJ format)
+#==============================================================================
+
+function pack_old_style(desig,    yyy, half, second, yy, year, century, century_char) {
+    # Parse: "A908 CJ" or "A873 OA" - old-style format used 1800s-1924
+    # The A prefix + 3 digits gives year: A908 = 1908, A873 = 1873
+    yyy = int(substr(desig, 2, 3))  # "908" or "873"
+    half = substr(desig, 6, 1)
+    second = substr(desig, 7, 1)
+
+    # Calculate full year: add 1000 to 3-digit year
+    year = 1000 + yyy
+    century = int(year / 100)
+    yy = year % 100
+    century_char = NUM_TO_CENTURY[century]
+
+    return century_char sprintf("%02d", yy) half "00" second
+}
+
+#==============================================================================
+# Ancient comet encoding (year < 1000 or 1000-1999)
+#==============================================================================
+
+function pack_ancient_comet(desig,    type, space_pos, year, desig_part, half, order, century, yy, century_char) {
+    # Parse: "C/240 V1" or "C/1014 C1"
+    type = substr(desig, 1, 1)
+    space_pos = index(desig, " ")
+    year = int(substr(desig, 3, space_pos - 3))
+    desig_part = substr(desig, space_pos + 1)
+    half = substr(desig_part, 1, 1)
+    order = substr(desig_part, 2)
+    if (order == "") order = 0
+
+    if (year >= 1000) {
+        # Years 1000-1999 use extended century codes (A=10, B=11, ...)
+        century = int(year / 100)
+        yy = year % 100
+        # A=10, B=11, ..., I=18 (then J-L for 19-21 as usual)
+        if (century >= 10 && century <= 17) {
+            century_char = substr("ABCDEFGH", century - 9, 1)
+        } else if (century >= 18 && century <= 21) {
+            century_char = NUM_TO_CENTURY[century]
+        }
+        return type century_char sprintf("%02d", yy) half sprintf("%02d", int(order)) "0"
+    } else {
+        # Years < 1000: format is type + 3-digit year + half + order + fragment
+        return type sprintf("%03d", year) half sprintf("%02d", int(order)) "0"
+    }
+}
+
+#==============================================================================
+# BCE comet encoding (negative year)
+#==============================================================================
+
+function pack_bce_comet(desig,    type, space_pos, year, desig_part, half, order, abs_year, century_code, yy) {
+    # Parse: "C/-146 P1" - BCE comet with negative year
+    type = substr(desig, 1, 1)
+    space_pos = index(desig, " ")
+    year = substr(desig, 3, space_pos - 3)  # "-146"
+    desig_part = substr(desig, space_pos + 1)
+    half = substr(desig_part, 1, 1)
+    order = substr(desig_part, 2)
+    if (order == "") order = 0
+
+    abs_year = -int(year)
+    # Century codes: / for 1-99, . for 100-199, - for 200-299
+    # yy = (century_max - abs_year - 1)
+    if (abs_year < 100) {
+        century_code = "/"
+        yy = 100 - abs_year - 1
+    } else if (abs_year < 200) {
+        century_code = "."
+        yy = 200 - abs_year - 1
+    } else {
+        century_code = "-"
+        yy = 300 - abs_year - 1
+    }
+
+    return type century_code sprintf("%02d", yy) half sprintf("%02d", int(order)) "0"
 }
 
 #==============================================================================
@@ -320,14 +466,29 @@ function detect_format(desig,    len, first, prefix, last) {
         return "unpacked_numbered_comet"
     }
 
-    # Unpacked provisional comet
+    # Unpacked provisional comet (4-digit year)
     if (desig ~ /^[PDCXA]\/[0-9]{4} [A-HJ-Y]/) {
         return "unpacked_provisional_comet"
+    }
+
+    # Unpacked ancient comet (1-3 digit year)
+    if (desig ~ /^[PDCXA]\/[0-9]{1,3} [A-HJ-Y]/) {
+        return "unpacked_ancient_comet"
+    }
+
+    # Unpacked BCE comet (negative year)
+    if (desig ~ /^[PDCXA]\/-[0-9]+ [A-HJ-Y]/) {
+        return "unpacked_bce_comet"
     }
 
     # Unpacked satellite
     if (desig ~ /^S\/[0-9]{4} [JSUN] [0-9]+$/) {
         return "unpacked_satellite"
+    }
+
+    # Old-style provisional asteroid (A908 CJ format, 1900-1924)
+    if (desig ~ /^[A-Z][0-9]{3} [A-HJ-Y][A-HJ-Z]/) {
+        return "unpacked_old_style"
     }
 
     # Unpacked provisional asteroid
@@ -357,6 +518,9 @@ function convert_simple(desig,    fmt) {
     if (fmt == "unpacked_provisional_comet") return pack_provisional_comet(desig)
     if (fmt == "packed_satellite") return unpack_satellite(desig)
     if (fmt == "unpacked_satellite") return pack_satellite(desig)
+    if (fmt == "unpacked_old_style") return pack_old_style(desig)
+    if (fmt == "unpacked_ancient_comet") return pack_ancient_comet(desig)
+    if (fmt == "unpacked_bce_comet") return pack_bce_comet(desig)
 
     return "ERROR: Unknown format: " desig
 }
