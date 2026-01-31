@@ -20,6 +20,8 @@ fun main(args: Array<String>) {
     println("=== MPC Designation Conversion Tests (Kotlin) ===")
     println()
 
+    val startTime = System.currentTimeMillis()
+
     try {
         File(csvFile).useLines { lines ->
             var isFirstLine = true
@@ -72,11 +74,16 @@ fun main(args: Array<String>) {
         System.exit(1)
     }
 
+    val endTime = System.currentTimeMillis()
+    val elapsedMs = endTime - startTime
+    val rate = totalTests * 1000.0 / elapsedMs
+
     println()
     println("=== Conversion Test Results ===")
     println("Total:  $totalTests")
     println("Passed: $passedTests")
     println("Failed: $failedTests")
+    println("Time:   ${elapsedMs}ms (${String.format("%.1f", rate)} entries/sec)")
 
     if (failedTests > 10) {
         println("(Showing first 10 failures only)")

@@ -5,6 +5,7 @@
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
 using MPCDesignation
+using Printf
 
 function main()
     if length(ARGS) < 1
@@ -19,6 +20,8 @@ function main()
 
     println("=== MPC Designation Conversion Tests (Julia) ===")
     println()
+
+    start_time = time_ns()
 
     open(csv_file) do f
         is_first_line = true
@@ -67,11 +70,16 @@ function main()
         end
     end
 
+    end_time = time_ns()
+    elapsed_ms = (end_time - start_time) / 1_000_000
+    rate = total_tests * 1000.0 / elapsed_ms
+
     println()
     println("=== Conversion Test Results ===")
     println("Total:  $total_tests")
     println("Passed: $passed_tests")
     println("Failed: $failed_tests")
+    @printf("Time:   %.0fms (%.1f entries/sec)\n", elapsed_ms, rate)
 
     if failed_tests > 10
         println("(Showing first 10 failures only)")

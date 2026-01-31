@@ -25,6 +25,8 @@ public class TestCSV {
         System.out.println("=== MPC Designation Conversion Tests (Java) ===");
         System.out.println();
 
+        long startTime = System.currentTimeMillis();
+
         try (BufferedReader reader = new BufferedReader(new FileReader(csvFile))) {
             String line;
             boolean isFirstLine = true;
@@ -80,11 +82,16 @@ public class TestCSV {
             System.exit(1);
         }
 
+        long endTime = System.currentTimeMillis();
+        long elapsedMs = endTime - startTime;
+        double rate = totalTests * 1000.0 / elapsedMs;
+
         System.out.println();
         System.out.println("=== Conversion Test Results ===");
         System.out.println("Total:  " + totalTests);
         System.out.println("Passed: " + passedTests);
         System.out.println("Failed: " + failedTests);
+        System.out.printf("Time:   %dms (%.1f entries/sec)%n", elapsedMs, rate);
 
         if (failedTests > 10) {
             System.out.println("(Showing first 10 failures only)");
