@@ -34,10 +34,11 @@ proc exampleWithInfo {} {
     puts "=== Conversion with Info ==="
 
     set result [MPCDesignation::convert "1995 XA"]
+    set info [dict get $result info]
     puts "  Input:   [dict get $result input]"
     puts "  Output:  [dict get $result output]"
-    puts "  Format:  [dict get $result format]"
-    puts "  Type:    [dict get $result subtype]"
+    puts "  Format:  [dict get $info format]"
+    puts "  Type:    [dict get $info subtype]"
     puts ""
 }
 
