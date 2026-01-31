@@ -51,8 +51,8 @@ SLOW_IMPLEMENTATIONS = {"Java", "Kotlin", "C#", "Julia"}
 IMPLEMENTATIONS = [
     # (name, command) - all CLIs auto-detect pack vs unpack based on input format
     ("Tcl",
-     ["tclsh", "src/mpc_designation.tcl"],
-     ["tclsh", "src/mpc_designation.tcl"]),
+     ["tclsh", "src/mpc_designation_cli.tcl"],
+     ["tclsh", "src/mpc_designation_cli.tcl"]),
     ("Ruby",
      ["ruby", "src/mpc_designation_cli.rb"],
      ["ruby", "src/mpc_designation_cli.rb"]),

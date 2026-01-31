@@ -44,7 +44,7 @@ for input in "${TEST_CASES[@]}"; do
     # Get outputs from each implementation
     C_OUTPUT=$("$ROOT_DIR/c/mpc_designation" "$input" 2>&1) || true
     PY_OUTPUT=$(python3 "$ROOT_DIR/python/src/mpc_designation/mpc_designation.py" "$input" 2>&1) || true
-    TCL_OUTPUT=$(tclsh "$ROOT_DIR/tcl/src/mpc_designation.tcl" "$input" 2>&1) || true
+    TCL_OUTPUT=$(tclsh "$ROOT_DIR/tcl/src/mpc_designation_cli.tcl" "$input" 2>&1) || true
 
     # Compare outputs
     if [ "$C_OUTPUT" = "$PY_OUTPUT" ] && [ "$PY_OUTPUT" = "$TCL_OUTPUT" ]; then
