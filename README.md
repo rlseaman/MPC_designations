@@ -31,9 +31,38 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Tcl** | [`tcl/`](tcl/) | Production |
 | **TypeScript** | [`typescript/`](typescript/) | Production |
 
-All production implementations pass the same test suite (2M+ conversions, 94 error cases) and produce identical results.
+All production implementations pass the same test suite and produce identical results.
 
 **Note:** The Forth implementation is minimal, supporting only numbered asteroids and basic provisional designations. See [forth/README.md](forth/README.md) for details.
+
+## Test Results
+
+All 20 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
+
+| Implementation | Pack (unpacked→packed) | Status |
+|----------------|------------------------|--------|
+| AWK | 2,021,090 / 2,021,090 | ✅ 100% |
+| C | 2,021,090 / 2,021,090 | ✅ 100% |
+| C++ | 2,021,090 / 2,021,090 | ✅ 100% |
+| C# | 2,021,090 / 2,021,090 | ✅ 100% |
+| Fortran | 2,021,090 / 2,021,090 | ✅ 100% |
+| Go | 2,021,090 / 2,021,090 | ✅ 100% |
+| Haskell | 2,021,090 / 2,021,090 | ✅ 100% |
+| Java | 2,021,090 / 2,021,090 | ✅ 100% |
+| JavaScript | 2,021,090 / 2,021,090 | ✅ 100% |
+| Julia | 2,021,090 / 2,021,090 | ✅ 100% |
+| Kotlin | 2,021,090 / 2,021,090 | ✅ 100% |
+| Nim | 2,021,090 / 2,021,090 | ✅ 100% |
+| Perl | 2,021,090 / 2,021,090 | ✅ 100% |
+| PHP | 2,021,090 / 2,021,090 | ✅ 100% |
+| Python | 2,021,090 / 2,021,090 | ✅ 100% |
+| Ruby | 2,021,090 / 2,021,090 | ✅ 100% |
+| Rust | 2,021,090 / 2,021,090 | ✅ 100% |
+| Swift | 2,021,090 / 2,021,090 | ✅ 100% |
+| Tcl | 2,021,090 / 2,021,090 | ✅ 100% |
+| TypeScript | 2,021,090 / 2,021,090 | ✅ 100% |
+
+**Roundtrip note:** 2,625 old-style designations (e.g., `A873 OA`) normalize to modern format (`1873 OA`) on unpack. This is correct behavior—the packed representation is identical either way.
 
 ## Quick Start
 
@@ -529,7 +558,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 
 All production implementations pass the packed round-trip test: `pack(unpack(y)) = y`.
 
-**Note:** Bash has minor issues with comet fragment designations (~0.02% of test cases).
+The 2,625 old-style provisional designations (e.g., `A873 OA` for year 1873) normalize to modern format (`1873 OA`) on unpack. This is expected behavior—both formats pack to the same representation (`I73O00A`).
 
 Run benchmarks with: `./scripts/benchmark.sh --roundtrip`
 
