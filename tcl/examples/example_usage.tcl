@@ -140,6 +140,61 @@ proc exampleBatchProcessing {} {
     puts ""
 }
 
+# Example 8: Unpacking mixed input (valid MPC + temporary identifiers)
+# Returns empty string for invalid/temporary identifiers
+proc exampleUnpackMixed {} {
+    puts "=== Unpack Mixed Input (MPC + Temporary IDs) ==="
+    puts "  (Empty result = not a valid MPC designation)\n"
+
+    # Mix of valid packed MPC designations and temporary/internal identifiers
+    set identifiers {
+        CE4AXE2  CE4JLW2  K22C02Q  K25Y08W  K25Y12R
+        K26A01L  K26A02E  K26A03Z  K26A04M  K26B02V
+        K26B04M  K26B05X  P12kY0u  P22l0lE  P22l2fg
+        P22l2g7  P22l2g8  P22l8O0  P22l8OS  P22l8Rk
+        P22lbY0  ST26AC0
+    }
+
+    foreach id $identifiers {
+        if {[catch {set unpacked [MPCDesignation::unpack $id]} err]} {
+            # Invalid identifier - return empty string
+            puts [format "  %-10s -> (invalid)" $id]
+        } else {
+            puts [format "  %-10s -> %s" $id $unpacked]
+        }
+    }
+    puts ""
+}
+
+# Example 9: Packing unpacked designations
+# Demonstrates converting human-readable designations to packed format
+proc examplePackDesignations {} {
+    puts "=== Pack Unpacked Designations ==="
+
+    # Mix of valid unpacked designations
+    set designations {
+        "2022 CQ2"
+        "2025 YW8"
+        "2026 AL1"
+        "2026 BX5"
+        "1"
+        "433"
+        "100000"
+        "1995 XA"
+        "1P"
+        "C/1995 O1"
+    }
+
+    foreach des $designations {
+        if {[catch {set packed [MPCDesignation::pack $des]} err]} {
+            puts [format "  %-15s -> (invalid)" $des]
+        } else {
+            puts [format "  %-15s -> %s" $des $packed]
+        }
+    }
+    puts ""
+}
+
 # Main
 puts "MPC Designation Library - Example Usage"
 puts "========================================\n"
@@ -151,3 +206,5 @@ exampleBidirectional
 exampleFormatDetection
 exampleDesignationTypes
 exampleBatchProcessing
+exampleUnpackMixed
+examplePackDesignations
