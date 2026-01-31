@@ -253,6 +253,27 @@ proc packProvisionalComet*(desig: string): string =
   let designPart = baseDesig[spaceIdx+1..^1]  # "V1" or "O1" or "AH2"
   let half = designPart[0]
 
+  # BCE comets (negative years) use special century codes
+  if year < 0:
+    let absYear = -year
+    var centuryCode: char
+    var yy: int
+    if absYear < 100:
+      centuryCode = '/'
+      yy = 100 - absYear - 1
+    elif absYear < 200:
+      centuryCode = '.'
+      yy = 200 - absYear - 1
+    else:
+      centuryCode = '-'
+      yy = 300 - absYear - 1
+
+    let order = if designPart.len > 1: parseInt(designPart[1..^1]) else: 0
+    let frag = if fragment.len > 0: fragment else: "0"
+    let orderStr = align($order, 2, '0')
+    result = $cometType & centuryCode & align($yy, 2, '0') & half & orderStr & frag
+    return
+
   # Ancient comets (year < 1000) use special format: TYYYHNNN
   if year < 1000:
     let order = if designPart.len > 1: parseInt(designPart[1..^1]) else: 0
