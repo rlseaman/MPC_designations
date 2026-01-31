@@ -152,7 +152,7 @@ proc exampleUnpackMixed {} {
         K26A01L  K26A02E  K26A03Z  K26A04M  K26B02V
         K26B04M  K26B05X  P12kY0u  P22l0lE  P22l2fg
         P22l2g7  P22l2g8  P22l8O0  P22l8OS  P22l8Rk
-        P22lbY0  ST26AC0
+        P22lbY0  ST26AC0 z2342
     }
 
     foreach id $identifiers {
@@ -195,6 +195,48 @@ proc examplePackDesignations {} {
     puts ""
 }
 
+# Example 10: Check if packed or unpacked
+proc exampleCheckPackedUnpacked {} {
+    puts "=== Check Packed vs Unpacked ==="
+
+    set designations {"K26A01L" "2026 AL1" "00433" "433" "CJ95O010" "C/1995 O1"}
+
+    foreach des $designations {
+        if {[catch {set info [MPCDesignation::detectFormat $des]} err]} {
+            puts [format "  %-12s -> (invalid)" $des]
+        } else {
+            set format [dict get $info format]
+            puts [format "  %-12s -> %s" $des $format]
+        }
+    }
+    puts ""
+}
+
+# Example 11: Check if provisional or permanent (numbered)
+proc exampleCheckProvisionalPermanent {} {
+    puts "=== Check Provisional vs Permanent ==="
+
+    set designations {"2026 AL1" "433" "K26A01L" "00433" "1995 XA" "1P" "C/1995 O1"}
+
+    foreach des $designations {
+        if {[catch {set info [MPCDesignation::detectFormat $des]} err]} {
+            puts [format "  %-12s -> (invalid)" $des]
+        } else {
+            set type [dict get $info type]
+            # Simplify: "permanent" or "provisional" (or other for comets/satellites)
+            if {$type eq "permanent"} {
+                set category "permanent (numbered)"
+            } elseif {$type in {provisional provisional_extended survey}} {
+                set category "provisional"
+            } else {
+                set category $type  ;# comet_numbered, comet_full, satellite, etc.
+            }
+            puts [format "  %-12s -> %s" $des $category]
+        }
+    }
+    puts ""
+}
+
 # Main
 puts "MPC Designation Library - Example Usage"
 puts "========================================\n"
@@ -208,3 +250,5 @@ exampleDesignationTypes
 exampleBatchProcessing
 exampleUnpackMixed
 examplePackDesignations
+exampleCheckPackedUnpacked
+exampleCheckProvisionalPermanent
