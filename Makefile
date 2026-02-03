@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-nim test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
+.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-nim test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-nim test-python test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
+test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-nim test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -126,6 +126,15 @@ test-python: test-data/prov_unpack_to_pack.csv
 	@echo ""
 	@echo "--- Python Conversion Tests ---"
 	cd python && python3 test/test_csv.py ../test-data/prov_unpack_to_pack.csv
+
+# R tests
+test-r: test-data/prov_unpack_to_pack.csv
+	@echo "=== R Tests ==="
+	@echo "--- R Error Tests ---"
+	cd r && Rscript test/test_errors.R
+	@echo ""
+	@echo "--- R Conversion Tests ---"
+	cd r && Rscript test/test_csv.R
 
 # TCL tests
 test-tcl: test-data/prov_unpack_to_pack.csv
@@ -284,6 +293,7 @@ help:
 	@echo "  test-fortran Run Fortran tests only"
 	@echo "  test-haskell Run Haskell tests only"
 	@echo "  test-python  Run Python tests only"
+	@echo "  test-r       Run R tests only"
 	@echo "  test-tcl     Run TCL tests only"
 	@echo "  test-swift   Run Swift tests only"
 	@echo "  test-perl    Run Perl tests only"

@@ -25,6 +25,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Perl** | [`perl/`](perl/) | Production |
 | **PHP** | [`php/`](php/) | Production |
 | **Python** | [`python/`](python/) | Production |
+| **R** | [`r/`](r/) | Production |
 | **Ruby** | [`ruby/`](ruby/) | Production |
 | **Rust** | [`rust/`](rust/) | Production |
 | **Swift** | [`swift/`](swift/) | Production |
@@ -37,7 +38,7 @@ All production implementations pass the same test suite and produce identical re
 
 ## Test Results
 
-All 20 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
+All 21 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
 
 | Implementation | Pack (unpacked→packed) | Status |
 |----------------|------------------------|--------|
@@ -56,6 +57,7 @@ All 20 production implementations achieve 100% accuracy on the full test suite (
 | Perl | 2,021,090 / 2,021,090 | ✅ 100% |
 | PHP | 2,021,090 / 2,021,090 | ✅ 100% |
 | Python | 2,021,090 / 2,021,090 | ✅ 100% |
+| R | 2,021,090 / 2,021,090 | ✅ 100% |
 | Ruby | 2,021,090 / 2,021,090 | ✅ 100% |
 | Rust | 2,021,090 / 2,021,090 | ✅ 100% |
 | Swift | 2,021,090 / 2,021,090 | ✅ 100% |
@@ -127,6 +129,17 @@ s" 1995 XA" convert-simple type  \ Prints: J95X00A
 ```python
 from mpc_designation import convert_simple
 convert_simple('1995 XA')  # Returns 'J95X00A'
+```
+
+### R
+```r
+source("mpc_designation.R")
+convert_simple("1995 XA")  # Returns "J95X00A"
+```
+
+```bash
+cd r
+Rscript src/mpc_designation_cli.R '1995 XA'    # Output: J95X00A
 ```
 
 ### Tcl
@@ -363,6 +376,12 @@ MPC_designations/
 │   ├── src/            # Source code
 │   ├── test/           # Test files
 │   └── examples/       # Usage examples
+├── r/
+│   ├── README.md       # R documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   ├── test/           # Test files
+│   └── examples/       # Usage examples
 ├── tcl/
 │   ├── README.md       # Tcl documentation
 │   ├── src/            # Source code
@@ -446,6 +465,7 @@ make test-kotlin
 make test-perl
 make test-php
 make test-python
+make test-r
 make test-ruby
 make test-rust
 make test-swift
