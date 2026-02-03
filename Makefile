@@ -2,7 +2,7 @@
 #
 # Orchestrates builds and tests across all language implementations
 
-.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-nim test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
+.PHONY: all clean test test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-gforth test-haskell test-nim test-octave test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript test-errors test-all validate version
 
 # Default: build all
 all: build-c build-cpp build-swift build-go build-java build-rust
@@ -58,7 +58,7 @@ test-data/prov_unpack_to_pack.csv: test-data/prov_unpack_to_pack.csv.gz
 	gunzip -k $<
 
 # Run all tests for all languages
-test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-nim test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
+test-all: test-awk test-bash test-c test-cpp test-csharp test-forth test-fortran test-haskell test-nim test-octave test-python test-r test-tcl test-swift test-perl test-go test-java test-julia test-js test-kotlin test-ruby test-rust test-php test-typescript
 	@echo ""
 	@echo "=== All Tests Complete ==="
 
@@ -209,6 +209,15 @@ test-nim: test-data/prov_unpack_to_pack.csv
 		echo "Nim not installed, skipping Nim tests"; \
 	fi
 
+# Octave tests
+test-octave: test-data/prov_unpack_to_pack.csv
+	@echo "=== Octave Tests ==="
+	@if command -v octave >/dev/null 2>&1; then \
+		$(MAKE) -C octave test; \
+	else \
+		echo "Octave not installed, skipping Octave tests"; \
+	fi
+
 # Ruby tests
 test-ruby: test-data/prov_unpack_to_pack.csv
 	@echo "=== Ruby Tests ==="
@@ -302,6 +311,8 @@ help:
 	@echo "  test-julia   Run Julia tests only"
 	@echo "  test-js      Run JavaScript tests only"
 	@echo "  test-kotlin  Run Kotlin tests only"
+	@echo "  test-nim     Run Nim tests only"
+	@echo "  test-octave  Run Octave/MATLAB tests only"
 	@echo "  test-ruby    Run Ruby tests only"
 	@echo "  test-rust    Run Rust tests only"
 	@echo "  test-php     Run PHP tests only"

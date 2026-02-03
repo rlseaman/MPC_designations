@@ -22,6 +22,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **Julia** | [`julia/`](julia/) | Production |
 | **Kotlin** | [`kotlin/`](kotlin/) | Production |
 | **Nim** | [`nim/`](nim/) | Production |
+| **Octave/MATLAB** | [`octave/`](octave/) | Production |
 | **Perl** | [`perl/`](perl/) | Production |
 | **PHP** | [`php/`](php/) | Production |
 | **Python** | [`python/`](python/) | Production |
@@ -38,7 +39,7 @@ All production implementations pass the same test suite and produce identical re
 
 ## Test Results
 
-All 21 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
+All 22 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
 
 | Implementation | Pack (unpacked→packed) | Status |
 |----------------|------------------------|--------|
@@ -54,6 +55,7 @@ All 21 production implementations achieve 100% accuracy on the full test suite (
 | Julia | 2,021,090 / 2,021,090 | ✅ 100% |
 | Kotlin | 2,021,090 / 2,021,090 | ✅ 100% |
 | Nim | 2,021,090 / 2,021,090 | ✅ 100% |
+| Octave | 2,021,090 / 2,021,090 | ✅ 100% |
 | Perl | 2,021,090 / 2,021,090 | ✅ 100% |
 | PHP | 2,021,090 / 2,021,090 | ✅ 100% |
 | Python | 2,021,090 / 2,021,090 | ✅ 100% |
@@ -264,6 +266,17 @@ import mpc_designation
 let result = convertSimple("1995 XA")  # Returns "J95X00A"
 ```
 
+### Octave/MATLAB
+```matlab
+source('src/mpc_designation.m');
+mpc_convert_simple('1995 XA')  % Returns 'J95X00A'
+```
+
+```bash
+cd octave
+octave --no-gui src/mpc_designation_cli.m '1995 XA'    # Output: J95X00A
+```
+
 ### Ruby
 ```ruby
 require_relative 'src/mpc_designation'
@@ -420,6 +433,11 @@ MPC_designations/
 │   ├── Makefile
 │   ├── src/            # Source code (mpc package)
 │   └── test/           # Test files
+├── octave/
+│   ├── README.md       # Octave/MATLAB documentation
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
 ├── rust/
 │   ├── Cargo.toml      # Rust package definition
 │   ├── Makefile
@@ -462,6 +480,8 @@ make test-java
 make test-julia
 make test-js
 make test-kotlin
+make test-nim
+make test-octave
 make test-perl
 make test-php
 make test-python
