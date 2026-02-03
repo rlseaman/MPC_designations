@@ -294,7 +294,7 @@ node dist/src/mpc_designation_cli.js '1995 XA'    # Output: J95X00A
 
 # Asteroids - provisional
 1995 XA       -> J95X00A
-2024 AB631    -> _4AMu1B
+2024 AB631    -> _OA004S
 
 # Asteroids - survey
 2040 P-L      -> PLS2040

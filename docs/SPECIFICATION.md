@@ -46,7 +46,7 @@ Format: `YYYY LLn` where:
 |--------|----------|--------|-------|
 | Standard | 1995 XA | J95X00A | First discovery in second half of December 1995 |
 | With cycle | 1995 XB1 | J95X01B | 26th discovery |
-| Extended | 2024 AA631 | _4AMu1A | Cycle >= 620 uses extended format |
+| Extended | 2024 AA631 | _OA004R | Cycle >= 620 uses extended format |
 
 Century codes:
 - I = 1800s, J = 1900s, K = 2000s, L = 2100s
@@ -120,7 +120,7 @@ Format: `S/YYYY P n` where:
 | Unpacked | Packed |
 |----------|--------|
 | S/2019 S 22 | SK19S220 |
-| S/2003 J 2 | SJ03J020 |
+| S/2003 J 2 | SK03J020 |
 
 ## Base-62 Encoding
 

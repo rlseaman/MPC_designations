@@ -84,7 +84,7 @@ Note: Letter I is skipped.
 |----------|--------|-----------|
 | 1995 XA | J95X00A | J=1900s, 95=year, X=half-month, 00=cycle 0, A=letter |
 | 2024 AB1 | K24A01B | K=2000s, 24=year, A=half-month, 01=cycle 1, B=letter |
-| 2024 AA631 | _4AMu1A | Extended: _=marker, 4A=base62(2024%100), Mu1=cycle, A=letter |
+| 2024 AA631 | _OA004R | Extended: _=marker, O=base62(24), A=half-month, 004R=sequence, A omitted |
 
 ## Asteroids - Survey
 
@@ -155,7 +155,7 @@ Note: Letter I is skipped.
 | Unpacked | Packed | Notes |
 |----------|--------|-------|
 | S/2019 S 22 | SK19S220 | S=satellite, K=century, S=Saturn, 22=number |
-| S/2003 J 2 | SJ03J020 | J=century (1900s), J=Jupiter |
+| S/2003 J 2 | SK03J020 | K=century (2000s), J=Jupiter |
 | S/2018 U 1 | SK18U010 | U=Uranus |
 
 ## Base-62 Character Set
