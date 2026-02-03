@@ -501,9 +501,9 @@ variable prov-outlen
   10 mod [char] 0 + out-buf 2 + c!
   over 5 + c@ out-buf 3 + c!  \ half-month
   \ Find order number
-  over 6 + over 6 - \ remaining string
+  over 6 + over 6 - \ remaining string: rem-addr rem-len
   \ Find - for fragment if present
-  0 2over bounds ?do
+  0 2 pick 2 pick bounds ?do
     i c@ [char] - = if drop i leave then
   loop
   dup 0= if
@@ -549,6 +549,8 @@ variable prov-outlen
 
 : is-comet-full-packed? ( addr len -- f )
   dup 8 < if 2drop false exit then
+  \ Exclude unpacked format (has slash at position 1)
+  over 1+ c@ [char] / = if 2drop false exit then
   dup 8 = if
     \ 8-char: type + 7-char provisional
     drop c@ is-comet-type? exit
@@ -587,6 +589,8 @@ variable prov-outlen
     out-buf 0
   then ;
 
+variable comet-type-char
+
 : pack-comet-full ( addr len -- addr' len' )
   \ Find the slash
   2dup
@@ -595,25 +599,36 @@ variable prov-outlen
   loop
   \ Stack: addr len slash-addr
   dup 0= if drop out-buf 0 2swap 2drop exit then
-  over -                        \ offset to slash
+  2 pick -                      \ offset to slash = slash-addr - addr
   dup 1 = if
-    \ Simple format: X/yyyy prov
+    \ Simple format: X/yyyy prov -> XJ95O010
     drop
-    over c@ out-buf c!          \ type
+    over c@ comet-type-char !   \ save type character
     over 2 + over 2 - pack-comet-prov
-    out-buf 1+ swap move
-    out-buf 1+ out-buf 1+ swap 2dup 2>r move
-    out-buf c@ out-buf c!
-    out-buf 2r> 1+
-    2swap 2drop
+    \ Stack: addr len out-buf prov-len
+    \ Copy result to tmp-buf
+    over tmp-buf 2 pick move    \ move(out-buf, tmp-buf, prov-len)
+    \ Put type at position 0
+    comet-type-char @ out-buf c!
+    \ Copy from tmp-buf back to out-buf+1
+    tmp-buf out-buf 1+ 2 pick move
+    \ Stack: addr len out-buf prov-len
+    \ Return out-buf with length = prov-len + 1
+    1+ >r                       \ save prov-len+1 to return stack
+    2drop drop                  \ drop out-buf, len, addr
+    out-buf r>
   else
     \ Numbered format: nnnX/yyyy prov
     2 pick over 1- str>num      \ comet number
-    s>d <# # # # # #> out-buf swap move
-    2 pick over + 1- c@ out-buf 4 + c!  \ type
+    s>d <# # # # # #> tmp-buf swap move
+    2 pick over + 1- c@ comet-type-char ! \ save type
     2 pick over + 1+ 2 pick over - 1- pack-comet-prov
-    out-buf 5 + swap move
-    out-buf over 5 + 2swap 2drop
+    \ Now build result: 4-digit number + type + prov result
+    tmp-buf out-buf 4 move      \ copy number
+    comet-type-char @ out-buf 4 + c! \ type at position 4
+    out-buf 5 + over move       \ copy prov result
+    out-buf swap 5 +            \ return with length
+    2swap 2drop
   then ;
 
 \ ============================================================================
