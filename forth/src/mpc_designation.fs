@@ -355,14 +355,17 @@ variable prov-outlen
   \ Check for extended format (cycle >= 620)
   dup 620 >= if
     \ Extended format: _YHbbbb
+    \ Stack: addr len cycle
     \ Year code (base-62 of year % 100)
-    3 pick 4 str>num 100 mod b62>char
+    2 pick 4 str>num 100 mod b62>char
     [char] _ out-buf c!
     out-buf 1+ c!
-    4 pick 5 + c@ out-buf 2 + c!  \ half-month
+    \ Stack: addr len cycle
+    2 pick 5 + c@ out-buf 2 + c!  \ half-month
+    \ Stack: addr len cycle
     \ Calculate base sequence: (cycle-620)*25 + letter_pos - 1
-    swap 620 - 25 *
-    5 pick 6 + c@ letter>pos + 1-
+    620 - 25 *                    \ addr len partial_seq
+    2 pick 6 + c@ letter>pos + 1- \ addr len sequence
     out-buf 3 + b62-encode4
     out-buf 7
     2swap 2drop
@@ -409,21 +412,32 @@ variable prov-outlen
   dup 7 <> if 2drop false exit then
   drop c@ [char] _ = ;
 
+variable ext-year
+variable ext-cycle
+variable ext-letter
+variable ext-outlen
+
 : unpack-extended ( addr len -- addr' len' )
   \ Format: _YHbbbb -> yyyy HL[n]
-  over 1+ c@ char>b62 2000 +    \ year
-  s>d <# # # # # #> tmp-buf swap move
-  bl tmp-buf 4 + c!
-  over 2 + c@ tmp-buf 5 + c!    \ half-month
-  \ Decode sequence
+  \ Calculate year
+  over 1+ c@ char>b62 2000 + ext-year !
+  \ Get half-month letter (position 2)
+  over 2 + c@ ext-letter !
+  \ Decode sequence (positions 3-6)
   over 3 + b62-decode4
-  \ sequence / 25 + 620 = cycle, sequence % 25 + 1 = letter position
-  dup 25 / 620 +                \ cycle
-  swap 25 mod 1+ pos>letter     \ second letter
-  tmp-buf 6 + c!
-  s>d <# #s #> tmp-buf 7 + swap 2dup 2>r move 2r>
-  7 + tmp-buf swap out-buf over 2>r move 2r>
-  2swap 2drop ;
+  dup 25 / 620 + ext-cycle !
+  25 mod 1+ pos>letter         \ second letter
+  \ Build output in out-buf
+  ext-year @ s>d <# # # # # #> out-buf swap move
+  bl out-buf 4 + c!
+  ext-letter @ out-buf 5 + c!  \ half-month
+  out-buf 6 + c!               \ second letter (was on stack)
+  \ Add cycle number
+  ext-cycle @ s>d <# #s #>
+  out-buf 7 + swap dup ext-outlen ! move
+  ext-outlen @ 7 +
+  2swap 2drop
+  out-buf swap ;
 
 \ ============================================================================
 \ Numbered comet designations (1P, 354P)
@@ -440,97 +454,116 @@ variable prov-outlen
   2dup + 1- c@ dup [char] P = swap [char] D = or 0= if 2drop false exit then
   1- all-digit? ;
 
+variable comet-num-len
+
 : unpack-comet-numbered ( addr len -- addr' len' )
   \ Format: 0001P -> 1P
-  over 4 str>num
-  s>d <# #s #>
-  out-buf swap 2dup 2>r move 2r>
-  2r> 2 pick 2 pick + 2>r
-  4 pick 4 + c@ 2r@ c!       \ copy type letter (P or D)
-  2r> 1+ 2swap 2drop
-  out-buf swap ;
+  over 4 str>num                   \ addr len number
+  s>d <# #s #>                     \ addr len num-str-addr num-str-len
+  dup comet-num-len !              \ save length
+  out-buf swap move                \ copy number string to out-buf
+  \ Stack: addr len
+  over 4 + c@                      \ get type letter (P or D)
+  out-buf comet-num-len @ + c!     \ append to out-buf
+  2drop
+  out-buf comet-num-len @ 1+ ;
 
 : pack-comet-numbered ( addr len -- addr' len' )
   \ Format: 1P -> 0001P
-  over over 1- str>num
+  2dup + 1- c@                     \ addr len type-char
+  -rot                             \ type-char addr len
+  1- str>num                       \ type-char number
   s>d <# # # # # #> out-buf swap move
-  over + 1- c@ out-buf 4 + c!  \ type letter
-  out-buf 5
-  2swap 2drop ;
+  out-buf 4 + c!                   \ store type letter
+  out-buf 5 ;
 
 \ ============================================================================
 \ Comet provisional designations (1995 O1, 1995 O1-B)
 \ ============================================================================
 
+variable comet-prov-len
+
 : unpack-comet-prov ( addr len -- addr' len' )
   \ Format: J95O010 -> 1995 O1 (or with fragment)
+  \ Calculate year from century code + 2 digits
   over c@ century>num 100 *
   2 pick 1+ c@ [char] 0 - 10 * +
   2 pick 2 + c@ [char] 0 - +
-  s>d <# # # # # #> tmp-buf swap move
-  bl tmp-buf 4 + c!
-  over 3 + c@ tmp-buf 5 + c!  \ half-month
-  over 4 + decode-cycle       \ order number
-  s>d <# #s #> tmp-buf 6 + swap 2dup 2>r move 2r>
-  \ Check for fragment
-  6 + 2r> +
-  3 pick 6 + c@ dup [char] 0 <> if
-    \ Has fragment
-    [char] - over c!
-    swap 1+ swap
-    3 pick 3 pick + 1- c@ \ fragment letter (might be 2 chars)
-    over 1+ c!
-    \ Check if 8-char format (2-letter fragment)
-    4 pick 8 = if
-      4 pick 7 + c@ [char] a - [char] A + over 2 + c!
-      1+
+  \ Stack: addr len year
+  s>d <# # # # # #> out-buf swap move
+  \ Space and half-month
+  bl out-buf 4 + c!
+  over 3 + c@ out-buf 5 + c!
+  \ Order number (positions 4-5)
+  over 4 + decode-cycle
+  s>d <# #s #>
+  \ Stack: addr len order-addr order-len
+  dup 6 + comet-prov-len !         \ save total length so far
+  out-buf 6 + swap move
+  \ Stack: addr len
+  \ Check for fragment (position 6)
+  over 6 + c@ dup [char] 0 <> if
+    \ Has fragment - add "-X"
+    [char] - out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+    \ Fragment letter: convert lowercase to uppercase
+    [char] a - [char] A + out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+    \ Check for 2-letter fragment (8-char input)
+    dup 8 = if
+      over 7 + c@ [char] a - [char] A +
+      out-buf comet-prov-len @ + c!
+      comet-prov-len @ 1+ comet-prov-len !
     then
-    1+
   else
     drop
   then
-  tmp-buf swap out-buf over 2>r move 2r>
-  2swap 2drop ;
+  2drop
+  out-buf comet-prov-len @ ;
+
+variable pcp-addr
+variable pcp-len
+variable pcp-order
+variable pcp-dash
 
 : pack-comet-prov ( addr len -- addr' len' )
   \ Format: 1995 O1 -> J95O010, 1995 O1-B -> J95O01b
-  over 4 str>num
+  pcp-len ! pcp-addr !
+  \ Year -> century code
+  pcp-addr @ 4 str>num
   dup 100 / num>century out-buf c!
   100 mod
   dup 10 / [char] 0 + out-buf 1+ c!
   10 mod [char] 0 + out-buf 2 + c!
-  over 5 + c@ out-buf 3 + c!  \ half-month
-  \ Find order number
-  over 6 + over 6 - \ remaining string: rem-addr rem-len
-  \ Find - for fragment if present
-  0 2 pick 2 pick bounds ?do
-    i c@ [char] - = if drop i leave then
+  \ Half-month letter
+  pcp-addr @ 5 + c@ out-buf 3 + c!
+  \ Find dash for fragment (if any)
+  0 pcp-dash !
+  pcp-addr @ pcp-len @ + pcp-addr @ 6 + ?do
+    i c@ [char] - = if i pcp-dash ! leave then
   loop
-  dup 0= if
-    \ No fragment
-    drop str>num
-    out-buf 4 + encode-cycle
+  \ Parse order number
+  pcp-dash @ 0= if
+    \ No fragment: order is from position 6 to end
+    pcp-addr @ 6 + pcp-len @ 6 - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
     [char] 0 out-buf 6 + c!
     out-buf 7
   else
-    \ Has fragment
-    over - str>num    \ order number
-    out-buf 4 + encode-cycle
-    \ Fragment letter(s)
-    2 pick 2 pick + 1- \ end of original string
-    over - 1-         \ fragment length (after -)
-    swap 1+ swap      \ fragment addr len
+    \ Has fragment: order is from position 6 to dash
+    pcp-addr @ 6 + pcp-dash @ pcp-addr @ 6 + - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
+    \ Fragment letter(s) after dash
+    pcp-addr @ pcp-len @ + pcp-dash @ - 1- \ fragment length
     dup 1 = if
-      drop c@ [char] A - [char] a + out-buf 6 + c!
+      drop pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
       out-buf 7
     else
-      \ 2-letter fragment
-      over c@ [char] A - [char] a + out-buf 6 + c!
-      1+ c@ [char] A - [char] a + out-buf 7 + c!
+      pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
+      pcp-dash @ 2 + c@ [char] A - [char] a + out-buf 7 + c!
       out-buf 8
     then
-  then
-  2swap 2drop ;
+  then ;
 
 \ ============================================================================
 \ Full comet designations (C/1995 O1, 1P/1995 O1)
@@ -572,20 +605,29 @@ variable prov-outlen
   1- c@ is-comet-type?
   -rot 2drop ;
 
+variable comet-full-len
+variable comet-full-type
+
 : unpack-comet-full ( addr len -- addr' len' )
   \ Format: CJ95O010 -> C/1995 O1, or 0001PJ95O010 -> 1P/1995 O1
   dup 8 = over 9 = or if
     \ Short format: type + provisional
-    over c@ tmp-buf c!
-    [char] / tmp-buf 1+ c!
+    \ Save type character before calling unpack-comet-prov
+    over c@ comet-full-type !
+    \ Unpack the provisional part (positions 1 to end)
     over 1+ over 1- unpack-comet-prov
-    tmp-buf 2 + swap move
-    tmp-buf 2 + out-buf 2 + swap 2dup 2>r move
-    tmp-buf out-buf 2 move
-    out-buf 2r> 2 +
+    \ Stack: addr len prov-addr prov-len
+    \ Result is in out-buf, save length
+    dup comet-full-len !
+    \ Copy to tmp-buf first, then back with prefix
+    out-buf tmp-buf comet-full-len @ move
+    comet-full-type @ out-buf c!
+    [char] / out-buf 1+ c!
+    tmp-buf out-buf 2 + comet-full-len @ move
+    2drop 2drop
+    out-buf comet-full-len @ 2 +
   else
     \ Long format: number + type + provisional (not common)
-    \ For now, just handle 8/9 char format
     out-buf 0
   then ;
 
@@ -648,15 +690,19 @@ variable comet-type-char
   endcase ;
 
 : is-satellite-unpacked? ( addr len -- f )
-  dup 11 < if 2drop false exit then
+  \ Minimum: "S/yyyy X n" = 10 chars
+  dup 10 < if 2drop false exit then
   over c@ [char] S <> if 2drop false exit then
   over 1+ c@ [char] / <> if 2drop false exit then
   2drop true ;
+
+variable sat-num-len
 
 : unpack-satellite ( addr len -- addr' len' )
   \ Format: SK19S220 -> S/2019 S 22
   [char] S out-buf c!
   [char] / out-buf 1+ c!
+  \ Year from century code + 2 digits
   over 1+ c@ century>num 100 *
   2 pick 2 + c@ [char] 0 - 10 * +
   2 pick 3 + c@ [char] 0 - +
@@ -664,10 +710,13 @@ variable comet-type-char
   bl out-buf 6 + c!
   over 4 + c@ out-buf 7 + c!    \ planet
   bl out-buf 8 + c!
-  over 5 + decode-cycle         \ satellite number
-  s>d <# #s #> out-buf 9 + swap 2dup 2>r move
-  9 + out-buf swap
-  2swap 2drop 2r> drop ;
+  \ Satellite number (positions 5-6)
+  over 5 + decode-cycle
+  s>d <# #s #>
+  dup sat-num-len !
+  out-buf 9 + swap move
+  2drop
+  out-buf sat-num-len @ 9 + ;
 
 : pack-satellite ( addr len -- addr' len' )
   \ Format: S/2019 S 22 -> SK19S220
