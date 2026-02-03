@@ -562,7 +562,9 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 18 | Perl | 17,178 | 117,654 | 0.04x |
 | 19 | Ruby | 23,765 | 85,045 | 0.03x |
 | 20 | Tcl | 44,384 | 45,537 | 0.02x |
-| 21 | Bash | ~6,000,000 | ~340 | <0.01x |
+| 21 | R | 603,586 | 3,348 | <0.01x |
+| 22 | Octave | 768,240 | 2,631 | <0.01x |
+| 23 | Bash | ~6,000,000 | ~340 | <0.01x |
 
 *Bash time extrapolated from sample (full run would take ~100 minutes)
 

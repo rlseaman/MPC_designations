@@ -301,6 +301,12 @@ else
     fi
     run_benchmark "Perl" "cd perl && perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv"
     run_benchmark "Tcl" "cd tcl && tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv"
+    if command -v Rscript >/dev/null 2>&1; then
+        run_benchmark "R" "cd r && Rscript test/test_csv.R"
+    fi
+    if command -v octave >/dev/null 2>&1; then
+        run_benchmark "Octave" "cd octave && octave --no-gui --quiet test/test_csv.m"
+    fi
 
     echo ""
     echo "=== Summary ==="

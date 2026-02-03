@@ -79,8 +79,9 @@ fprintf('\n');
 fprintf('=== Results ===\n');
 fprintf('Passed: %d / %d\n', passed, total);
 fprintf('Failed: %d\n', failed);
-fprintf('Time: %.2f seconds\n', elapsed);
-fprintf('Rate: %.0f conversions/second\n', total / elapsed);
+time_ms = round(elapsed * 1000);
+rate = total / elapsed;
+fprintf('Time: %dms (%.0f entries/sec)\n', time_ms, rate);
 
 if failed > 0
   fprintf('\nFirst failures:\n');

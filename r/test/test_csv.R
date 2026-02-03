@@ -78,8 +78,9 @@ cat("\n")
 cat(sprintf("=== Results ===\n"))
 cat(sprintf("Passed: %d / %d\n", passed, total))
 cat(sprintf("Failed: %d\n", failed))
-cat(sprintf("Time: %.2f seconds\n", elapsed))
-cat(sprintf("Rate: %.0f conversions/second\n", total / elapsed))
+time_ms <- round(elapsed * 1000)
+rate <- total / elapsed
+cat(sprintf("Time: %dms (%.0f entries/sec)\n", time_ms, rate))
 
 if (failed > 0) {
   cat("\nFirst failures:\n")
