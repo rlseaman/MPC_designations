@@ -39,14 +39,16 @@ All production implementations pass the same test suite and produce identical re
 
 ## Test Results
 
-All 22 production implementations achieve 100% accuracy on the full test suite (2,021,090 conversions):
+All 24 implementations and their test status on the full test suite (2,021,090 conversions):
 
 | Implementation | Pack (unpacked→packed) | Status |
 |----------------|------------------------|--------|
 | AWK | 2,021,090 / 2,021,090 | ✅ 100% |
+| Bash | 2,021,090 / 2,021,090 | ✅ 100% |
 | C | 2,021,090 / 2,021,090 | ✅ 100% |
 | C++ | 2,021,090 / 2,021,090 | ✅ 100% |
 | C# | 2,021,090 / 2,021,090 | ✅ 100% |
+| Forth | 86 / 86 | ✅ 100%* |
 | Fortran | 2,021,090 / 2,021,090 | ✅ 100% |
 | Go | 2,021,090 / 2,021,090 | ✅ 100% |
 | Haskell | 2,021,090 / 2,021,090 | ✅ 100% |
@@ -65,6 +67,8 @@ All 22 production implementations achieve 100% accuracy on the full test suite (
 | Swift | 2,021,090 / 2,021,090 | ✅ 100% |
 | Tcl | 2,021,090 / 2,021,090 | ✅ 100% |
 | TypeScript | 2,021,090 / 2,021,090 | ✅ 100% |
+
+*Forth passes 86 comprehensive tests covering all formats; full CSV test limited by gforth memory constraints.
 
 **Roundtrip note:** 2,625 old-style designations (e.g., `A873 OA`) normalize to modern format (`1873 OA`) on unpack. This is correct behavior—the packed representation is identical either way.
 
@@ -433,6 +437,10 @@ MPC_designations/
 │   ├── Makefile
 │   ├── src/            # Source code (mpc package)
 │   └── test/           # Test files
+├── nim/
+│   ├── Makefile
+│   ├── src/            # Source code
+│   └── test/           # Test files
 ├── octave/
 │   ├── README.md       # Octave/MATLAB documentation
 │   ├── Makefile
@@ -551,22 +559,23 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 7 | Fortran | 2,524 | 800,749 | 0.22x |
 | 8 | Julia | 3,051 | 662,503 | 0.19x |
 | 9 | C# | 3,265 | 619,017 | 0.17x |
-| 10 | Kotlin | 5,822 | 347,147 | 0.10x |
-| 11 | PHP | 6,348 | 318,365 | 0.09x |
-| 12 | Haskell | 7,542 | 267,971 | 0.08x |
-| 13 | Swift | 8,871 | 227,831 | 0.06x |
-| 14 | AWK | 9,360 | 215,936 | 0.06x |
-| 15 | Python | 10,201 | 198,133 | 0.06x |
-| 16 | Java | 10,504 | 192,412 | 0.05x |
-| 17 | Perl | 15,965 | 126,595 | 0.04x |
-| 18 | C++ | 22,068 | 91,585 | 0.03x |
-| 19 | Ruby | 22,296 | 90,648 | 0.03x |
-| 20 | Tcl | 33,971 | 59,495 | 0.02x |
-| 21 | R | 603,586 | 3,348 | <0.01x |
-| 22 | Octave | 768,240 | 2,631 | <0.01x |
-| 23 | Bash | ~6,000,000 | ~340 | <0.01x |
+| 10 | Forth* | ~4,000 | ~500,000 | 0.14x |
+| 11 | Kotlin | 5,822 | 347,147 | 0.10x |
+| 12 | PHP | 6,348 | 318,365 | 0.09x |
+| 13 | Haskell | 7,542 | 267,971 | 0.08x |
+| 14 | Swift | 8,871 | 227,831 | 0.06x |
+| 15 | AWK | 9,360 | 215,936 | 0.06x |
+| 16 | Python | 10,201 | 198,133 | 0.06x |
+| 17 | Java | 10,504 | 192,412 | 0.05x |
+| 18 | Perl | 15,965 | 126,595 | 0.04x |
+| 19 | C++ | 22,068 | 91,585 | 0.03x |
+| 20 | Ruby | 22,296 | 90,648 | 0.03x |
+| 21 | Tcl | 33,971 | 59,495 | 0.02x |
+| 22 | R | 603,586 | 3,348 | <0.01x |
+| 23 | Octave | 768,240 | 2,631 | <0.01x |
+| 24 | Bash | ~6,000,000 | ~340 | <0.01x |
 
-*Bash time extrapolated from sample (full run would take ~100 minutes)
+*Forth time estimated from 10k sample; Bash time extrapolated (full run would take ~100 minutes)
 
 ### Unpack Direction (packed → unpacked)
 
@@ -585,18 +594,19 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 11 | Fortran | 1,939 | 1,042,336 | 0.14x |
 | 12 | Java | 2,293 | 881,417 | 0.12x |
 | 13 | Julia | 2,650 | 762,610 | 0.10x |
-| 14 | PHP | 4,323 | 467,488 | 0.06x |
-| 15 | Swift | 4,363 | 463,234 | 0.06x |
-| 16 | Python | 4,929 | 410,014 | 0.05x |
-| 17 | AWK | 9,254 | 218,402 | 0.03x |
-| 18 | Ruby | 11,813 | 171,090 | 0.02x |
-| 19 | Perl | 12,426 | 162,650 | 0.02x |
-| 20 | Tcl | 18,567 | 108,854 | 0.01x |
-| 21 | R* | ~400,000 | ~5,000 | <0.01x |
-| 22 | Octave* | ~500,000 | ~4,000 | <0.01x |
-| 23 | Bash | ~7,200,000 | ~280 | <0.01x |
+| 14 | Forth* | ~4,000 | ~500,000 | 0.07x |
+| 15 | PHP | 4,323 | 467,488 | 0.06x |
+| 16 | Swift | 4,363 | 463,234 | 0.06x |
+| 17 | Python | 4,929 | 410,014 | 0.05x |
+| 18 | AWK | 9,254 | 218,402 | 0.03x |
+| 19 | Ruby | 11,813 | 171,090 | 0.02x |
+| 20 | Perl | 12,426 | 162,650 | 0.02x |
+| 21 | Tcl | 18,567 | 108,854 | 0.01x |
+| 22 | R* | ~400,000 | ~5,000 | <0.01x |
+| 23 | Octave* | ~500,000 | ~4,000 | <0.01x |
+| 24 | Bash | ~7,200,000 | ~280 | <0.01x |
 
-*R and Octave unpack times estimated (too slow to benchmark in full); Bash time extrapolated from sample
+*Forth time estimated from 10k sample; R and Octave times estimated (too slow to benchmark); Bash time extrapolated
 
 ### Round-trip Verification
 
