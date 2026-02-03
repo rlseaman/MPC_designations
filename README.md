@@ -13,7 +13,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **C** | [`c/`](c/) | Production |
 | **C++** | [`cpp/`](cpp/) | Production |
 | **C#** | [`csharp/`](csharp/) | Production |
-| **Forth** | [`forth/`](forth/) | Minimal |
+| **Forth** | [`forth/`](forth/) | Production |
 | **Fortran** | [`fortran/`](fortran/) | Production |
 | **Go** | [`go/`](go/) | Production |
 | **Haskell** | [`haskell/`](haskell/) | Production |
@@ -35,7 +35,7 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 
 All production implementations pass the same test suite and produce identical results.
 
-**Note:** The Forth implementation is minimal, supporting only numbered asteroids and basic provisional designations. See [forth/README.md](forth/README.md) for details.
+**Note:** The Forth implementation passes 86 comprehensive tests covering all formats but has not been verified on the full 2M CSV test due to gforth memory constraints.
 
 ## Test Results
 
@@ -542,26 +542,26 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 
 | Rank | Language | Time (ms) | Rate (entries/sec) | Relative |
 |-----:|----------|----------:|-------------------:|---------:|
-| 1 | Go | 730 | 2,768,283 | 1.00x |
-| 2 | Nim | 1,059 | 1,908,404 | 0.69x |
-| 3 | C | 1,065 | 1,898,352 | 0.69x |
-| 4 | TypeScript | 1,419 | 1,424,306 | 0.51x |
-| 5 | JavaScript | 1,439 | 1,404,510 | 0.51x |
-| 6 | Rust | 1,543 | 1,309,845 | 0.47x |
-| 7 | Julia | 1,965 | 1,028,389 | 0.37x |
-| 8 | C# | 2,672 | 756,396 | 0.27x |
-| 9 | Fortran | 3,010 | 671,459 | 0.24x |
-| 10 | Kotlin | 3,711 | 544,621 | 0.20x |
-| 11 | PHP | 4,318 | 468,025 | 0.17x |
-| 12 | Java | 7,559 | 267,375 | 0.10x |
-| 13 | Haskell | 7,567 | 267,108 | 0.10x |
-| 14 | AWK | 9,561 | 211,389 | 0.08x |
-| 15 | Python | 10,949 | 184,592 | 0.07x |
-| 16 | Swift | 11,444 | 176,605 | 0.06x |
-| 17 | C++ | 15,488 | 130,494 | 0.05x |
-| 18 | Perl | 17,178 | 117,654 | 0.04x |
-| 19 | Ruby | 23,765 | 85,045 | 0.03x |
-| 20 | Tcl | 44,384 | 45,537 | 0.02x |
+| 1 | Go | 566 | 3,569,824 | 1.00x |
+| 2 | Nim | 569 | 3,550,257 | 0.99x |
+| 3 | JavaScript | 834 | 2,423,369 | 0.68x |
+| 4 | C | 970 | 2,083,598 | 0.58x |
+| 5 | TypeScript | 1,163 | 1,737,825 | 0.49x |
+| 6 | Rust | 1,317 | 1,534,617 | 0.43x |
+| 7 | Fortran | 2,524 | 800,749 | 0.22x |
+| 8 | Julia | 3,051 | 662,503 | 0.19x |
+| 9 | C# | 3,265 | 619,017 | 0.17x |
+| 10 | Kotlin | 5,822 | 347,147 | 0.10x |
+| 11 | PHP | 6,348 | 318,365 | 0.09x |
+| 12 | Haskell | 7,542 | 267,971 | 0.08x |
+| 13 | Swift | 8,871 | 227,831 | 0.06x |
+| 14 | AWK | 9,360 | 215,936 | 0.06x |
+| 15 | Python | 10,201 | 198,133 | 0.06x |
+| 16 | Java | 10,504 | 192,412 | 0.05x |
+| 17 | Perl | 15,965 | 126,595 | 0.04x |
+| 18 | C++ | 22,068 | 91,585 | 0.03x |
+| 19 | Ruby | 22,296 | 90,648 | 0.03x |
+| 20 | Tcl | 33,971 | 59,495 | 0.02x |
 | 21 | R | 603,586 | 3,348 | <0.01x |
 | 22 | Octave | 768,240 | 2,631 | <0.01x |
 | 23 | Bash | ~6,000,000 | ~340 | <0.01x |
@@ -572,29 +572,31 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 
 | Rank | Language | Time (ms) | Rate (entries/sec) | Relative |
 |-----:|----------|----------:|-------------------:|---------:|
-| 1 | Nim | 261 | 7,743,640 | 1.00x |
-| 2 | C | 283 | 7,141,661 | 0.92x |
-| 3 | C# | 296 | 6,828,007 | 0.88x |
-| 4 | JavaScript | 450 | 4,491,311 | 0.58x |
-| 5 | C++ | 455 | 4,441,956 | 0.57x |
-| 6 | Go | 465 | 4,340,646 | 0.56x |
-| 7 | TypeScript | 577 | 3,502,756 | 0.45x |
-| 8 | Rust | 790 | 2,558,342 | 0.33x |
-| 9 | Haskell | 1,180 | 1,713,433 | 0.22x |
-| 10 | Kotlin | 1,341 | 1,507,151 | 0.19x |
-| 11 | Fortran | 1,909 | 1,058,717 | 0.14x |
-| 12 | Java | 2,356 | 857,848 | 0.11x |
-| 13 | Julia | 2,658 | 760,351 | 0.10x |
-| 14 | Swift | 4,182 | 483,283 | 0.06x |
-| 15 | PHP | 4,370 | 462,449 | 0.06x |
-| 16 | Python | 4,972 | 406,526 | 0.05x |
+| 1 | Nim | 266 | 7,576,833 | 1.00x |
+| 2 | C | 284 | 7,116,514 | 0.94x |
+| 3 | C# | 297 | 6,805,017 | 0.90x |
+| 4 | JavaScript | 454 | 4,451,740 | 0.59x |
+| 5 | C++ | 456 | 4,432,215 | 0.59x |
+| 6 | Go | 469 | 4,308,162 | 0.57x |
+| 7 | TypeScript | 576 | 3,508,837 | 0.46x |
+| 8 | Rust | 796 | 2,539,058 | 0.34x |
+| 9 | Haskell | 1,179 | 1,714,239 | 0.23x |
+| 10 | Kotlin | 1,333 | 1,516,196 | 0.20x |
+| 11 | Fortran | 1,939 | 1,042,336 | 0.14x |
+| 12 | Java | 2,293 | 881,417 | 0.12x |
+| 13 | Julia | 2,650 | 762,610 | 0.10x |
+| 14 | PHP | 4,323 | 467,488 | 0.06x |
+| 15 | Swift | 4,363 | 463,234 | 0.06x |
+| 16 | Python | 4,929 | 410,014 | 0.05x |
 | 17 | AWK | 9,254 | 218,402 | 0.03x |
-| 18 | Ruby | 11,896 | 169,897 | 0.02x |
-| 19 | Perl | 12,601 | 160,391 | 0.02x |
-| 20 | Tcl | 27,477 | 73,556 | 0.01x |
-| 21 | Bash | ~7,200,000 | ~280 | <0.01x |
+| 18 | Ruby | 11,813 | 171,090 | 0.02x |
+| 19 | Perl | 12,426 | 162,650 | 0.02x |
+| 20 | Tcl | 18,567 | 108,854 | 0.01x |
+| 21 | R* | ~400,000 | ~5,000 | <0.01x |
+| 22 | Octave* | ~500,000 | ~4,000 | <0.01x |
+| 23 | Bash | ~7,200,000 | ~280 | <0.01x |
 
-*Bash time extrapolated from sample (full run would take ~120 minutes)
+*R and Octave unpack times estimated (too slow to benchmark in full); Bash time extrapolated from sample
 
 ### Round-trip Verification
 
