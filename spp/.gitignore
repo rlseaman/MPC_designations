@@ -3,6 +3,7 @@
 *.e
 *.f
 build/
+cl/mpc_designation.x
 
 # Editor backups
 *~
