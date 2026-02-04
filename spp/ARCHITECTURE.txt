@@ -1,0 +1,146 @@
+MPC Designation Converter - SPP/IRAF Implementation
+Architecture and Interface Analysis
+====================================
+
+1. CODE ORGANIZATION
+--------------------
+
+The library (mpc_designation.x) is a pure procedure library with no `task`
+declaration. It exports ~25 procedures organized in layers:
+
+High-level API:
+  mpc_convert()     - Auto-detect and convert (main entry point)
+  mpc_detect()      - Detect format and type
+  mpc_valid()       - Validate input for invalid characters
+
+Dispatch layer:
+  mpc_pack()        - Pack by type (switch on dtype)
+  mpc_unpack()      - Unpack by type (switch on dtype)
+
+Type-specific converters:
+  mpc_unperm/pkperm - Permanent (numbered) asteroids
+  mpc_unprov/pkprov - Provisional designations
+  mpc_unext/pkext   - Extended provisional (cycle >= 620)
+  mpc_pkold         - Old-style provisional (A/B prefix, pre-1925)
+  mpc_unsurv/pksurv - Survey designations (P-L, T-1, T-2, T-3)
+  mpc_uncnum/pkcnum - Numbered comets
+  mpc_uncprv        - Comet provisional
+  mpc_uncful/pkcful - Full comet designations (including ancient/BCE)
+  mpc_unsat/pksat   - Natural satellites
+
+Helper functions:
+  mpc_b62c/n2b62    - Base-62 character conversion
+  mpc_b62d4/b62e4   - 4-character base-62 encoding/decoding
+  mpc_centc/centl   - Century code conversion
+  mpc_deccyc/enccyc - Cycle count encoding/decoding
+  mpc_iscent        - Check if char is century code
+  mpc_ishalfmo      - Check if char is valid half-month
+  mpc_isseclet      - Check if char is valid secondary letter
+  mpc_isplanet      - Check if char is planet code (J,S,U,N)
+  mpc_isb62         - Check if char is valid base-62
+  mpc_strtrim       - Trim whitespace from string
+  mpc_strchr        - Find character in string
+  mpc_strfrom       - Find character starting from position
+  mpc_strstr        - Find substring in string
+  mpc_shiftl/shiftr - Shift string left/right
+  mpc_l2p/p2l       - Letter to position / position to letter
+
+2. DETECTION TYPE CODES (dtype)
+-------------------------------
+
+  1 = permanent (numbered asteroid)
+  2 = provisional
+  3 = survey (P-L, T-1, T-2, T-3)
+  4 = comet_numbered
+  5 = comet_provisional
+  6 = comet_full
+  7 = satellite
+  8 = extended provisional (cycle >= 620)
+  9 = old-style provisional (A/B prefix)
+
+3. INTERFACE MODEL
+------------------
+
+NO CL PARAMETER INTERFACE:
+- No .par files exist
+- No clgstr()/clgeti()/clgetr() calls
+- Test executables use hardcoded paths
+
+EXECUTION MODEL:
+- Executables run from host OS command line, not within CL
+- Example: ./test_csv.e test_csv
+- Task name argument required by IRAF runtime even standalone
+
+LIBRARY USAGE:
+- Include source directly: include "mpc_designation.x"
+- Or compile separately and link: xc myprogram.x mpc_designation.o
+
+4. CURRENT DESIGN INTENT
+------------------------
+
+The implementation is designed as:
+- A REUSABLE SPP LIBRARY (include source or link .o file)
+- STANDALONE TEST EXECUTABLES run from shell
+- NOT a proper IRAF package with CL parameters
+
+This is appropriate for:
+- Integration into existing IRAF tasks/packages
+- Batch processing via shell scripts
+- Testing and validation
+
+5. FOR PROPER IRAF CL INTEGRATION (not implemented)
+---------------------------------------------------
+
+Would require:
+
+a) Parameter file (mpcdes.par):
+   input,s,a,,,,"Input designation or @filename"
+   output,s,h,STDOUT,,,"Output file"
+   mode,s,h,"ql"
+
+b) Parameter retrieval in task:
+   call clgstr ("input", infile, SZ_FNAME)
+
+c) Package installation with mkpkg and extern.pkg definitions
+
+6. FILE STRUCTURE
+-----------------
+
+spp/
+├── src/
+│   ├── mpc_designation.x    # Main library (~1700 lines)
+│   └── mpc_designation.h    # Header with constants (if needed)
+├── test/
+│   ├── test_mpc.x           # Unit tests (32 tests)
+│   ├── test_errors.x        # Error handling tests (94 tests)
+│   └── test_csv.x           # CSV benchmark (2M+ tests)
+├── build/                   # Build directory
+├── example_usage.x          # Interactive example task
+├── README.md                # Documentation
+└── ARCHITECTURE.txt         # This file
+
+7. SUPPORTED FORMATS
+--------------------
+
+Asteroids:
+- Numbered < 100000:      "00001" <-> "1"
+- Numbered 100000-619999: "A0000" <-> "100000"
+- Numbered >= 620000:     "~0000" <-> "620000"
+- Provisional:            "K24KG7S" <-> "2024 KS167"
+- Extended provisional:   "_OA004S" <-> "2024 AB631"
+- Old-style (pre-1925):   "A908 CJ" <-> "J08C00J"
+
+Surveys:
+- Palomar-Leiden:         "PLS2040" <-> "2040 P-L"
+- Trojan-1/2/3:           "T1S2040" <-> "2040 T-1"
+
+Comets:
+- Numbered:               "0001P" <-> "1P"
+- Provisional:            "CJ95O010" <-> "C/1995 O1"
+- With fragment:          "DJ93F02b" <-> "D/1993 F2-B"
+- Two-letter fragment:    "PJ30J01aa" <-> "P/1930 J1-AA"
+- Ancient (year < 1000):  "C574A010" <-> "C/574 A1"
+- BCE (year < 0):         "C/49A010" <-> "C/-50 A1"
+
+Natural Satellites:
+- Standard:               "SK19S220" <-> "S/2019 S 22"
