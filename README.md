@@ -29,17 +29,18 @@ Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/Packe
 | **R** | [`r/`](r/) | Production |
 | **Ruby** | [`ruby/`](ruby/) | Production |
 | **Rust** | [`rust/`](rust/) | Production |
+| **SPP/IRAF** | [`spp/`](spp/) | Production |
 | **Swift** | [`swift/`](swift/) | Production |
 | **Tcl** | [`tcl/`](tcl/) | Production |
 | **TypeScript** | [`typescript/`](typescript/) | Production |
 
 All production implementations pass the same test suite and produce identical results.
 
-**Note:** The Forth implementation passes 86 comprehensive tests covering all formats but has not been verified on the full 2M CSV test due to gforth memory constraints.
+**Note:** The Forth implementation passes 86 comprehensive tests covering all formats but has not been verified on the full 2M CSV test due to gforth memory constraints. The SPP/IRAF implementation requires the IRAF environment for compilation.
 
 ## Test Results
 
-All 24 implementations and their test status on the full test suite (2,021,090 conversions):
+All 25 implementations and their test status on the full test suite (2,021,090 conversions):
 
 | Implementation | Pack (unpacked→packed) | Status |
 |----------------|------------------------|--------|
@@ -64,6 +65,7 @@ All 24 implementations and their test status on the full test suite (2,021,090 c
 | R | 2,021,090 / 2,021,090 | ✅ 100% |
 | Ruby | 2,021,090 / 2,021,090 | ✅ 100% |
 | Rust | 2,021,090 / 2,021,090 | ✅ 100% |
+| SPP/IRAF | 2,021,090 / 2,021,090 | ✅ 100% |
 | Swift | 2,021,090 / 2,021,090 | ✅ 100% |
 | Tcl | 2,021,090 / 2,021,090 | ✅ 100% |
 | TypeScript | 2,021,090 / 2,021,090 | ✅ 100% |
@@ -292,6 +294,20 @@ cd ruby
 ruby src/mpc_designation_cli.rb '1995 XA'    # Output: J95X00A
 ```
 
+### SPP/IRAF
+```spp
+include "mpc_designation.x"
+char input[80], output[80]
+call strcpy ("1995 XA", input, 80)
+call mpc_convert (input, output, 80)  # output = "J95X00A"
+```
+
+```bash
+cd spp/build
+xc example_usage.x mpc_designation.x -o mpcdes.e
+./mpcdes.e mpcdes    # Interactive converter
+```
+
 ### JavaScript (Node.js)
 ```javascript
 const { convertSimple } = require('./src/mpc_designation');
@@ -450,6 +466,11 @@ MPC_designations/
 │   ├── Cargo.toml      # Rust package definition
 │   ├── Makefile
 │   └── src/            # Source code (lib.rs + binaries)
+├── spp/
+│   ├── README.md       # SPP/IRAF documentation
+│   ├── ARCHITECTURE.txt # Code organization
+│   ├── src/            # Source code (mpc_designation.x)
+│   └── test/           # Test files
 ├── ruby/
 │   ├── Makefile
 │   └── src/            # Source code
@@ -496,6 +517,7 @@ make test-python
 make test-r
 make test-ruby
 make test-rust
+make test-spp
 make test-swift
 make test-tcl
 make test-typescript
@@ -554,26 +576,27 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 2 | Nim | 569 | 3,550,257 | 0.99x |
 | 3 | JavaScript | 834 | 2,423,369 | 0.68x |
 | 4 | C | 970 | 2,083,598 | 0.58x |
-| 5 | TypeScript | 1,163 | 1,737,825 | 0.49x |
-| 6 | Rust | 1,317 | 1,534,617 | 0.43x |
-| 7 | Fortran | 2,524 | 800,749 | 0.22x |
-| 8 | Julia | 3,051 | 662,503 | 0.19x |
-| 9 | C# | 3,265 | 619,017 | 0.17x |
-| 10 | Forth* | ~4,000 | ~500,000 | 0.14x |
-| 11 | Kotlin | 5,822 | 347,147 | 0.10x |
-| 12 | PHP | 6,348 | 318,365 | 0.09x |
-| 13 | Haskell | 7,542 | 267,971 | 0.08x |
-| 14 | Swift | 8,871 | 227,831 | 0.06x |
-| 15 | AWK | 9,360 | 215,936 | 0.06x |
-| 16 | Python | 10,201 | 198,133 | 0.06x |
-| 17 | Java | 10,504 | 192,412 | 0.05x |
-| 18 | Perl | 15,965 | 126,595 | 0.04x |
-| 19 | C++ | 22,068 | 91,585 | 0.03x |
-| 20 | Ruby | 22,296 | 90,648 | 0.03x |
-| 21 | Tcl | 33,971 | 59,495 | 0.02x |
-| 22 | R | 603,586 | 3,348 | <0.01x |
-| 23 | Octave | 768,240 | 2,631 | <0.01x |
-| 24 | Bash | ~6,000,000 | ~340 | <0.01x |
+| 5 | SPP/IRAF | 1,000 | 2,021,090 | 0.57x |
+| 6 | TypeScript | 1,163 | 1,737,825 | 0.49x |
+| 7 | Rust | 1,317 | 1,534,617 | 0.43x |
+| 8 | Fortran | 2,524 | 800,749 | 0.22x |
+| 9 | Julia | 3,051 | 662,503 | 0.19x |
+| 10 | C# | 3,265 | 619,017 | 0.17x |
+| 11 | Forth* | ~4,000 | ~500,000 | 0.14x |
+| 12 | Kotlin | 5,822 | 347,147 | 0.10x |
+| 13 | PHP | 6,348 | 318,365 | 0.09x |
+| 14 | Haskell | 7,542 | 267,971 | 0.08x |
+| 15 | Swift | 8,871 | 227,831 | 0.06x |
+| 16 | AWK | 9,360 | 215,936 | 0.06x |
+| 17 | Python | 10,201 | 198,133 | 0.06x |
+| 18 | Java | 10,504 | 192,412 | 0.05x |
+| 19 | Perl | 15,965 | 126,595 | 0.04x |
+| 20 | C++ | 22,068 | 91,585 | 0.03x |
+| 21 | Ruby | 22,296 | 90,648 | 0.03x |
+| 22 | Tcl | 33,971 | 59,495 | 0.02x |
+| 23 | R | 603,586 | 3,348 | <0.01x |
+| 24 | Octave | 768,240 | 2,631 | <0.01x |
+| 25 | Bash | ~6,000,000 | ~340 | <0.01x |
 
 *Forth time estimated from 10k sample; Bash time extrapolated (full run would take ~100 minutes)
 
@@ -589,24 +612,25 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 6 | Go | 469 | 4,308,162 | 0.57x |
 | 7 | TypeScript | 576 | 3,508,837 | 0.46x |
 | 8 | Rust | 796 | 2,539,058 | 0.34x |
-| 9 | Haskell | 1,179 | 1,714,239 | 0.23x |
-| 10 | Kotlin | 1,333 | 1,516,196 | 0.20x |
-| 11 | Fortran | 1,939 | 1,042,336 | 0.14x |
-| 12 | Java | 2,293 | 881,417 | 0.12x |
-| 13 | Julia | 2,650 | 762,610 | 0.10x |
-| 14 | Forth* | ~4,000 | ~500,000 | 0.07x |
-| 15 | PHP | 4,323 | 467,488 | 0.06x |
-| 16 | Swift | 4,363 | 463,234 | 0.06x |
-| 17 | Python | 4,929 | 410,014 | 0.05x |
-| 18 | AWK | 9,254 | 218,402 | 0.03x |
-| 19 | Ruby | 11,813 | 171,090 | 0.02x |
-| 20 | Perl | 12,426 | 162,650 | 0.02x |
-| 21 | Tcl | 18,567 | 108,854 | 0.01x |
-| 22 | R* | ~400,000 | ~5,000 | <0.01x |
-| 23 | Octave* | ~500,000 | ~4,000 | <0.01x |
-| 24 | Bash | ~7,200,000 | ~280 | <0.01x |
+| 9 | SPP/IRAF | ~1,000 | ~2,021,090 | 0.27x |
+| 10 | Haskell | 1,179 | 1,714,239 | 0.23x |
+| 11 | Kotlin | 1,333 | 1,516,196 | 0.20x |
+| 12 | Fortran | 1,939 | 1,042,336 | 0.14x |
+| 13 | Java | 2,293 | 881,417 | 0.12x |
+| 14 | Julia | 2,650 | 762,610 | 0.10x |
+| 15 | Forth* | ~4,000 | ~500,000 | 0.07x |
+| 16 | PHP | 4,323 | 467,488 | 0.06x |
+| 17 | Swift | 4,363 | 463,234 | 0.06x |
+| 18 | Python | 4,929 | 410,014 | 0.05x |
+| 19 | AWK | 9,254 | 218,402 | 0.03x |
+| 20 | Ruby | 11,813 | 171,090 | 0.02x |
+| 21 | Perl | 12,426 | 162,650 | 0.02x |
+| 22 | Tcl | 18,567 | 108,854 | 0.01x |
+| 23 | R* | ~400,000 | ~5,000 | <0.01x |
+| 24 | Octave* | ~500,000 | ~4,000 | <0.01x |
+| 25 | Bash | ~7,200,000 | ~280 | <0.01x |
 
-*Forth time estimated from 10k sample; R and Octave times estimated (too slow to benchmark); Bash time extrapolated
+*Forth time estimated from 10k sample; R and Octave times estimated (too slow to benchmark); Bash time extrapolated; SPP time estimated (requires IRAF environment)
 
 ### Round-trip Verification
 
