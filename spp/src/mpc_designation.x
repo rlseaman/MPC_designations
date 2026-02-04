@@ -918,7 +918,7 @@ char	packed[ARB], unpacked[ARB]
 int	maxch
 
 int	len, year, order, bcecode, mpc_deccyc(), strlen()
-char	ctype, bceprefix, halfmo, frag, frag2, provpk[10], provup[30]
+char	ctype, bceprefix, halfmo, frag, frag2, ufrag, ufrag2, provpk[10], provup[30]
 
 begin
 	len = strlen (packed)
@@ -939,22 +939,24 @@ begin
 	    frag = packed[8]
 	    frag2 = packed[9]
 	    if (frag != '0' && frag != EOS) {
+		ufrag = frag - 32
 		if (frag2 != EOS && IS_LOWER(frag2)) {
 		    # Two-letter fragment
+		    ufrag2 = frag2 - 32
 		    call sprintf (unpacked, maxch, "%c/%d %c%d-%c%c")
 			call pargc (ctype)
 			call pargi (year)
 			call pargc (halfmo)
 			call pargi (order)
-			call pargc (frag - 32)  # uppercase
-			call pargc (frag2 - 32) # uppercase
+			call pargc (ufrag)
+			call pargc (ufrag2)
 		} else {
 		    call sprintf (unpacked, maxch, "%c/%d %c%d-%c")
 			call pargc (ctype)
 			call pargi (year)
 			call pargc (halfmo)
 			call pargi (order)
-			call pargc (frag - 32)  # uppercase
+			call pargc (ufrag)
 		}
 	    } else {
 		call sprintf (unpacked, maxch, "%c/%d %c%d")
@@ -974,22 +976,24 @@ begin
 	    frag = packed[8]
 	    frag2 = packed[9]
 	    if (frag != '0' && frag != EOS) {
+		ufrag = frag - 32
 		if (frag2 != EOS && IS_LOWER(frag2)) {
 		    # Two-letter fragment
+		    ufrag2 = frag2 - 32
 		    call sprintf (unpacked, maxch, "%c/%d %c%d-%c%c")
 			call pargc (ctype)
 			call pargi (year)
 			call pargc (halfmo)
 			call pargi (order)
-			call pargc (frag - 32)  # uppercase
-			call pargc (frag2 - 32) # uppercase
+			call pargc (ufrag)
+			call pargc (ufrag2)
 		} else {
 		    call sprintf (unpacked, maxch, "%c/%d %c%d-%c")
 			call pargc (ctype)
 			call pargi (year)
 			call pargc (halfmo)
 			call pargi (order)
-			call pargc (frag - 32)  # uppercase
+			call pargc (ufrag)
 		}
 	    } else {
 		call sprintf (unpacked, maxch, "%c/%d %c%d")

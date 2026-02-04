@@ -33,6 +33,11 @@ spp/
 ├── src/
 │   ├── mpc_designation.x    # Main library implementation (~1700 lines)
 │   └── mpc_designation.h    # Header file with constants
+├── cl/
+│   ├── t_mpcdes.x           # CL task implementation
+│   ├── mpcdes.par           # CL parameter file
+│   ├── mpcpkg.cl            # Package definition script
+│   └── README.md            # CL interface documentation
 ├── test/
 │   ├── test_mpc.x           # Unit test suite (32 tests)
 │   ├── test_errors.x        # Error handling tests (94 tests)
@@ -70,21 +75,51 @@ libmpc.a:
 
 ## Usage
 
-### As an IRAF Task
+### As an IRAF CL Task (with parameters)
 
-From the cl environment:
+Build and install the CL task:
+
+```bash
+cd spp/cl
+cp ../src/mpc_designation.x .
+xc t_mpcdes.x mpc_designation.x -o mpcdes.e
+```
+
+From the CL environment:
 
 ```
-cl> task mpcdes = "path/to/mpcdes.e"
-cl> mpcdes
+cl> task mpcdes = "path/to/cl/mpcdes.e"
+
+cl> mpcdes "1995 XA"
+J95X00A
+
+cl> mpcdes "J95X00A"
+1995 XA
+
+cl> mpcdes "C/1995 O1" verbose+
+  Input:    C/1995 O1
+  Detected: unpacked format, full comet
+  Action:   packing to MPC compact form
+  Output:   CJ95O010
+
+cl> mpcdes @input.txt output=results.txt
+```
+
+See `cl/README.md` for full CL task documentation.
+
+### Interactive Example Task
+
+Build the interactive example:
+
+```
+cl> xc example_usage.x src/mpc_designation.x -o mpcdes_interactive.e
+cl> task mpcdes_i = "path/to/mpcdes_interactive.e"
+cl> mpcdes_i
 MPC Designation Converter
 Enter a designation to convert, 'q' to quit.
 
 des> K24KG7S
 Packed 'K24KG7S' -> Unpacked '2024 KS167'
-
-des> 2024 KS167
-Unpacked '2024 KS167' -> Packed 'K24KG7S'
 
 des> q
 Goodbye.

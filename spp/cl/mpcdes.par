@@ -1,0 +1,11 @@
+# MPCDES.PAR -- Parameter file for MPC Designation Converter
+#
+# Parameter format: name, type, mode, value, min, max, prompt
+#
+# Modes: a=auto, h=hidden, l=learned, q=query
+
+input,s,a,,,,"Designation to convert (or @file for list)"
+output,s,h,"STDOUT",,,"Output file"
+verbose,b,h,no,,,"Print verbose output?"
+result,s,h,"",,,"Last conversion result (output)"
+mode,s,h,"ql"
