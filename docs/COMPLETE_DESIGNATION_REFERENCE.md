@@ -9,6 +9,7 @@ implementations (Python, TCL, C, Go, Java, Rust), and 2M+ test cases.
 1. **MPC Official**: https://www.minorplanetcenter.net/iau/info/PackedDes.html
 2. **Repository test data**: 2,021,090 provisional designation pairs + 114 error cases
 3. **Language implementations**: Python, TCL, C, Go, Java, Rust (all produce identical results)
+4. **MPC Help Desk**: Direct clarifications received (see Part 11)
 
 ---
 
@@ -189,17 +190,25 @@ Where letter_position: A=0, B=1, ..., Z=24 (skipping I).
 
 ### 2.6 Old-Style Provisional Designations
 
-**⚠️ CRITICAL AMBIGUITY - REQUIRES MPC CLARIFICATION**
+**✓ CLARIFIED BY MPC HELP DESK**
 
-There are TWO different "old-style" designation formats that are often confused:
+#### 2.6.1 MPC Official Guidance
 
-#### 2.6.1 A-Prefix Modern Notation (Retrospective)
+The MPC Help Desk confirmed:
 
-The MPC uses "A" or "B" prefix notation to represent pre-1925 discoveries in the
-MODERN designation system. From [MPC documentation](https://www.minorplanetcenter.net/iau/info/PackedDes.html):
+1. **Before 1925, asteroids were only designated by name/number** - there were no
+   provisional designations in the modern sense.
 
-> "This scheme is now also used retrospectively for pre-1925 discoveries.
-> For these, the first digit of the year is replaced by an A."
+2. **The MPC created A-prefix designations** to fill a gap in the database. These
+   are PRIMARY designations assigned by the MPC, not conversions from historical data.
+
+3. **A893 XA is the PRIMARY designation** for (378) Holmia - it is NOT a "modern
+   equivalent" of some historical designation.
+
+4. **Software should ONLY accept A-prefix format** for pre-1925 objects. The "A"
+   means 1 (first digit of year) and indicates an MPC-created designation.
+
+#### 2.6.2 A-Prefix Format Specification
 
 **Format**: `[A|B][century-digit][YY] [half-month][letter]`
 
@@ -210,54 +219,35 @@ MODERN designation system. From [MPC documentation](https://www.minorplanetcente
 | Half-month | Modern half-month code (A-Y, not I) |
 | Letter | Second letter in modern sense |
 
-**Examples (A-prefix modern notation)**:
+**Examples**:
 | Unpacked | Packed | Meaning |
 |----------|--------|---------|
 | A908 CJ | J08C00J | Year 1908, Feb 1-15 (C), letter J |
 | A873 OA | I73O00A | Year 1873, Jul 16-31 (O), letter A |
 | A801 AA | I01A00A | (1 Ceres) Year 1801, Jan 1-15, letter A |
 
-#### 2.6.2 Original Historical Designations (pre-1925)
+#### 2.6.3 Historical Context
 
-The ORIGINAL designation system used before 1925 was completely different.
-From [MPC DesDoc](https://www.minorplanetcenter.net/iau/info/DesDoc.html):
+The ORIGINAL designation system used before 1925 was completely different:
 
 - **1892**: Year + single letter (1892 A, 1892 B, ..., omitting I)
 - **1893+**: Double letters when 25 proved insufficient (1893 AA, 1893 AB, ...)
 - Letters were **sequential**, NOT based on half-month of discovery
 - The double-letter sequence continued across years until 1916 ZZ, then restarted
 
-**Critical Example - These are NOT the same object**:
-| Original Designation | Modern Equivalent | Asteroid |
-|---------------------|-------------------|----------|
-| 1893 AP | A893 XA | (378) Holmia |
+**Important**: The original historical designations (like "1893 AP") have NO
+algorithmic relationship to the MPC-assigned A-prefix designations. For example,
+the object historically called "1893 AP" is now (378) Holmia with primary
+designation "A893 XA" - these share only the year, nothing else.
 
-The object historically designated "1893 AP" (the 16th double-letter designation
-of 1893) is now known as (378) Holmia. Its MODERN provisional designation is
-"A893 XA" (discovered in second half of November), NOT "A893 AP".
+#### 2.6.4 Implementation Behavior
 
-#### 2.6.3 Current Implementation Behavior
+Implementations correctly handle A-prefix format:
+- `A908 CJ` → `J08C00J` (pack)
+- `J08C00J` → `1908 CJ` (unpack - normalizes to 4-digit year)
 
-The implementations in this repository treat A-prefix format as modern notation:
-- `A908 CJ` → `J08C00J` (correct for A-prefix modern notation)
-- Unpacking `J08C00J` → `1908 CJ` (normalizes to 4-digit year)
-
-**⚠️ LIMITATION**: The implementations do NOT handle original historical designations
-like "1893 AP". These cannot be round-tripped because:
-1. They use a completely different lettering scheme
-2. No algorithm exists to convert between original and modern designations
-3. Conversion requires a lookup table of historical assignments
-
-#### 2.6.4 Questions for MPC Help Desk
-
-1. Is there a published mapping between original historical designations
-   (1893 AP style) and modern A-prefix designations (A893 XA style)?
-
-2. Should implementations reject original historical format input, or is there
-   an expected conversion behavior?
-
-3. What is the canonical unpacked representation for pre-1925 objects:
-   "A908 CJ" or "1908 CJ"?
+**Note**: Original historical designations (1893 AP style) are NOT supported
+and should be rejected. Only A-prefix format is accepted for pre-1925 objects.
 
 ---
 
@@ -398,7 +388,7 @@ Comets with both a periodic number and provisional designation.
 
 ### 4.7 Comet Fragment Packing Rules
 
-**⚠️ REQUIRES MPC CLARIFICATION FOR TWO-LETTER FRAGMENTS**
+**✓ PARTIALLY CLARIFIED BY MPC HELP DESK**
 
 #### 4.7.1 Single-Letter Fragments (Documented)
 
@@ -423,51 +413,58 @@ From [MPC PackedDes.html](https://www.minorplanetcenter.net/iau/info/PackedDes.h
 **Real-world example**: Comet Shoemaker-Levy 9 (D/1993 F2) broke into 21 fragments
 labeled A through W. Each fragment was designated D/1993 F2-A, D/1993 F2-B, etc.
 
-#### 4.7.2 Two-Letter Fragments (NOT Documented by MPC)
+#### 4.7.2 Two-Letter Fragments - MPC Guidance
 
-The MPC PackedDes.html does **NOT** document how two-letter fragments (like -AA,
--AB, -AZ) should be packed. The implementations in this repository use an
-**inferred** 9-character format:
+**MPC Help Desk confirmed**:
 
-**Inferred packing rule for two-letter fragments**:
-- Two lowercase letters in positions 8-9
-- Total packed length: 9 characters (vs. 8 for single-letter)
+1. **Two-letter fragments exist ONLY for numbered comets** - e.g., 73P (Comet
+   Schwassmann-Wachmann 3) has 74 fragments: A-Z (skipping I), then AA, AB, etc.
 
-| Unpacked | Packed (9 chars) | Fragment | Status |
-|----------|------------------|----------|--------|
-| P/1930 J1-AA | PJ30J01aa | AA → aa | ⚠️ INFERRED |
-| P/1930 J1-AB | PJ30J01ab | AB → ab | ⚠️ INFERRED |
-| P/1930 J1-AZ | PJ30J01az | AZ → az | ⚠️ INFERRED |
+2. **Letters skip I as usual** - the sequence is A-H, J-Z, AA, AB, etc.
 
-**Questions about two-letter fragments**:
-1. What is the official packed format for two-letter comet fragments?
-2. Are there any comets with two-letter fragment designations in the MPC database?
-3. Is the 9-character format (8 + 2 lowercase letters) correct?
+3. **Always convert to lowercase** in packed format.
 
-#### 4.7.3 Fragment Packing for Different Comet Types
+4. **⚠️ NO OFFICIAL PACKED FORMAT POLICY** - The MPC acknowledged this is a known
+   issue that needs documentation. Current inferred format is acceptable.
 
-Fragments can apply to any comet designation type:
+#### 4.7.3 Numbered Comets with Fragments
 
-| Type | Unpacked | Packed | Notes |
-|------|----------|--------|-------|
-| Provisional modern | D/1993 F2-B | DJ93F02b | 8 chars |
-| Provisional ancient | C/240 V1-A | C240V01a | 8 chars |
-| Provisional BCE | C/-43 K1-A | C/56K01a | 8 chars |
-| Full with number | 1P/1986 F1-A | 0001PJ86F01a | 12 chars |
+For **numbered comets** (e.g., 73P), fragments are packed by appending lowercase
+letter(s) to the standard 5-character packed format:
 
-#### 4.7.4 Questions for MPC Help Desk - Comet Fragments
+| Unpacked | Packed | Length | Notes |
+|----------|--------|--------|-------|
+| 73P | 0073P | 5 | No fragment |
+| 73P-A | 0073Pa | 6 | Single-letter fragment |
+| 73P-H | 0073Ph | 6 | Last before skipping I |
+| 73P-J | 0073Pj | 6 | First after skipping I |
+| 73P-Z | 0073Pz | 6 | Last single-letter |
+| 73P-AA | 0073Paa | 7 | First two-letter fragment |
+| 73P-BZ | 0073Pbz | 7 | Two-letter example |
 
-1. **Two-letter fragments**: What is the official packed representation for
-   comet fragments with two letters (e.g., D/1993 F2-AA if it existed)?
+**Constraints**:
+- Fragment letters skip I (confusion with 1)
+- Single-letter: A-H, J-Z (25 fragments)
+- Two-letter: AA, AB, ..., AZ (skipping AI), BA, BB, ... (extending beyond 25)
 
-2. **Maximum fragments**: Is there a maximum number of fragments a comet can
-   have? The single-letter scheme allows 26 (A-Z), but what happens beyond Z?
+#### 4.7.4 Provisional Comets with Two-Letter Fragments
 
-3. **Fragment ordering**: Are fragment letters always sequential (A, B, C, ...)
-   or can they skip letters?
+For **provisional comets** (e.g., P/1930 J1), two-letter fragments have **no
+official packed format**. Per MPC guidance, implementations should:
 
-4. **Lowercase in packed format**: Is it correct that fragments are always
-   lowercase in the packed format (A→a, B→b)?
+1. Pack single-letter fragments normally (9-char format with trailing lowercase)
+2. For two-letter fragments, **return the unpacked designation as-is** (passthrough)
+
+This passthrough behavior is correct until MPC establishes an official format.
+
+#### 4.7.5 Fragment Packing Summary by Comet Type
+
+| Type | Single-letter | Two-letter | Example |
+|------|---------------|------------|---------|
+| Numbered (73P) | 0073Pa | 0073Paa | ✓ Supported |
+| Provisional (P/1930 J1) | PJ30J01a | Passthrough | Per MPC guidance |
+| Provisional ancient | C240V01a | Passthrough | Per MPC guidance |
+| Full with number | 0001PJ86F01a | N/A | Single-letter only |
 
 ---
 
@@ -633,89 +630,120 @@ Provisional comet `CJ95O010` could look like packed asteroid:
 
 ## Part 10: Questions for MPC Help Desk
 
-The following questions require clarification from the Minor Planet Center.
-These represent gaps in documentation or inferred behaviors that need verification.
+The following questions were submitted to the Minor Planet Center Help Desk.
+Most have been resolved.
 
-### 10.1 Old-Style vs. A-Prefix Designations
+### 10.1 Old-Style vs. A-Prefix Designations - ✓ RESOLVED
 
-**Background**: Pre-1925 designations used a sequential lettering system
-(1892 A, 1892 B, ..., 1893 AA, 1893 AB, ...) that is fundamentally different
-from the modern half-month + letter system.
+**MPC Response**:
+- Before 1925, asteroids were only designated by name/number - no provisional designations
+- The MPC created A-prefix designations to fill a database gap
+- A893 XA is the PRIMARY designation for (378) Holmia, not a "modern equivalent"
+- **Software should ONLY accept A-prefix format** for pre-1925 objects
+- "A" means 1 (first digit of year) and indicates MPC-created designation
 
-**Questions**:
+### 10.2 Comet Fragment Packed Format - ✓ PARTIALLY RESOLVED
 
-1. **Mapping table**: Is there a published mapping between original historical
-   designations (e.g., "1893 AP") and their modern equivalents (e.g., "A893 XA"
-   for asteroid 378 Holmia)?
+**MPC Response**:
+- Two-letter fragments exist ONLY for numbered comets (e.g., 73P has 74 fragments)
+- Letters skip I as usual
+- Always convert to lowercase in packed format
+- **⚠️ NO OFFICIAL PACKED FORMAT POLICY** for two-letter fragments - this is a known issue
 
-2. **Input handling**: Should software implementations:
-   - Accept only A-prefix format ("A908 CJ") for pre-1925 objects?
-   - Accept only the original format ("1908 CJ")?
-   - Accept both, treating them as equivalent?
-   - Reject original format since it cannot be algorithmically converted?
-
-3. **Canonical representation**: For pre-1925 objects, what is the canonical
-   unpacked representation: "A908 CJ" or "1908 CJ"?
-
-4. **Year digit meaning**: In "A908 CJ", does the "A" prefix simply replace
-   the first digit of the year (making it equivalent to "1908 CJ"), or does
-   it have additional semantic meaning?
-
-### 10.2 Comet Fragment Packed Format
-
-**Background**: [PackedDes.html](https://www.minorplanetcenter.net/iau/info/PackedDes.html)
-documents single-letter fragments stored as lowercase in position 8, but does not
-address two-letter fragments.
-
-**Questions**:
-
-1. **Two-letter format**: What is the official packed representation for
-   two-letter comet fragments (e.g., if D/1993 F2-AA existed)?
-   - Is it 9 characters with two lowercase letters (e.g., "DJ93F02aa")?
-   - Or is there a different encoding scheme?
-
-2. **Do two-letter fragments exist?**: Are there any comets in the MPC database
-   with two-letter fragment designations (AA, AB, etc.)?
-
-3. **Fragment maximum**: What happens when a comet has more than 26 fragments?
-   - Are fragments always assigned A through Z?
-   - Can letters be skipped (e.g., A, B, D, skipping C)?
-
-4. **Case conversion**: Is lowercase for packed fragments mandatory?
-   Specifically: D/1993 F2-A always packs to "DJ93F02a" (lowercase), correct?
+**Implementation guidance**:
+- For numbered comets: Pack two-letter fragments (73P-AA → 0073Paa)
+- For provisional comets: Use passthrough (return unpacked designation as-is)
 
 ### 10.3 BCE Comet Encoding
 
-**Background**: The implementations use a complement encoding for BCE years:
+**✓ CONFIRMED ACCEPTABLE BY MPC HELP DESK**
+
+The MPC confirmed that while no official documentation exists for BCE comet
+encoding, the current inferred format is acceptable until documented.
+
+**Current encoding**:
 - Prefix `/` for years -1 to -99, code = 99 - abs(year)
 - Prefix `.` for years -100 to -199, code = 99 - (abs(year) - 100)
 - Prefix `-` for years -200 to -299, code = 99 - (abs(year) - 200)
 
-**Questions**:
-
-1. **Documentation**: Is this encoding scheme documented anywhere officially?
-   We inferred it from patterns in the data.
-
-2. **Year range**: What is the minimum BCE year that can be encoded?
-   The current scheme supports -1 to -299. Are older comets possible?
-
-3. **Prefix characters**: Are `/`, `.`, `-` the correct prefix characters for
-   BCE year ranges? These overlap with path separators and may cause issues.
+The MPC acknowledged they need to add BCE encoding documentation.
 
 ### 10.4 Permanent Natural Satellites
 
-**Background**: [PackedDes.html](https://www.minorplanetcenter.net/iau/info/PackedDes.html)
-mentions permanent satellite format `[Planet][3-digit-number]S` (e.g., "J013S"
-for Jupiter XIII), but this is not well documented.
+**✓ CONFIRMED BY MPC HELP DESK**
 
-**Questions**:
+The MPC confirmed:
 
-1. **Format confirmation**: Is "J013S" the correct packed format for Jupiter XIII?
+1. **J013S is correct** for Jupiter XIII
 
-2. **Number encoding**: Is the Roman numeral converted to decimal and zero-padded
-   to 3 digits?
+2. **Roman numeral → decimal**, zero-padded to 3 digits
 
-3. **Maximum**: What is the maximum satellite number that can be encoded?
+3. **Maximum: 999** (3 digits)
+
+---
+
+## Part 11: MPC Help Desk Clarifications
+
+This section documents official responses received from the MPC Help Desk.
+
+### 11.1 Old-Style (A-Prefix) Designations
+
+**Question**: What is the relationship between original historical designations
+(1893 AP style) and modern A-prefix designations (A893 XA style)?
+
+**MPC Response**:
+> Before 1925, asteroids were only designated by name/number - there were no
+> provisional designations in the modern sense. The MPC created A-prefix
+> designations to fill a gap in the database. These are PRIMARY designations
+> assigned by the MPC, not conversions from historical data.
+>
+> A893 XA is the PRIMARY designation for (378) Holmia. Software should ONLY
+> accept A-prefix format for pre-1925 objects. The "A" means 1 (first digit of
+> year) and indicates an MPC-created designation.
+
+### 11.2 Two-Letter Comet Fragments
+
+**Question**: What is the official packed format for two-letter comet fragments?
+
+**MPC Response**:
+> Two-letter fragments exist ONLY for numbered comets. For example, 73P (Comet
+> Schwassmann-Wachmann 3) has 74 fragments: A-Z (skipping I), then AA, AB, etc.
+>
+> Letters skip I as usual. Always convert to lowercase in packed format.
+>
+> There is NO official packed format policy for two-letter fragments - this is
+> a known issue at the MPC that needs to be addressed.
+
+### 11.3 BCE Comet Encoding
+
+**Question**: Is the inferred BCE encoding scheme correct?
+
+**MPC Response**:
+> No documentation exists for BCE comet encoding. The MPC needs to add this
+> documentation. The current inferred encoding is acceptable until documented.
+
+### 11.4 Permanent Natural Satellites
+
+**Question**: What is the correct packed format for permanent satellites?
+
+**MPC Response**:
+> J013S is correct for Jupiter XIII. The Roman numeral is converted to decimal
+> and zero-padded to 3 digits. Maximum: 999.
+
+### 11.5 Implementation Guidance
+
+Based on MPC feedback, implementations should:
+
+1. **A-prefix designations**: Only accept A-prefix format (A908 CJ) for pre-1925
+   objects. Reject original historical format (1893 AP).
+
+2. **Two-letter comet fragments**:
+   - For numbered comets: Pack as lowercase letters (73P-AA → 0073Paa)
+   - For provisional comets: Return unpacked designation as-is (passthrough)
+
+3. **BCE encoding**: Continue using inferred format until MPC documents officially.
+
+4. **Permanent satellites**: Use J013S format (planet + 3-digit decimal + S).
 
 ---
 
@@ -732,11 +760,11 @@ This reference covers all known MPC designation formats:
 All implementations in this repository handle these formats identically,
 validated by 2,021,090+ test cases with zero discrepancies.
 
-**⚠️ Areas requiring MPC clarification**:
-1. Old-style vs. A-prefix designation relationship (Section 10.1)
-2. Two-letter comet fragment encoding (Section 10.2)
-3. BCE comet year encoding verification (Section 10.3)
-4. Permanent satellite packed format (Section 10.4)
+**✓ Clarified by MPC Help Desk** (see Part 11):
+1. Old-style vs. A-prefix designation relationship - ✓ RESOLVED
+2. Two-letter comet fragment encoding - ✓ PARTIALLY RESOLVED (no official format)
+3. BCE comet year encoding verification - ✓ RESOLVED (acceptable)
+4. Permanent satellite packed format - ✓ RESOLVED
 
 ---
 

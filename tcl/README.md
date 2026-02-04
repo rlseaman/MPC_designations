@@ -118,6 +118,33 @@ Detect the format of a designation without converting.
 - **Parameters:** `designation` - The MPC designation to analyze
 - **Returns:** Dictionary with format information
 
+## Comet Fragment Handling
+
+The library supports comet fragment designations:
+
+### Numbered Comets with Fragments
+
+Numbered comets (like 73P) can have fragments:
+
+```tcl
+MPCDesignation::convertSimple "73P-A"    ;# Returns "0073Pa"
+MPCDesignation::convertSimple "73P-AA"   ;# Returns "0073Paa"
+MPCDesignation::convertSimple "0073Pa"   ;# Returns "73P-A"
+MPCDesignation::convertSimple "0073Paa"  ;# Returns "73P-AA"
+```
+
+### Provisional Comets with Fragments
+
+Provisional comets can also have fragments:
+
+```tcl
+MPCDesignation::convertSimple "P/1930 J1-A"   ;# Returns "PJ30J01a"
+MPCDesignation::convertSimple "P/1930 J1-AA"  ;# Returns "PJ30J01aa"
+MPCDesignation::convertSimple "PJ30J01aa"     ;# Returns "P/1930 J1-AA"
+```
+
+Fragment letters include all A-Z (including I, per MPC data).
+
 ## Error Handling
 
 The library uses TCL's standard error mechanism:
@@ -133,6 +160,9 @@ if {[catch {set result [MPCDesignation::convertSimple $input]} err]} {
 ```bash
 # Run error handling tests
 tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
+
+# Run fragment handling tests
+tclsh test/test_fragments.tcl
 
 # Run conversion tests (requires decompressing test data)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz

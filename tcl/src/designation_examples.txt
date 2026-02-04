@@ -1,0 +1,239 @@
+# MPC Designation Examples - Unpacked/Packed Pairs
+# Format: unpacked,packed
+# Generated from TCL implementation for verification
+
+# ============================================================
+# PERMANENT (NUMBERED) ASTEROIDS
+# ============================================================
+
+# Simple 5-digit range (1 - 99,999)
+1,00001
+99,00099
+999,00999
+9999,09999
+99999,99999
+
+# Letter prefix uppercase A-Z (100,000 - 359,999)
+100000,A0000
+100001,A0001
+109999,A9999
+110000,B0000
+200000,K0000
+359999,Z9999
+
+# Letter prefix lowercase a-z (360,000 - 619,999)
+360000,a0000
+360001,a0001
+369999,a9999
+370000,b0000
+500000,o0000
+619999,z9999
+
+# Tilde format (620,000 - 15,396,335)
+620000,~0000
+620001,~0001
+620062,~0010
+1000000,~1ar2
+15396335,~zzzz
+
+# ============================================================
+# PROVISIONAL ASTEROIDS
+# ============================================================
+
+# Standard format - various centuries
+1801 AA,I01A00A
+1850 XZ,I50X00Z
+1900 AA,J00A00A
+1995 XA,J95X00A
+2000 AA,K00A00A
+2024 AB,K24A00B
+2100 AA,L00A00A
+
+# With cycle counts
+1995 XA1,J95X01A
+1995 XA9,J95X09A
+1995 XA10,J95X10A
+1995 XA99,J95X99A
+1995 XA100,J95XA0A
+1995 XA359,J95XZ9A
+1995 XA360,J95Xa0A
+1995 XA619,J95Xz9A
+
+# Extended format (cycle >= 620)
+2015 BA620,_FB0000
+2015 BB620,_FB0001
+2024 AA620,_OA0000
+2024 AZ620,_OA000O
+
+# Half-month codes (I is skipped in half-months)
+2024 AA,K24A00A
+2024 BA,K24B00A
+2024 CA,K24C00A
+2024 DA,K24D00A
+2024 EA,K24E00A
+2024 FA,K24F00A
+2024 GA,K24G00A
+2024 HA,K24H00A
+2024 JA,K24J00A
+2024 KA,K24K00A
+2024 LA,K24L00A
+2024 MA,K24M00A
+2024 NA,K24N00A
+2024 OA,K24O00A
+2024 PA,K24P00A
+2024 QA,K24Q00A
+2024 RA,K24R00A
+2024 SA,K24S00A
+2024 TA,K24T00A
+2024 UA,K24U00A
+2024 VA,K24V00A
+2024 WA,K24W00A
+2024 XA,K24X00A
+2024 YA,K24Y00A
+
+# Old-style A-prefix (pre-1925) - canonical unpacked format
+A801 AA,I01A00A
+A893 XA,I93X00A
+A908 CJ,J08C00J
+A924 YZ,J24Y00Z
+
+# ============================================================
+# SURVEY DESIGNATIONS
+# ============================================================
+
+1 P-L,PLS0001
+2040 P-L,PLS2040
+9999 P-L,PLS9999
+1 T-1,T1S0001
+3138 T-1,T1S3138
+1010 T-2,T2S1010
+4101 T-3,T3S4101
+
+# ============================================================
+# NUMBERED COMETS
+# ============================================================
+
+# Basic numbered comets
+1P,0001P
+1D,0001D
+73P,0073P
+354P,0354P
+9999P,9999P
+
+# With single-letter fragments
+1P-A,0001Pa
+73P-A,0073Pa
+73P-B,0073Pb
+73P-H,0073Ph
+73P-I,0073Pi
+73P-J,0073Pj
+73P-Z,0073Pz
+
+# With two-letter fragments
+73P-AA,0073Paa
+73P-AB,0073Pab
+73P-AI,0073Pai
+73P-AZ,0073Paz
+73P-BA,0073Pba
+73P-BI,0073Pbi
+73P-BZ,0073Pbz
+73P-ZZ,0073Pzz
+
+# ============================================================
+# PROVISIONAL COMETS
+# ============================================================
+
+# Various comet types
+C/1995 O1,CJ95O010
+P/2019 A4,PK19A040
+D/1993 F2,DJ93F020
+X/2011 A1,XK11A010
+A/2019 G1,AK19G010
+I/2019 Q4,IK19Q040
+
+# With single-letter fragments
+D/1993 F2-A,DJ93F02a
+D/1993 F2-B,DJ93F02b
+D/1993 F2-W,DJ93F02w
+C/1996 B2-A,CJ96B02a
+
+# With two-letter fragments
+P/1930 J1-AA,PJ30J01aa
+P/1930 J1-AI,PJ30J01ai
+P/1930 J1-AZ,PJ30J01az
+P/1930 J1-BA,PJ30J01ba
+P/1930 J1-BI,PJ30J01bi
+
+# Asteroid-style provisional with comet prefix
+P/2006 AH2,PK06A02H
+A/2010 LN135,AK10LD5N
+
+# ============================================================
+# ANCIENT COMETS (year < 1000)
+# ============================================================
+
+C/240 V1,C240V010
+C/574 A1,C574A010
+C/837 F1,C837F010
+
+# ============================================================
+# BCE COMETS
+# ============================================================
+
+# Prefix / for years -1 to -99
+C/-43 L1,C/56L010
+C/-87 A1,C/12A010
+
+# Prefix . for years -100 to -199
+C/-146 P1,C.53P010
+
+# Prefix - for years -200 to -299
+C/-240 V1,C-59V010
+
+# ============================================================
+# FULL COMET DESIGNATIONS (number + provisional)
+# ============================================================
+
+1P/1982 U1,0001PJ82U010
+29P/1993 F1,0029PJ93F010
+
+# ============================================================
+# NATURAL SATELLITES
+# ============================================================
+
+S/2003 J 2,SK03J020
+S/2019 S 22,SK19S220
+S/2018 U 1,SK18U010
+S/2020 N 1,SK20N010
+
+# Satellite numbers with encoding
+S/2000 J 1,SK00J010
+S/2000 J 10,SK00J100
+S/2000 J 99,SK00J990
+S/2000 J 100,SK00JA00
+
+# ============================================================
+# EDGE CASES
+# ============================================================
+
+# Minimum/maximum asteroid
+1,00001
+15396335,~zzzz
+
+# Century boundaries
+1099 YZ,A99Y00Z
+1100 AA,B00A00A
+1899 YZ,I99Y00Z
+1900 AA,J00A00A
+1999 YZ,J99Y00Z
+2000 AA,K00A00A
+2099 YZ,K99Y00Z
+2100 AA,L00A00A
+
+# Cycle count boundaries
+1995 XA619,J95Xz9A
+2015 BA620,_FB0000
+
+# Maximum comet number
+9999P,9999P
+9999D,9999D

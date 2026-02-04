@@ -100,6 +100,10 @@ namespace eval MPCDesignation {
     variable pat_comet_prov_unpacked {^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$}
     variable pat_comet_numbered_packed {^(\d{4})([PD])$}
     variable pat_comet_numbered_unpacked {^(\d+)([PD])(?:/[A-Za-z].*)?$}
+    # Numbered comet with optional fragment (e.g., "73P-A" or "73P-AA")
+    variable pat_comet_numbered_frag_unpacked {^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$}
+    # Packed: 4-digit number + type + optional lowercase fragment(s)
+    variable pat_comet_numbered_frag_packed {^(\d{4})([PD])([a-z]{1,2})?$}
     variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
     variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
     variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
@@ -485,8 +489,36 @@ namespace eval MPCDesignation {
             error "Invalid century code: $century"
         }
 
-        set fullYear "[dict get $centuryCodes $century]$year"
+        # Asteroid provisionals: only I-L valid (1800-2199)
+        if {$century ni {I J K L}} {
+            error "Invalid century code for asteroid provisional: $century (must be I-L for years 1800-2199)"
+        }
+
+        set centuryNum [dict get $centuryCodes $century]
+        set fullYear "$centuryNum$year"
         set cycleCount [decodeCycleCount $cycleEncoded]
+
+        # For pre-1925 designations, use A-prefix format (MPC canonical)
+        # A-prefix: A=1 for 1xxx years, B=2 for 2xxx years (theoretical)
+        set yearNum [scan $fullYear %d]
+        if {$yearNum < 1925} {
+            set firstDigit [string index $fullYear 0]
+            set restOfYear [string range $fullYear 1 end]
+            if {$firstDigit eq "1"} {
+                set prefix "A"
+            } elseif {$firstDigit eq "2"} {
+                set prefix "B"
+            } else {
+                set prefix ""
+            }
+            if {$prefix ne ""} {
+                if {$cycleCount == 0} {
+                    return "$prefix$restOfYear $halfMonth$secondLetter"
+                } else {
+                    return "$prefix$restOfYear $halfMonth$secondLetter$cycleCount"
+                }
+            }
+        }
 
         if {$cycleCount == 0} {
             return "$fullYear $halfMonth$secondLetter"
@@ -564,6 +596,12 @@ namespace eval MPCDesignation {
             error "Invalid century in year: $year"
         }
 
+        # Asteroid provisionals: only years 1800-2199 valid
+        set yearNum [scan $year %d]
+        if {$yearNum < 1800 || $yearNum > 2199} {
+            error "Year out of range for asteroid provisional: $year (must be 1800-2199)"
+        }
+
         set centuryCode [dict get $reverseCenturyCodes $century]
         set cycleEncoded [encodeCycleCount $cycleCount]
 
@@ -598,6 +636,11 @@ namespace eval MPCDesignation {
 
         if {![dict exists $centuryCodes $century]} {
             error "Invalid century code: $century"
+        }
+
+        # Comet provisionals: only A-L valid (1000-2199)
+        if {$century ni {A B C D E F G H I J K L}} {
+            error "Invalid century code for comet provisional: $century (must be A-L for years 1000-2199)"
         }
 
         set fullYear "[dict get $centuryCodes $century]$year"
@@ -642,6 +685,12 @@ namespace eval MPCDesignation {
             error "Invalid century in year: $year"
         }
 
+        # Comet provisionals: only years 1000-2199 valid
+        set yearNum [scan $year %d]
+        if {$yearNum < 1000 || $yearNum > 2199} {
+            error "Year out of range for comet provisional: $year (must be 1000-2199)"
+        }
+
         set centuryCode [dict get $reverseCenturyCodes $century]
         set orderEncoded [encodeCycleCount $orderNum]
 
@@ -657,32 +706,36 @@ namespace eval MPCDesignation {
 
     #
     # Unpack a numbered periodic comet designation
-    # Input: 4-5 character packed format like "0001P" or "0354P"
-    # Output: unpacked format like "1P" or "354P"
+    # Input: 5-7 character packed format like "0001P", "0354P", "0073Pa", or "0073Paa"
+    # Output: unpacked format like "1P", "354P", "73P-A", or "73P-AA"
     #
     proc unpackCometNumbered {packed} {
         set packed [string trim $packed]
 
-        variable pat_comet_numbered_packed
-        if {![regexp $pat_comet_numbered_packed $packed -> numStr cometType]} {
+        variable pat_comet_numbered_frag_packed
+        if {![regexp $pat_comet_numbered_frag_packed $packed -> numStr cometType fragment]} {
             error "Invalid packed numbered comet designation: $packed"
         }
 
         set number [scan $numStr %d]
-        return "$number$cometType"
+        set result "$number$cometType"
+        if {$fragment ne ""} {
+            append result "-" [string toupper $fragment]
+        }
+        return $result
     }
 
     #
     # Pack a numbered periodic comet designation
-    # Input: unpacked format like "1P" or "354P"
-    # Output: 5-character packed format like "0001P"
+    # Input: unpacked format like "1P", "354P", "73P-A", or "73P-AA"
+    # Output: 5-7 character packed format like "0001P", "0073Pa", or "0073Paa"
     #
     proc packCometNumbered {unpacked} {
         set unpacked [string trim $unpacked]
 
-        # Match "1P" or "354P" or "1P/Halley" (with optional name after slash)
-        variable pat_comet_numbered_unpacked
-        if {![regexp $pat_comet_numbered_unpacked $unpacked -> number cometType]} {
+        # Match "1P", "354P", "73P-A", "73P-AA", or "1P/Halley" (with optional name after slash)
+        variable pat_comet_numbered_frag_unpacked
+        if {![regexp $pat_comet_numbered_frag_unpacked $unpacked -> number cometType fragment]} {
             error "Invalid unpacked numbered comet designation: $unpacked"
         }
 
@@ -690,7 +743,11 @@ namespace eval MPCDesignation {
             error "Comet number out of range (1-9999): $number"
         }
 
-        return [format "%04d%s" $number $cometType]
+        set result [format "%04d%s" $number $cometType]
+        if {$fragment ne ""} {
+            append result [string tolower $fragment]
+        }
+        return $result
     }
 
     #
@@ -1254,11 +1311,17 @@ namespace eval MPCDesignation {
         # ============ COMET DESIGNATIONS ============
 
         # Check for packed numbered periodic comet "0001P" or "0354D"
-        if {[regexp $pat_packed_comet_numbered $des -> ctype]} {
+        # Also handles fragments: "0073Pa" or "0073Paa"
+        variable pat_comet_numbered_frag_packed
+        if {[regexp $pat_comet_numbered_frag_packed $des -> numStr ctype fragment]} {
             dict set result format packed
             dict set result type comet_numbered
             variable cometTypeDescriptions
-            dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
+            if {$fragment ne ""} {
+                dict set result subtype "comet numbered with fragment [dict get $cometTypeDescriptions $ctype]"
+            } else {
+                dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
+            }
             return $result
         }
 
@@ -1310,12 +1373,18 @@ namespace eval MPCDesignation {
         }
 
         # Check for unpacked numbered periodic comet "1P" or "354P" or "1P/Halley"
+        # Also handles fragments: "73P-A" or "73P-AA"
         # Note: "1P/1982 U1" is handled above as comet_full
-        if {[regexp $pat_comet_numbered_unpacked $des -> num ctype]} {
+        variable pat_comet_numbered_frag_unpacked
+        if {[regexp $pat_comet_numbered_frag_unpacked $des -> num ctype fragment]} {
             dict set result format unpacked
             dict set result type comet_numbered
             variable cometTypeDescriptions
-            dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
+            if {$fragment ne ""} {
+                dict set result subtype "comet numbered with fragment [dict get $cometTypeDescriptions $ctype]"
+            } else {
+                dict set result subtype "comet numbered [dict get $cometTypeDescriptions $ctype]"
+            }
             dict set result number $num
             dict set result cometType $ctype
             return $result

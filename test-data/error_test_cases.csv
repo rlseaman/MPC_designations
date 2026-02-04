@@ -14,7 +14,9 @@ whitespace,carriage_return,1995\rXA,format,Carriage return in designation
 whitespace,form_feed,1995\fXA,format,Form feed in designation
 whitespace,vertical_tab,1995\vXA,format,Vertical tab character
 whitespace,double_space_survey,2040  P-L,format,Double space in survey designation
-whitespace,missing_space_survey,2040P-L,format,Missing space in survey designation
+# Note: 2040P-L is now valid as numbered comet 2040P with fragment L
+# Test a clearly invalid survey format instead
+whitespace,missing_space_survey,T-1 3138,format,Invalid survey format (order reversed)
 whitespace,double_space_satellite,S/2019  S  22,format,Double spaces in satellite designation
 whitespace,double_space_comet,C/1995  O1,format,Double space in comet designation
 whitespace,double_space_old_style,A908  CJ,format,Double space in old-style designation
@@ -108,7 +110,7 @@ boundary,min_extended,100000,valid,Minimum extended (A0000)
 boundary,max_extended,619999,valid,Maximum extended before tilde
 boundary,min_tilde,620000,valid,Minimum tilde format
 boundary,max_tilde,15396335,valid,Maximum tilde format
-boundary,min_year,1000 AA,valid,Minimum standard year
+boundary,min_year,1800 AA,valid,Minimum standard year for asteroids
 boundary,max_standard_year,2199 YZ,valid,Maximum standard year (century L)
 boundary,ancient_comet,C/240 V1,valid,Ancient year comet (< 1000 CE)
 boundary,bce_comet,C/-146 P1,valid,BCE year comet
