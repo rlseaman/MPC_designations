@@ -113,6 +113,39 @@ create work-buf MAX-LEN allot
   endcase ;
 
 \ ============================================================================
+\ BCE year encoding/decoding (for ancient comets)
+\ ============================================================================
+
+variable bce-prefix
+variable bce-code
+
+: encode-bce-year ( year -- prefix code )
+  \ Input: negative astronomical year (e.g., -119)
+  \ Output: prefix char (/ . -) and 2-digit code
+  negate 1+                           \ convert to BC year (1-indexed)
+  dup 100 <= if
+    [char] / swap 100 swap -          \ 1-100 BC: /, 100-bc
+  else dup 200 <= if
+    [char] . swap 200 swap -          \ 101-200 BC: ., 200-bc
+  else
+    [char] - swap 300 swap -          \ 201-300 BC: -, 300-bc
+  then then ;
+
+: decode-bce-year ( prefix code -- year )
+  \ Input: prefix char and 2-digit code
+  \ Output: negative astronomical year
+  swap case
+    [char] / of 100 swap - endof      \ 1-100 BC
+    [char] . of 200 swap - endof      \ 101-200 BC
+    [char] - of 300 swap - endof      \ 201-300 BC
+    drop 0 swap                       \ invalid
+  endcase
+  1- negate ;                         \ convert BC to astronomical year
+
+: is-bce-prefix? ( c -- f )
+  dup [char] / = swap dup [char] . = swap [char] - = or or ;
+
+\ ============================================================================
 \ Cycle count encoding/decoding (for provisional designations)
 \ ============================================================================
 
@@ -677,6 +710,184 @@ variable pcp-dash
   then ;
 
 \ ============================================================================
+\ BCE and Ancient comet provisional designations
+\ ============================================================================
+
+variable bce-year
+variable bce-order
+variable bce-frag-len
+variable ancient-year
+
+variable bce-order-len
+
+: unpack-bce-comet-prov ( addr len -- addr' len' )
+  \ Format: .80K010 -> -119 K1 (BCE comet)
+  \ Position 0: BCE prefix (/ . -)
+  \ Position 1-2: 2-digit code
+  \ Position 3: half-month
+  \ Position 4-5: order (cycle encoded)
+  \ Position 6: fragment or 0
+  over c@ swap                       \ prefix on stack
+  over 1+ 2 str>num                  \ code
+  decode-bce-year bce-year !         \ decode to negative year
+  \ Format year
+  bce-year @ negate
+  s>d <# #s [char] - hold #>         \ format as "-119"
+  dup comet-prov-len !
+  out-buf swap move
+  \ Space and half-month
+  bl out-buf comet-prov-len @ + c!
+  comet-prov-len @ 1+ comet-prov-len !
+  over 3 + c@ out-buf comet-prov-len @ + c!
+  comet-prov-len @ 1+ comet-prov-len !
+  \ Order number
+  over 4 + decode-cycle
+  s>d <# #s #>
+  \ Stack: addr len order-addr order-len
+  dup bce-order-len !
+  out-buf comet-prov-len @ + swap move
+  bce-order-len @ comet-prov-len +!
+  \ Fragment (position 6)
+  over 6 + c@ dup [char] 0 <> if
+    [char] - out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+    [char] a - [char] A + out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+  else
+    drop
+  then
+  2drop
+  out-buf comet-prov-len @ ;
+
+variable ancient-order-len
+
+: unpack-ancient-comet-prov ( addr len -- addr' len' )
+  \ Format: 422F010 -> 422 F1 (ancient year 1-999 AD)
+  \ Position 0-2: 3-digit year
+  \ Position 3: half-month
+  \ Position 4-5: order (cycle encoded)
+  \ Position 6: fragment or 0
+  over 3 str>num ancient-year !
+  \ Format year
+  ancient-year @ s>d <# #s #>
+  dup comet-prov-len !
+  out-buf swap move
+  \ Space and half-month
+  bl out-buf comet-prov-len @ + c!
+  comet-prov-len @ 1+ comet-prov-len !
+  over 3 + c@ out-buf comet-prov-len @ + c!
+  comet-prov-len @ 1+ comet-prov-len !
+  \ Order number
+  over 4 + decode-cycle
+  s>d <# #s #>
+  \ Stack: addr len order-addr order-len
+  dup ancient-order-len !
+  out-buf comet-prov-len @ + swap move
+  ancient-order-len @ comet-prov-len +!
+  \ Fragment (position 6)
+  over 6 + c@ dup [char] 0 <> if
+    [char] - out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+    [char] a - [char] A + out-buf comet-prov-len @ + c!
+    comet-prov-len @ 1+ comet-prov-len !
+  else
+    drop
+  then
+  2drop
+  out-buf comet-prov-len @ ;
+
+variable pcp-space-pos
+variable pcp-year-len
+
+: find-space ( addr len -- pos | 0 )
+  \ Find position of first space, or 0 if not found
+  0 -rot bounds ?do
+    i c@ bl = if drop i leave then
+  loop ;
+
+: pack-bce-comet-prov ( addr len -- addr' len' )
+  \ Format: -119 K1 -> .80K010
+  pcp-len ! pcp-addr !
+  \ Find space to get year length
+  pcp-addr @ pcp-len @ find-space
+  dup 0= if drop out-buf 0 exit then
+  pcp-addr @ - pcp-year-len !
+  \ Parse negative year (skip the minus sign)
+  pcp-addr @ 1+ pcp-year-len @ 1- str>num negate bce-year !
+  \ Encode BCE year
+  bce-year @ encode-bce-year         \ -> prefix code
+  swap out-buf c!                    \ store prefix
+  s>d <# # # #> out-buf 1+ swap move \ store 2-digit code
+  \ Half-month letter (after space)
+  pcp-addr @ pcp-year-len @ + 1+ c@ out-buf 3 + c!
+  \ Find dash for fragment
+  0 pcp-dash !
+  pcp-addr @ pcp-len @ + pcp-addr @ pcp-year-len @ + 2 + ?do
+    i c@ [char] - = if i pcp-dash ! leave then
+  loop
+  \ Order number and fragment
+  pcp-dash @ 0= if
+    \ No fragment
+    pcp-addr @ pcp-year-len @ + 2 + pcp-len @ pcp-year-len @ - 2 - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
+    [char] 0 out-buf 6 + c!
+    out-buf 7
+  else
+    \ Has fragment
+    pcp-addr @ pcp-year-len @ + 2 + pcp-dash @ pcp-addr @ pcp-year-len @ + 2 + - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
+    pcp-addr @ pcp-len @ + pcp-dash @ - 1- bce-frag-len !
+    bce-frag-len @ 1 = if
+      pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
+      out-buf 7
+    else
+      pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
+      pcp-dash @ 2 + c@ [char] A - [char] a + out-buf 7 + c!
+      out-buf 8
+    then
+  then ;
+
+: pack-ancient-comet-prov ( addr len -- addr' len' )
+  \ Format: 422 F1 -> 422F010
+  pcp-len ! pcp-addr !
+  \ Find space to get year length
+  pcp-addr @ pcp-len @ find-space
+  dup 0= if drop out-buf 0 exit then
+  pcp-addr @ - pcp-year-len !
+  \ Parse year
+  pcp-addr @ pcp-year-len @ str>num ancient-year !
+  \ Format 3-digit year
+  ancient-year @ s>d <# # # # #> out-buf swap move
+  \ Half-month letter
+  pcp-addr @ pcp-year-len @ + 1+ c@ out-buf 3 + c!
+  \ Find dash for fragment
+  0 pcp-dash !
+  pcp-addr @ pcp-len @ + pcp-addr @ pcp-year-len @ + 2 + ?do
+    i c@ [char] - = if i pcp-dash ! leave then
+  loop
+  \ Order number and fragment
+  pcp-dash @ 0= if
+    \ No fragment
+    pcp-addr @ pcp-year-len @ + 2 + pcp-len @ pcp-year-len @ - 2 - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
+    [char] 0 out-buf 6 + c!
+    out-buf 7
+  else
+    \ Has fragment
+    pcp-addr @ pcp-year-len @ + 2 + pcp-dash @ pcp-addr @ pcp-year-len @ + 2 + - str>num pcp-order !
+    pcp-order @ out-buf 4 + encode-cycle
+    pcp-addr @ pcp-len @ + pcp-dash @ - 1- bce-frag-len !
+    bce-frag-len @ 1 = if
+      pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
+      out-buf 7
+    else
+      pcp-dash @ 1+ c@ [char] A - [char] a + out-buf 6 + c!
+      pcp-dash @ 2 + c@ [char] A - [char] a + out-buf 7 + c!
+      out-buf 8
+    then
+  then ;
+
+\ ============================================================================
 \ Full comet designations (C/1995 O1, 1P/1995 O1)
 \ ============================================================================
 
@@ -691,9 +902,35 @@ variable pcp-dash
     false swap
   endcase ;
 
+: is-comet-bce-packed? ( addr len -- f )
+  \ 8-char format: type + BCE prefix (/ . -) + 2-digit code + provisional
+  dup 8 <> if 2drop false exit then
+  over c@ is-comet-type? 0= if 2drop false exit then
+  over 1+ c@ is-bce-prefix? 0= if 2drop false exit then
+  \ Positions 2-3 must be digits (year code)
+  over 2 + c@ is-digit 0= if 2drop false exit then
+  over 3 + c@ is-digit 0= if 2drop false exit then
+  \ Position 4 must be uppercase letter (half-month)
+  over 4 + c@ is-upper ;
+
+: is-comet-ancient-packed? ( addr len -- f )
+  \ 8-char format: type + 3-digit year + provisional (year < 1000)
+  dup 8 <> if 2drop false exit then
+  over c@ is-comet-type? 0= if 2drop false exit then
+  \ Check positions 1-3 are all digits
+  over 1+ c@ is-digit 0= if 2drop false exit then
+  over 2 + c@ is-digit 0= if 2drop false exit then
+  over 3 + c@ is-digit 0= if 2drop false exit then
+  \ Check position 4 is letter (half-month), not digit (which would be standard)
+  over 4 + c@ is-upper ;
+
 : is-comet-full-packed? ( addr len -- f )
   dup 8 < if 2drop false exit then
-  \ Exclude unpacked format (has slash at position 1)
+  \ Check for BCE format first (type + BCE prefix)
+  2dup is-comet-bce-packed? if 2drop true exit then
+  \ Check for ancient format (type + 3-digit year)
+  2dup is-comet-ancient-packed? if 2drop true exit then
+  \ Exclude unpacked format (has slash at position 1 that's not BCE)
   over 1+ c@ [char] / = if 2drop false exit then
   dup 8 = if
     \ 8-char: type + 7-char provisional
@@ -721,16 +958,38 @@ variable comet-full-type
 
 : unpack-comet-full ( addr len -- addr' len' )
   \ Format: CJ95O010 -> C/1995 O1, or 0001PJ95O010 -> 1P/1995 O1
+  \ Also handles BCE: C.80K010 -> C/-119 K1
+  \ Also handles ancient: C422F010 -> C/422 F1
   dup 8 = over 9 = or if
-    \ Short format: type + provisional
-    \ Save type character before calling unpack-comet-prov
+    \ Short format: type + provisional (or BCE/ancient)
     over c@ comet-full-type !
-    \ Unpack the provisional part (positions 1 to end)
+    \ Check for BCE format (position 1 is BCE prefix)
+    2dup is-comet-bce-packed? if
+      over 1+ over 1- unpack-bce-comet-prov
+      dup comet-full-len !
+      out-buf tmp-buf comet-full-len @ move
+      comet-full-type @ out-buf c!
+      [char] / out-buf 1+ c!
+      tmp-buf out-buf 2 + comet-full-len @ move
+      2drop 2drop
+      out-buf comet-full-len @ 2 +
+      exit
+    then
+    \ Check for ancient format (position 1-3 are digits for year < 1000)
+    2dup is-comet-ancient-packed? if
+      over 1+ over 1- unpack-ancient-comet-prov
+      dup comet-full-len !
+      out-buf tmp-buf comet-full-len @ move
+      comet-full-type @ out-buf c!
+      [char] / out-buf 1+ c!
+      tmp-buf out-buf 2 + comet-full-len @ move
+      2drop 2drop
+      out-buf comet-full-len @ 2 +
+      exit
+    then
+    \ Standard format: type + 7-char provisional
     over 1+ over 1- unpack-comet-prov
-    \ Stack: addr len prov-addr prov-len
-    \ Result is in out-buf, save length
     dup comet-full-len !
-    \ Copy to tmp-buf first, then back with prefix
     out-buf tmp-buf comet-full-len @ move
     comet-full-type @ out-buf c!
     [char] / out-buf 1+ c!
@@ -743,6 +1002,29 @@ variable comet-full-type
   then ;
 
 variable comet-type-char
+
+variable pcf-prov-addr
+variable pcf-prov-len
+variable pcf-space-pos
+
+: pack-comet-full-prov ( addr len -- addr' len' )
+  \ Dispatch to appropriate packer based on year format
+  \ Input: provisional part (e.g., "-119 K1" or "422 F1" or "1995 O1")
+  pcf-prov-len ! pcf-prov-addr !
+  \ Check for BCE (starts with minus)
+  pcf-prov-addr @ c@ [char] - = if
+    pcf-prov-addr @ pcf-prov-len @ pack-bce-comet-prov exit
+  then
+  \ Find space to determine year length
+  pcf-prov-addr @ pcf-prov-len @ find-space
+  dup 0= if drop out-buf 0 exit then
+  pcf-prov-addr @ - pcf-space-pos !
+  \ If year is 1-3 digits, it's ancient
+  pcf-space-pos @ 4 < if
+    pcf-prov-addr @ pcf-prov-len @ pack-ancient-comet-prov exit
+  then
+  \ Standard 4-digit year
+  pcf-prov-addr @ pcf-prov-len @ pack-comet-prov ;
 
 : pack-comet-full ( addr len -- addr' len' )
   \ Find the slash
@@ -757,7 +1039,7 @@ variable comet-type-char
     \ Simple format: X/yyyy prov -> XJ95O010
     drop
     over c@ comet-type-char !   \ save type character
-    over 2 + over 2 - pack-comet-prov
+    over 2 + over 2 - pack-comet-full-prov
     \ Stack: addr len out-buf prov-len
     \ Copy result to tmp-buf
     over tmp-buf 2 pick move    \ move(out-buf, tmp-buf, prov-len)
@@ -775,7 +1057,7 @@ variable comet-type-char
     2 pick over 1- str>num      \ comet number
     s>d <# # # # # #> tmp-buf swap move
     2 pick over + 1- c@ comet-type-char ! \ save type
-    2 pick over + 1+ 2 pick over - 1- pack-comet-prov
+    2 pick over + 1+ 2 pick over - 1- pack-comet-full-prov
     \ Now build result: 4-digit number + type + prov result
     tmp-buf out-buf 4 move      \ copy number
     comet-type-char @ out-buf 4 + c! \ type at position 4
