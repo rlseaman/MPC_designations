@@ -9,7 +9,7 @@ TEST_DATA = ../test-data
 # Output directory
 BUILD = build
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all build
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all build
 
 # Default: build all
 all: $(BUILD)/mpc_designation_cli
@@ -38,6 +38,9 @@ $(BUILD)/test_errors: test/test_errors.f90 $(BUILD)/mpc_designation.o
 $(BUILD)/test_roundtrip: test/test_roundtrip.f90 $(BUILD)/mpc_designation.o
 	$(FC) $(FFLAGS) -I$(BUILD) $^ -o $@
 
+$(BUILD)/test_helpers: test/test_helpers.f90 $(BUILD)/mpc_designation.o
+	$(FC) $(FFLAGS) -I$(BUILD) $^ -o $@
+
 # Run the CLI (for manual testing)
 run: $(BUILD)/mpc_designation_cli
 	$(BUILD)/mpc_designation_cli $(ARGS)
@@ -64,8 +67,12 @@ test-roundtrip: $(BUILD)/test_roundtrip
 	fi
 	$(BUILD)/test_roundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers: $(BUILD)/test_helpers
+	$(BUILD)/test_helpers
+
 # Run all tests
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-csv test-roundtrip test-helpers
 
 # Clean build artifacts
 clean:
@@ -81,6 +88,7 @@ help:
 	@echo "  clean        Remove all build artifacts"
 	@echo "  test         Run conversion tests"
 	@echo "  test-errors  Run error handling tests"
+	@echo "  test-helpers Run helper function tests"
 	@echo "  test-all     Run all tests"
 	@echo "  run ARGS=... Run CLI with arguments"
 	@echo ""

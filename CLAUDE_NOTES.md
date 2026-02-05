@@ -182,24 +182,38 @@ Updated test cases:
      - `"73P-A"`, `"0073Pa"` → true (same object)
      - `"73P-A"`, `"73P-B"` → false (different fragments)
 
-**Implementation Status**:
+**Implementation Status** (Helper Functions + 77 test cases):
 - [x] C library (c/src/mpc_designation.c)
-- [x] TCL library (tcl/src/mpc_designation.tcl)
-- [x] Python library (python/src/mpc_designation/mpc_designation.py)
 - [x] Go library (go/mpc/mpc_designation.go)
 - [x] Java (java/src/mpc/MPCDesignation.java)
-- [x] Rust (rust/src/lib.rs)
 - [x] JavaScript (js/src/mpc_designation.js)
-- [ ] TypeScript
-- [ ] Ruby
-- [ ] Perl
-- [ ] PHP
+- [x] Perl (perl/src/MPC/Designation.pm)
+- [x] PHP (php/src/MpcDesignation.php)
+- [x] Python library (python/src/mpc_designation/mpc_designation.py)
+- [x] Ruby (ruby/src/mpc_designation.rb)
+- [x] Rust (rust/src/lib.rs)
+- [x] TCL library (tcl/src/mpc_designation.tcl)
+- [x] TypeScript (typescript/src/mpc_designation.ts)
+- [x] AWK (awk/src/mpc_designation.awk)
+- [ ] Bash
+- [x] C++ (cpp/src/mpc_designation.cpp)
+- [ ] C#
+- [ ] Forth
+- [x] Fortran (fortran/src/mpc_designation.f90)
+- [ ] Haskell
+- [ ] Julia
+- [ ] Kotlin
+- [x] Nim (nim/src/mpc_designation.nim)
+- [ ] Octave/MATLAB
+- [ ] R
+- [x] SPP/IRAF (spp/src/mpc_designation.x)
+- [ ] Swift
 
 **Test file**: Each library should have a `test_helpers` test with 77 test cases covering all functions.
 
-## Implementation Checklist for Other Languages
+## Implementation Checklist for Remaining Languages
 
-When updating Java, Rust, JavaScript, Ruby, Perl, PHP, etc.:
+When updating AWK, Bash, C++, C#, Forth, Fortran, Haskell, Julia, Kotlin, Nim, Octave, R, SPP, Swift:
 
 - [ ] Add numbered comet fragment support (pack/unpack)
 - [ ] Add two-letter fragment support for provisional comets
@@ -240,3 +254,22 @@ Packed 8-char: ^[A-L]\d{2}[A-Z]\d{2}[a-z]{2}$
 3. **BCE comet encoding**: Current inferred format acceptable until MPC documents it.
 
 4. **Permanent satellites**: J013S format confirmed (planet + 3-digit decimal + S).
+
+## Next Steps (as of 2026-02-04)
+
+The following languages still need helper functions and test_helpers with 77 test cases:
+
+**Remaining (in approximate performance order)**:
+1. Swift - compiled, high performance
+2. Julia - JIT compiled, designed for numerical computing
+3. Kotlin - JVM with JIT
+4. C# - .NET JIT
+5. Haskell - compiled functional
+6. Forth - stack-based
+7. R - interpreted
+8. Octave/MATLAB - interpreted
+9. Bash - shell scripting
+
+**Completed**:
+- C, Go, Java, JavaScript, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
+- AWK, C++, Fortran, Nim, SPP/IRAF

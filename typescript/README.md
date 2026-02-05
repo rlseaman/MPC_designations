@@ -140,6 +140,66 @@ interface ConversionResult {
 | `detectFormat(designation: string): FormatInfo` | Detect format without converting |
 | `isValidDesignation(designation: string): boolean` | Check if valid |
 
+### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `toReportFormat(minimal: string): string` | Convert minimal packed to 12-char report format |
+| `fromReportFormat(report: string): string` | Convert 12-char report format to minimal packed |
+| `hasFragment(desig: string): boolean` | Check if designation has comet fragment |
+| `getFragment(desig: string): string` | Extract fragment suffix (uppercase) |
+| `getParent(desig: string): string` | Get parent designation without fragment |
+| `designationsEqual(d1: string, d2: string): boolean` | Compare designations across formats |
+
+## Helper Function Examples
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+```typescript
+import { toReportFormat, fromReportFormat } from 'mpc-designation-ts';
+
+// Minimal to 12-char report format
+toReportFormat('0073Pa');   // '0073P      a'
+toReportFormat('00001');    // '       00001'
+
+// 12-char report format to minimal
+fromReportFormat('0073P      a');  // '0073Pa'
+fromReportFormat('       00001');  // '00001'
+```
+
+### Fragment Extraction
+
+```typescript
+import { hasFragment, getFragment, getParent } from 'mpc-designation-ts';
+
+// Check if designation has a fragment
+hasFragment('73P-A');   // true
+hasFragment('73P');     // false
+hasFragment('0073Pa');  // true (packed)
+
+// Extract fragment (uppercase)
+getFragment('73P-A');    // 'A'
+getFragment('73P-AA');   // 'AA'
+getFragment('0073Paa');  // 'AA'
+
+// Get parent comet
+getParent('73P-A');   // '73P'
+getParent('0073Pa');  // '0073P'
+```
+
+### Designation Comparison
+
+```typescript
+import { designationsEqual } from 'mpc-designation-ts';
+
+// Same object, different formats
+designationsEqual('1995 XA', 'J95X00A');  // true
+designationsEqual('73P-A', '0073Pa');     // true
+
+// Different objects
+designationsEqual('73P-A', '73P-B');      // false
+```
+
 ### Constants
 
 ```typescript

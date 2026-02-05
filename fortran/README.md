@@ -120,6 +120,38 @@ end type
 | `detect_format(designation)` | Detect format without converting |
 | `is_valid_designation(designation)` | Check if valid |
 
+#### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `to_report_format(packed)` | Convert packed designation to 12-character MPC report format |
+| `from_report_format(report)` | Convert 12-character MPC report format to minimal packed format |
+| `has_fragment(designation)` | Check if designation has a comet fragment suffix |
+| `get_fragment(designation)` | Extract fragment suffix (returns uppercase, e.g., "A", "AA") |
+| `get_parent(designation)` | Get parent comet without fragment suffix |
+| `designations_equal(d1, d2)` | Check if two designations refer to the same object |
+
+```fortran
+! Helper function examples
+character(len=12) :: report
+character(len=80) :: minimal, parent
+character(len=10) :: frag
+logical :: has_frag, same_obj
+
+! Convert to/from 12-character MPC report format
+report = to_report_format('0073Pa')      ! '0073P      a'
+minimal = from_report_format('0073P      a')  ! '0073Pa'
+
+! Fragment handling
+has_frag = has_fragment('73P-A')         ! .true.
+frag = get_fragment('73P-A')             ! 'A'
+parent = get_parent('73P-A')             ! '73P'
+
+! Compare designations across formats
+same_obj = designations_equal('73P-A', '0073Pa')    ! .true. (same object)
+same_obj = designations_equal('73P-A', '73P-B')     ! .false. (different)
+```
+
 #### Error Handling
 
 ```fortran
@@ -147,6 +179,7 @@ make test-all
 
 # Run specific test suites
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ cases)
 ```
 

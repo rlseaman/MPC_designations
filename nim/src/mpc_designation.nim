@@ -189,10 +189,21 @@ proc unpackProvisional*(packed: string): string =
   let year = century * 100 + yy
   let cycle = decodeCycle(cycleEnc)
 
+  # Pre-1925 designations use A-prefix format (A for 1xxx years, B for 2xxx years)
+  var prefix = ""
+  var yearStr = $year
+  if year < 1925:
+    let firstDigit = year div 1000
+    if firstDigit == 1:
+      prefix = "A"
+    elif firstDigit == 2:
+      prefix = "B"
+    yearStr = $(year mod 1000)  # e.g., 1908 -> 908
+
   if cycle == 0:
-    result = $year & " " & half & second
+    result = prefix & yearStr & " " & half & second
   else:
-    result = $year & " " & half & second & $cycle
+    result = prefix & yearStr & " " & half & second & $cycle
 
 #==============================================================================
 # Survey designation encoding/decoding
@@ -216,14 +227,36 @@ proc unpackSurvey*(packed: string): string =
 #==============================================================================
 
 proc packNumberedComet*(desig: string): string =
-  let cometType = desig[^1]
-  let num = parseInt(desig[0..^2])
-  result = align($num, 4, '0') & cometType
+  var fragment = ""
+  var baseDesig = desig
+
+  # Check for 2-letter fragment: "73P-AA"
+  if desig.len >= 4 and desig[^3] == '-':
+    let frag1 = desig[^2]
+    let frag2 = desig[^1]
+    if frag1 in {'A'..'Z'} and frag2 in {'A'..'Z'}:
+      fragment = $toLowerAscii(frag1) & toLowerAscii(frag2)
+      baseDesig = desig[0..^4]
+  # Check for 1-letter fragment: "73P-A"
+  elif desig.len >= 2 and desig[^2] == '-':
+    let fragChar = desig[^1]
+    if fragChar in {'A'..'Z'}:
+      fragment = $toLowerAscii(fragChar)
+      baseDesig = desig[0..^3]
+
+  let cometType = baseDesig[^1]
+  let num = parseInt(baseDesig[0..^2])
+  result = align($num, 4, '0') & cometType & fragment
 
 proc unpackNumberedComet*(packed: string): string =
   let num = parseInt(packed[0..3])
   let cometType = packed[4]
   result = $num & cometType
+
+  # Check for fragment (6-7 chars)
+  if packed.len >= 6:
+    let fragment = packed[5..^1]
+    result &= "-" & toUpperAscii(fragment)
 
 proc packProvisionalComet*(desig: string): string =
   var fragment = ""
@@ -428,13 +461,26 @@ proc detectFormat*(desig: string): DesignationFormat =
 
   let first = desig[0]
 
-  # Packed permanent asteroid (5 chars, no slash or space)
-  if len == 5 and '/' notin desig and ' ' notin desig:
+  # Packed permanent asteroid (5 chars, no slash, space, or hyphen)
+  if len == 5 and '/' notin desig and ' ' notin desig and '-' notin desig:
     let last = desig[4]
     # Check for numbered comet
     if last in {'P', 'D', 'C', 'X', 'A'} and desig[0..3].isAllDigits:
       return fmtPackedNumberedComet
     return fmtPackedPermanent
+
+  # Packed numbered comet with fragment (6 or 7 chars: 4 digits + P/D + 1-2 lowercase)
+  if (len == 6 or len == 7) and desig[0..3].isAllDigits:
+    let cometType = desig[4]
+    if cometType in {'P', 'D'}:
+      let fragmentPart = desig[5..^1]
+      var allLower = true
+      for c in fragmentPart:
+        if c notin {'a'..'z'}:
+          allLower = false
+          break
+      if allLower:
+        return fmtPackedNumberedComet
 
   # Packed provisional asteroid (7 chars starting with century code)
   if len == 7 and first in {'I', 'J', 'K', 'L'} and '/' notin desig:
@@ -477,9 +523,25 @@ proc detectFormat*(desig: string): DesignationFormat =
     if parts.len == 2 and parts[1] in ["P-L", "T-1", "T-2", "T-3"]:
       return fmtUnpackedSurvey
 
-  # Unpacked numbered comet
-  if len >= 2 and desig[^1] in {'P', 'D', 'C', 'X', 'A'} and desig[0..^2].isAllDigits:
-    return fmtUnpackedNumberedComet
+  # Unpacked numbered comet (with optional fragment like "73P-A" or "73P-AA")
+  if len >= 2:
+    # Check for fragment: "73P-A" or "73P-AA"
+    let dashIdx = desig.find('-')
+    if dashIdx > 0:
+      let basePart = desig[0..<dashIdx]
+      if basePart.len >= 2 and basePart[^1] in {'P', 'D'} and basePart[0..^2].isAllDigits:
+        let fragPart = desig[dashIdx+1..^1]
+        if fragPart.len in {1, 2}:
+          var allUpper = true
+          for c in fragPart:
+            if c notin {'A'..'Z'}:
+              allUpper = false
+              break
+          if allUpper:
+            return fmtUnpackedNumberedComet
+    # Without fragment
+    if desig[^1] in {'P', 'D', 'C', 'X', 'A'} and desig[0..^2].isAllDigits:
+      return fmtUnpackedNumberedComet
 
   # Unpacked provisional comet (must have space for year separation)
   if len >= 2 and first in {'P', 'D', 'C', 'X', 'A'} and desig[1] == '/' and ' ' in desig:
@@ -524,6 +586,176 @@ proc convertSimple*(desig: string): string =
   of fmtPackedSatellite: unpackSatellite(desig)
   of fmtUnpackedSatellite: packSatellite(desig)
   of fmtUnknown: "ERROR: Unknown format: " & desig
+
+#==============================================================================
+# Helper functions
+#==============================================================================
+
+proc toReportFormat*(minimal: string): string =
+  ## Convert minimal packed format to 12-character MPC observation report format
+  let len = minimal.len
+
+  # Numbered comet with fragment (6-7 chars: ####P/Df or ####P/Dff)
+  if (len == 6 or len == 7) and minimal[0..3].isAllDigits and minimal[4] in {'P', 'D'}:
+    let base = minimal[0..4]  # "0073P"
+    let fragment = minimal[5..^1]  # "a" or "aa"
+    if len == 6:
+      return base & "      " & fragment  # 5 + 6 spaces + 1 = 12
+    else:
+      return base & "     " & fragment  # 5 + 5 spaces + 2 = 12
+
+  # Numbered comet without fragment (5 chars: ####P/D)
+  if len == 5 and minimal[0..3].isAllDigits and minimal[4] in {'P', 'D'}:
+    return minimal & "       "  # 5 + 7 spaces = 12
+
+  # Numbered asteroid or provisional (5-8 chars) - right-align to 12 chars
+  let padding = 12 - len
+  if padding > 0:
+    result = spaces(padding) & minimal
+  else:
+    result = minimal
+
+proc fromReportFormat*(report: string): string =
+  ## Convert 12-character MPC report format to minimal packed format
+  # Handle numbered comet with fragment in columns 11-12
+  if report.len >= 5 and report[0..3].isAllDigits and report[4] in {'P', 'D'}:
+    let base = report[0..4]
+    let rest = report[5..^1].strip()  # fragment is at the end
+    if rest.len > 0:
+      return base & rest
+    return base
+
+  # Standard format: strip leading spaces
+  result = report.strip(leading = true, trailing = true)
+
+proc hasFragment*(desig: string): bool =
+  ## Returns true if designation has a comet fragment suffix
+  let len = desig.len
+  if len < 2: return false
+
+  # Unpacked format: "73P-A", "73P-AA", "D/1993 F2-A"
+  let dashIdx = desig.find('-')
+  if dashIdx > 0:
+    let basePart = desig[0..<dashIdx]
+    # Numbered comet with fragment
+    if basePart.len >= 2 and basePart[^1] in {'P', 'D'} and basePart[0..^2].isAllDigits:
+      return true
+    # Provisional comet with fragment (has space before the dash position)
+    if ' ' in basePart and basePart[0] in COMET_TYPES and basePart[1] == '/':
+      return true
+
+  # Packed numbered comet with fragment (6-7 chars)
+  if (len == 6 or len == 7) and desig[0..3].isAllDigits and desig[4] in {'P', 'D'}:
+    let fragmentPart = desig[5..^1]
+    for c in fragmentPart:
+      if c notin {'a'..'z'}: return false
+    return true
+
+  # Packed provisional comet with fragment (8 chars ending in lowercase, 9 chars for 2-letter)
+  if len == 8 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'}:
+      return true
+
+  if len == 9 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'} and desig[8] in {'a'..'z'}:
+      return true
+
+  false
+
+proc getFragment*(desig: string): string =
+  ## Extract fragment suffix from comet designation (returns uppercase)
+  let len = desig.len
+  if len < 2: return ""
+
+  # Unpacked format: "73P-A", "73P-AA"
+  let dashIdx = desig.find('-')
+  if dashIdx > 0:
+    let fragPart = desig[dashIdx+1..^1]
+    # Check if it looks like a fragment (1-2 uppercase letters)
+    if fragPart.len in {1, 2}:
+      for c in fragPart:
+        if c notin {'A'..'Z'}: return ""
+      return fragPart
+
+  # Packed numbered comet with fragment (6-7 chars)
+  if (len == 6 or len == 7) and desig[0..3].isAllDigits and desig[4] in {'P', 'D'}:
+    let fragmentPart = desig[5..^1]
+    for c in fragmentPart:
+      if c notin {'a'..'z'}: return ""
+    return toUpperAscii(fragmentPart)
+
+  # Packed provisional comet with fragment (8 chars ending in lowercase)
+  if len == 8 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'}:
+      return $toUpperAscii(desig[7])
+
+  # Packed provisional comet with 2-letter fragment (9 chars)
+  if len == 9 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'} and desig[8] in {'a'..'z'}:
+      return toUpperAscii(desig[7..8])
+
+  ""
+
+proc getParent*(desig: string): string =
+  ## Returns parent comet designation without fragment suffix
+  let len = desig.len
+  if len < 2: return desig
+
+  # Unpacked format: "73P-A" -> "73P"
+  let dashIdx = desig.find('-')
+  if dashIdx > 0:
+    let basePart = desig[0..<dashIdx]
+    # Numbered comet with fragment
+    if basePart.len >= 2 and basePart[^1] in {'P', 'D'} and basePart[0..^2].isAllDigits:
+      return basePart
+    # Provisional comet with fragment
+    if ' ' in basePart and basePart[0] in COMET_TYPES and basePart[1] == '/':
+      return basePart
+
+  # Packed numbered comet with fragment (6-7 chars)
+  if (len == 6 or len == 7) and desig[0..3].isAllDigits and desig[4] in {'P', 'D'}:
+    let fragmentPart = desig[5..^1]
+    var allLower = true
+    for c in fragmentPart:
+      if c notin {'a'..'z'}:
+        allLower = false
+        break
+    if allLower:
+      return desig[0..4]
+
+  # Packed provisional comet with fragment (8 chars ending in lowercase)
+  if len == 8 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'}:
+      return desig[0..6] & "0"  # Replace fragment with '0'
+
+  # Packed provisional comet with 2-letter fragment (9 chars)
+  if len == 9 and desig[0] in COMET_TYPES and desig[1] in {'A'..'L'}:
+    if desig[7] in {'a'..'z'} and desig[8] in {'a'..'z'}:
+      return desig[0..6] & "0"  # Replace fragment with '0'
+
+  desig
+
+proc designationsEqual*(d1, d2: string): bool =
+  ## Returns true if two designations refer to the same object
+  try:
+    var packed1 = d1
+    var packed2 = d2
+
+    # Convert to packed format if needed
+    let fmt1 = detectFormat(d1)
+    let fmt2 = detectFormat(d2)
+
+    if fmt1 in {fmtUnpackedPermanent, fmtUnpackedProvisional, fmtUnpackedSurvey,
+                fmtUnpackedNumberedComet, fmtUnpackedProvisionalComet, fmtUnpackedSatellite}:
+      packed1 = convertSimple(d1)
+
+    if fmt2 in {fmtUnpackedPermanent, fmtUnpackedProvisional, fmtUnpackedSurvey,
+                fmtUnpackedNumberedComet, fmtUnpackedProvisionalComet, fmtUnpackedSatellite}:
+      packed2 = convertSimple(d2)
+
+    packed1 == packed2
+  except:
+    false
 
 #==============================================================================
 # CLI entry point

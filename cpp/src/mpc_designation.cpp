@@ -337,6 +337,11 @@ std::string MPCDesignation::packProvisional(const std::string& unpacked) {
     }
     char centuryCode = static_cast<char>(centuryCodeInt);
 
+    // Asteroid provisionals only valid for I-L (1800-2199)
+    if (centuryCode < 'I') {
+        throw MPCDesignationError("Asteroid provisional year must be >= 1800: " + std::to_string(year));
+    }
+
     long orderNum = 0;
     if (!orderStr.empty()) {
         try {
@@ -417,10 +422,21 @@ std::string MPCDesignation::unpackProvisional(const std::string& packed) {
     int fullYear = century * 100 + yearShort;
 
     char buf[32];
-    if (orderNum == 0) {
-        snprintf(buf, sizeof(buf), "%d %c%c", fullYear, halfMonth, secondLetter);
+    // For pre-1925 years, output in A-prefix format (A=1xxx, B=2xxx)
+    if (fullYear < 1925) {
+        char prefix = (fullYear < 2000) ? 'A' : 'B';
+        int shortYear = fullYear % 1000;
+        if (orderNum == 0) {
+            snprintf(buf, sizeof(buf), "%c%03d %c%c", prefix, shortYear, halfMonth, secondLetter);
+        } else {
+            snprintf(buf, sizeof(buf), "%c%03d %c%c%d", prefix, shortYear, halfMonth, secondLetter, orderNum);
+        }
     } else {
-        snprintf(buf, sizeof(buf), "%d %c%c%d", fullYear, halfMonth, secondLetter, orderNum);
+        if (orderNum == 0) {
+            snprintf(buf, sizeof(buf), "%d %c%c", fullYear, halfMonth, secondLetter);
+        } else {
+            snprintf(buf, sizeof(buf), "%d %c%c%d", fullYear, halfMonth, secondLetter, orderNum);
+        }
     }
     return std::string(buf);
 }
@@ -511,7 +527,8 @@ std::string MPCDesignation::unpackCometProvisional(const std::string& packed) {
 std::string MPCDesignation::packCometNumbered(const std::string& unpacked) {
     std::string u = trim(unpacked);
 
-    std::regex numberedRe(R"(^(\d+)([PD])(?:/[A-Za-z].*)?$)");
+    // Match numbered comet with optional fragment: "73P", "73P-A", "73P-AA"
+    std::regex numberedRe(R"(^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
     std::smatch match;
     if (!std::regex_match(u, match, numberedRe)) {
         throw MPCDesignationError("Invalid unpacked numbered comet designation");
@@ -519,24 +536,37 @@ std::string MPCDesignation::packCometNumbered(const std::string& unpacked) {
 
     int number = std::stoi(match[1].str());
     char cometType = match[2].str()[0];
+    std::string fragment = match[3].matched ? match[3].str() : "";
 
     if (number < 1 || number > 9999) {
         throw MPCDesignationError("Comet number out of range (1-9999): " + std::to_string(number));
     }
 
     char buf[16];
-    snprintf(buf, sizeof(buf), "%04d%c", number, cometType);
+    if (fragment.empty()) {
+        snprintf(buf, sizeof(buf), "%04d%c", number, cometType);
+    } else {
+        // Fragment letters are lowercase in packed format
+        std::string fragLower;
+        for (char c : fragment) {
+            fragLower += static_cast<char>(std::tolower(c));
+        }
+        snprintf(buf, sizeof(buf), "%04d%c%s", number, cometType, fragLower.c_str());
+    }
     return std::string(buf);
 }
 
 std::string MPCDesignation::unpackCometNumbered(const std::string& packed) {
     std::string p = trim(packed);
+    size_t len = p.length();
 
-    if (p.length() != 5) {
+    // Length 5: no fragment, 6: single-letter fragment, 7: two-letter fragment
+    if (len < 5 || len > 7) {
         throw MPCDesignationError("Invalid packed numbered comet designation");
     }
 
-    std::regex numberedRe(R"(^(\d{4})([PD])$)");
+    // Match with optional fragment: "0073P", "0073Pa", "0073Paa"
+    std::regex numberedRe(R"(^(\d{4})([PD])([a-z]{0,2})$)");
     std::smatch match;
     if (!std::regex_match(p, match, numberedRe)) {
         throw MPCDesignationError("Invalid packed numbered comet designation");
@@ -544,8 +574,17 @@ std::string MPCDesignation::unpackCometNumbered(const std::string& packed) {
 
     int number = std::stoi(match[1].str());
     char cometType = match[2].str()[0];
+    std::string fragment = match[3].str();
 
-    return std::to_string(number) + cometType;
+    std::stringstream ss;
+    ss << number << cometType;
+    if (!fragment.empty()) {
+        ss << "-";
+        for (char c : fragment) {
+            ss << static_cast<char>(std::toupper(c));
+        }
+    }
+    return ss.str();
 }
 
 // =========================================================================
@@ -948,6 +987,29 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
         }
     }
 
+    // Check for packed numbered comet with single-letter fragment (6 chars)
+    if (len == 6 && des.find(' ') == std::string::npos) {
+        if (std::isdigit(des[0]) && std::isdigit(des[1]) && std::isdigit(des[2]) &&
+            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D') && std::islower(des[5])) {
+            info.format = Format::Packed;
+            info.type = Type::CometNumbered;
+            info.subtype = "comet numbered with fragment " + getCometTypeName(des[4]);
+            return info;
+        }
+    }
+
+    // Check for packed numbered comet with two-letter fragment (7 chars) - before provisional check
+    if (len == 7 && des.find(' ') == std::string::npos) {
+        if (std::isdigit(des[0]) && std::isdigit(des[1]) && std::isdigit(des[2]) &&
+            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D') &&
+            std::islower(des[5]) && std::islower(des[6])) {
+            info.format = Format::Packed;
+            info.type = Type::CometNumbered;
+            info.subtype = "comet numbered with 2-letter fragment " + getCometTypeName(des[4]);
+            return info;
+        }
+    }
+
     // Check for packed provisional (7 chars)
     if (len == 7) {
         if (des[0] == '_') {
@@ -1069,14 +1131,17 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
         return info;
     }
 
-    // Check for unpacked numbered comet
-    std::regex numberedRe(R"(^(\d+)([PD])(?:/[A-Za-z].*)?$)");
+    // Check for unpacked numbered comet (with optional fragment)
+    std::regex numberedRe(R"(^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
     std::smatch numberedMatch;
     if (std::regex_match(des, numberedMatch, numberedRe)) {
         char cometType = numberedMatch[2].str()[0];
+        bool hasFragment = numberedMatch[3].matched;
         info.format = Format::Unpacked;
         info.type = Type::CometNumbered;
-        info.subtype = "comet numbered " + getCometTypeName(cometType);
+        info.subtype = hasFragment
+            ? "comet numbered with fragment " + getCometTypeName(cometType)
+            : "comet numbered " + getCometTypeName(cometType);
         return info;
     }
 
@@ -1177,6 +1242,226 @@ bool MPCDesignation::isValid(const std::string& designation) noexcept {
     try {
         detectFormat(designation);
         return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+// =========================================================================
+// Helper functions
+// =========================================================================
+
+std::string MPCDesignation::toReportFormat(const std::string& minimal) {
+    std::string m = trim(minimal);
+    size_t len = m.length();
+
+    // Check for numbered comet with fragment: 0073Pa (6 chars) or 0073Paa (7 chars)
+    if ((len == 6 || len == 7) && std::isdigit(m[0]) && std::isdigit(m[1]) &&
+        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D') &&
+        std::islower(m[5])) {
+        // Numbered comet with fragment
+        std::string base = m.substr(0, 5);  // "0073P"
+        std::string frag = m.substr(5);     // "a" or "aa"
+        // Format: "0073P      a" or "0073P     aa"
+        int padding = 12 - 5 - static_cast<int>(frag.length());
+        return base + std::string(padding, ' ') + frag;
+    }
+
+    // Check for numbered comet without fragment: 0073P (5 chars)
+    if (len == 5 && std::isdigit(m[0]) && std::isdigit(m[1]) &&
+        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D')) {
+        return m + std::string(7, ' ');  // "0073P       "
+    }
+
+    // All other designations: right-align in 12 characters
+    if (len >= 12) return m;
+    return std::string(12 - len, ' ') + m;
+}
+
+std::string MPCDesignation::fromReportFormat(const std::string& report) {
+    if (report.length() != 12) {
+        throw MPCDesignationError("Report format must be exactly 12 characters");
+    }
+
+    // Check for numbered comet format: "0073P      a" or "0073P     aa"
+    if (std::isdigit(report[0]) && std::isdigit(report[1]) &&
+        std::isdigit(report[2]) && std::isdigit(report[3]) &&
+        (report[4] == 'P' || report[4] == 'D')) {
+        std::string base = report.substr(0, 5);
+        std::string rest = report.substr(5);
+        // Find fragment letters at the end (skip spaces)
+        size_t fragStart = rest.find_last_not_of(' ');
+        if (fragStart == std::string::npos) {
+            return base;  // No fragment
+        }
+        // Get fragment (1 or 2 lowercase letters)
+        std::string frag;
+        if (fragStart > 0 && std::islower(rest[fragStart - 1])) {
+            frag = rest.substr(fragStart - 1, 2);
+        } else if (std::islower(rest[fragStart])) {
+            frag = rest.substr(fragStart, 1);
+        }
+        if (frag.empty()) {
+            return base;
+        }
+        return base + frag;
+    }
+
+    // Other designations: strip leading and trailing spaces
+    return trim(report);
+}
+
+bool MPCDesignation::hasFragment(const std::string& designation) {
+    std::string d = trim(designation);
+
+    // Unpacked format: "73P-A" or "D/1993 F2-B"
+    if (d.find('-') != std::string::npos) {
+        // Check if it's a comet with fragment (not a survey like "P-L" or "T-1")
+        size_t dashPos = d.find('-');
+        if (dashPos > 0 && dashPos < d.length() - 1) {
+            // Check characters after dash are uppercase letters
+            std::string afterDash = d.substr(dashPos + 1);
+            if (!afterDash.empty() && afterDash.length() <= 2) {
+                bool allUpper = true;
+                for (char c : afterDash) {
+                    if (!std::isupper(c)) { allUpper = false; break; }
+                }
+                if (allUpper) {
+                    // Make sure it's not a survey designation
+                    if (d.find("P-L") == std::string::npos &&
+                        d.find("T-1") == std::string::npos &&
+                        d.find("T-2") == std::string::npos &&
+                        d.find("T-3") == std::string::npos) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Packed format: "0073Pa" (6 chars) or "0073Paa" (7 chars)
+    size_t len = d.length();
+    if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
+        if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            return true;
+        }
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" (8 chars) or "DJ93F02aa" (9 chars)
+    if (len >= 8 && len <= 9 && isCometType(d[0])) {
+        if (std::islower(d[len - 1]) && d[len - 1] != '0') {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+std::string MPCDesignation::getFragment(const std::string& designation) {
+    std::string d = trim(designation);
+
+    // Unpacked format: "73P-A" or "D/1993 F2-B"
+    size_t dashPos = d.rfind('-');
+    if (dashPos != std::string::npos && dashPos > 0 && dashPos < d.length() - 1) {
+        std::string afterDash = d.substr(dashPos + 1);
+        if (!afterDash.empty() && afterDash.length() <= 2) {
+            bool allUpper = true;
+            for (char c : afterDash) {
+                if (!std::isupper(c)) { allUpper = false; break; }
+            }
+            if (allUpper) {
+                // Make sure it's not a survey designation
+                if (d.find("P-L") == std::string::npos &&
+                    d.find("T-1") == std::string::npos &&
+                    d.find("T-2") == std::string::npos &&
+                    d.find("T-3") == std::string::npos) {
+                    return afterDash;
+                }
+            }
+        }
+    }
+
+    // Packed numbered comet format: "0073Pa" or "0073Paa"
+    size_t len = d.length();
+    if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
+        if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            std::string frag;
+            for (size_t i = 5; i < len; i++) {
+                frag += static_cast<char>(std::toupper(d[i]));
+            }
+            return frag;
+        }
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" or "DJ93F02aa"
+    if (len >= 8 && len <= 9 && isCometType(d[0])) {
+        if (std::islower(d[len - 1]) && d[len - 1] != '0') {
+            std::string frag;
+            if (len == 9 && std::islower(d[7])) {
+                frag += static_cast<char>(std::toupper(d[7]));
+                frag += static_cast<char>(std::toupper(d[8]));
+            } else if (len == 8) {
+                frag += static_cast<char>(std::toupper(d[7]));
+            }
+            return frag;
+        }
+    }
+
+    return "";
+}
+
+std::string MPCDesignation::getParent(const std::string& designation) {
+    std::string d = trim(designation);
+
+    // Unpacked format: "73P-A" -> "73P"
+    size_t dashPos = d.rfind('-');
+    if (dashPos != std::string::npos && dashPos > 0 && dashPos < d.length() - 1) {
+        std::string afterDash = d.substr(dashPos + 1);
+        if (!afterDash.empty() && afterDash.length() <= 2) {
+            bool allUpper = true;
+            for (char c : afterDash) {
+                if (!std::isupper(c)) { allUpper = false; break; }
+            }
+            if (allUpper) {
+                // Make sure it's not a survey designation
+                if (d.find("P-L") == std::string::npos &&
+                    d.find("T-1") == std::string::npos &&
+                    d.find("T-2") == std::string::npos &&
+                    d.find("T-3") == std::string::npos) {
+                    return d.substr(0, dashPos);
+                }
+            }
+        }
+    }
+
+    // Packed numbered comet format: "0073Pa" -> "0073P"
+    size_t len = d.length();
+    if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
+        if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            return d.substr(0, 5);
+        }
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+    if (len >= 8 && len <= 9 && isCometType(d[0])) {
+        if (std::islower(d[len - 1]) && d[len - 1] != '0') {
+            // Return without the fragment, with '0' as the fragment placeholder
+            return d.substr(0, 7) + "0";
+        }
+    }
+
+    // No fragment, return as-is
+    return d;
+}
+
+bool MPCDesignation::designationsEqual(const std::string& d1, const std::string& d2) {
+    try {
+        std::string p1 = pack(d1);
+        std::string p2 = pack(d2);
+        return p1 == p2;
     } catch (...) {
         return false;
     }

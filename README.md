@@ -40,35 +40,35 @@ All production implementations pass the same test suite and produce identical re
 
 ## Test Results
 
-All 25 implementations and their test status on the full test suite (2,021,090 conversions):
+All 25 implementations and their test status on the full test suite (2,022,404 conversions):
 
 | Implementation | Pack (unpacked→packed) | Status |
 |----------------|------------------------|--------|
-| AWK | 2,021,090 / 2,021,090 | ✅ 100% |
-| Bash | 2,021,090 / 2,021,090 | ✅ 100% |
-| C | 2,021,090 / 2,021,090 | ✅ 100% |
-| C++ | 2,021,090 / 2,021,090 | ✅ 100% |
-| C# | 2,021,090 / 2,021,090 | ✅ 100% |
+| AWK | 2,022,404 / 2,022,404 | ✅ 100% |
+| Bash | 2,022,404 / 2,022,404 | ✅ 100% |
+| C | 2,022,404 / 2,022,404 | ✅ 100% |
+| C++ | 2,022,404 / 2,022,404 | ✅ 100% |
+| C# | 2,022,404 / 2,022,404 | ✅ 100% |
 | Forth | 86 / 86 | ✅ 100%* |
-| Fortran | 2,021,090 / 2,021,090 | ✅ 100% |
-| Go | 2,021,090 / 2,021,090 | ✅ 100% |
-| Haskell | 2,021,090 / 2,021,090 | ✅ 100% |
-| Java | 2,021,090 / 2,021,090 | ✅ 100% |
-| JavaScript | 2,021,090 / 2,021,090 | ✅ 100% |
-| Julia | 2,021,090 / 2,021,090 | ✅ 100% |
-| Kotlin | 2,021,090 / 2,021,090 | ✅ 100% |
-| Nim | 2,021,090 / 2,021,090 | ✅ 100% |
-| Octave | 2,021,090 / 2,021,090 | ✅ 100% |
-| Perl | 2,021,090 / 2,021,090 | ✅ 100% |
-| PHP | 2,021,090 / 2,021,090 | ✅ 100% |
-| Python | 2,021,090 / 2,021,090 | ✅ 100% |
-| R | 2,021,090 / 2,021,090 | ✅ 100% |
-| Ruby | 2,021,090 / 2,021,090 | ✅ 100% |
-| Rust | 2,021,090 / 2,021,090 | ✅ 100% |
-| SPP/IRAF | 2,021,090 / 2,021,090 | ✅ 100% |
-| Swift | 2,021,090 / 2,021,090 | ✅ 100% |
-| Tcl | 2,021,090 / 2,021,090 | ✅ 100% |
-| TypeScript | 2,021,090 / 2,021,090 | ✅ 100% |
+| Fortran | 2,022,404 / 2,022,404 | ✅ 100% |
+| Go | 2,022,404 / 2,022,404 | ✅ 100% |
+| Haskell | 2,022,404 / 2,022,404 | ✅ 100% |
+| Java | 2,022,404 / 2,022,404 | ✅ 100% |
+| JavaScript | 2,022,404 / 2,022,404 | ✅ 100% |
+| Julia | 2,022,404 / 2,022,404 | ✅ 100% |
+| Kotlin | 2,022,404 / 2,022,404 | ✅ 100% |
+| Nim | 2,022,404 / 2,022,404 | ✅ 100% |
+| Octave | 2,022,404 / 2,022,404 | ✅ 100% |
+| Perl | 2,022,404 / 2,022,404 | ✅ 100% |
+| PHP | 2,022,404 / 2,022,404 | ✅ 100% |
+| Python | 2,022,404 / 2,022,404 | ✅ 100% |
+| R | 2,022,404 / 2,022,404 | ✅ 100% |
+| Ruby | 2,022,404 / 2,022,404 | ✅ 100% |
+| Rust | 2,022,404 / 2,022,404 | ✅ 100% |
+| SPP/IRAF | 2,022,404 / 2,022,404 | ✅ 100% |
+| Swift | 2,022,404 / 2,022,404 | ✅ 100% |
+| Tcl | 2,022,404 / 2,022,404 | ✅ 100% |
+| TypeScript | 2,022,404 / 2,022,404 | ✅ 100% |
 
 *Forth passes 86 comprehensive tests covering all formats; full CSV test limited by gforth memory constraints.
 
@@ -554,8 +554,10 @@ git sparse-checkout set python test-data docs
 | Type | Unpacked | Packed |
 |------|----------|--------|
 | Numbered | 1P | 0001P |
+| Numbered with fragment | 73P-A | 0073Pa |
+| Numbered with 2-letter fragment | 73P-AA | 0073Paa |
 | Provisional | C/1995 O1 | CJ95O010 |
-| Fragment | D/1993 F2-B | DJ93F02b |
+| Provisional with fragment | D/1993 F2-B | DJ93F02b |
 | Ancient | C/240 V1 | C240V010 |
 | BCE | C/-146 P1 | C.53P010 |
 
@@ -564,9 +566,55 @@ git sparse-checkout set python test-data docs
 |----------|--------|
 | S/2019 S 22 | SK19S220 |
 
+## Helper Functions
+
+The following helper functions are available in C, Go, Java, JavaScript, Perl, PHP, Python, Ruby, Rust, Tcl, and TypeScript implementations:
+
+| Function | Description |
+|----------|-------------|
+| `toReportFormat` | Convert minimal packed format to 12-character MPC observation report format |
+| `fromReportFormat` | Convert 12-character report format to minimal packed format |
+| `hasFragment` | Check if a comet designation has a fragment suffix |
+| `getFragment` | Extract fragment suffix (uppercase) from a comet designation |
+| `getParent` | Get parent comet designation without fragment |
+| `designationsEqual` | Compare two designations across different formats |
+
+### Format Conversion Examples
+
+```python
+# Python
+to_report_format('0073Pa')   # '0073P      a' (numbered comet with fragment)
+to_report_format('00001')    # '       00001' (numbered asteroid)
+
+from_report_format('0073P      a')  # '0073Pa'
+```
+
+### Fragment Handling Examples
+
+```python
+# Python
+has_fragment('73P-A')    # True
+has_fragment('73P')      # False
+
+get_fragment('73P-A')    # 'A'
+get_fragment('73P-AA')   # 'AA'
+
+get_parent('73P-A')      # '73P'
+get_parent('0073Pa')     # '0073P'
+```
+
+### Designation Comparison
+
+```python
+# Python - same object, different formats
+designations_equal('1995 XA', 'J95X00A')  # True
+designations_equal('73P-A', '0073Pa')     # True
+designations_equal('73P-A', '73P-B')      # False
+```
+
 ## Performance
 
-Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
+Benchmark results on Apple M1 Max, processing 2,022,404 designation conversions.
 
 ### Pack Direction (unpacked → packed)
 
@@ -576,7 +624,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 2 | Nim | 569 | 3,550,257 | 0.99x |
 | 3 | JavaScript | 834 | 2,423,369 | 0.68x |
 | 4 | C | 970 | 2,083,598 | 0.58x |
-| 5 | SPP/IRAF | 1,000 | 2,021,090 | 0.57x |
+| 5 | SPP/IRAF | 1,000 | 2,022,404 | 0.57x |
 | 6 | TypeScript | 1,163 | 1,737,825 | 0.49x |
 | 7 | Rust | 1,317 | 1,534,617 | 0.43x |
 | 8 | Fortran | 2,524 | 800,749 | 0.22x |
@@ -612,7 +660,7 @@ Benchmark results on Apple M1 Max, processing 2,021,090 designation conversions.
 | 6 | Go | 469 | 4,308,162 | 0.57x |
 | 7 | TypeScript | 576 | 3,508,837 | 0.46x |
 | 8 | Rust | 796 | 2,539,058 | 0.34x |
-| 9 | SPP/IRAF | ~1,000 | ~2,021,090 | 0.27x |
+| 9 | SPP/IRAF | ~1,000 | ~2,022,404 | 0.27x |
 | 10 | Haskell | 1,179 | 1,714,239 | 0.23x |
 | 11 | Kotlin | 1,333 | 1,516,196 | 0.20x |
 | 12 | Fortran | 1,939 | 1,042,336 | 0.14x |

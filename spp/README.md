@@ -41,6 +41,7 @@ spp/
 ├── test/
 │   ├── test_mpc.x           # Unit test suite (32 tests)
 │   ├── test_errors.x        # Error handling tests (94 tests)
+│   ├── test_helpers.x       # Helper function tests (77 tests)
 │   └── test_csv.x           # CSV benchmark tests (2M+ tests)
 ├── build/                   # Build directory (generated)
 ├── example_usage.x          # Interactive example task
@@ -183,7 +184,7 @@ call mpc_pkext (year, halfmo, seclet, cycle, packed, maxch)
 call mpc_unsurv (packed, unpacked, maxch)
 call mpc_pksurv (unpacked, packed, maxch)
 
-# Numbered comets
+# Numbered comets (with optional fragment)
 call mpc_uncnum (packed, unpacked, maxch)
 call mpc_pkcnum (unpacked, packed, maxch)
 
@@ -197,6 +198,37 @@ call mpc_pkcful (unpacked, packed, maxch)
 # Natural satellites
 call mpc_unsat (packed, unpacked, maxch)
 call mpc_pksat (unpacked, packed, maxch)
+```
+
+### Helper Functions
+
+```spp
+# Convert minimal packed format to 12-character report format
+call mpc_torep (minimal, report, maxch)
+# "0073Pa" -> "0073P      a"
+# "00001"  -> "       00001"
+
+# Convert 12-character report format to minimal packed format
+call mpc_fromrep (report, minimal, maxch)
+# "0073P      a" -> "0073Pa"
+# "       00001" -> "00001"
+
+# Check if designation has a comet fragment
+bool mpc_hasfrag (desig)
+# "73P-A" -> true, "73P" -> false
+
+# Extract fragment suffix (returns uppercase)
+call mpc_getfrag (desig, frag, maxch)
+# "73P-A" -> "A", "73P-AA" -> "AA"
+
+# Get parent comet without fragment
+call mpc_getpar (desig, parent, maxch)
+# "73P-A" -> "73P", "0073Pa" -> "0073P"
+
+# Check if two designations refer to the same object
+bool mpc_deseq (d1, d2)
+# "73P-A", "0073Pa" -> true (same object)
+# "73P-A", "73P-B" -> false (different)
 ```
 
 ## Supported Formats
@@ -225,6 +257,8 @@ call mpc_pksat (unpacked, packed, maxch)
 | Type | Packed | Unpacked |
 |------|--------|----------|
 | Numbered | `0001P` | `1P` |
+| Numbered with fragment | `0073Pa` | `73P-A` |
+| Numbered with 2-letter fragment | `0073Paa` | `73P-AA` |
 | Provisional | `CJ95O010` | `C/1995 O1` |
 | With fragment | `DJ93F02b` | `D/1993 F2-B` |
 | Two-letter fragment | `PJ30J01aa` | `P/1930 J1-AA` |
@@ -276,9 +310,10 @@ CSV benchmark (2M+ conversions, path hardcoded relative to build/):
 ### Test Results
 
 - **Unit tests**: 32 passed, 0 failed
+- **Helper tests**: 77 passed, 0 failed
 - **Error tests**: 92 passed, 2 failed
   - The 2 failures are null byte tests (documented limitation of EOS-terminated strings)
-- **CSV benchmark**: 2,021,090 passed, 0 failed
+- **CSV benchmark**: 2,022,404 passed, 0 failed
   - Execution time: ~1.0 second for 2M+ conversions
 
 All conversion tests pass, including:
@@ -293,7 +328,7 @@ strings since the null terminates the string before scanning can reach it.
 
 ## Performance
 
-- **CSV benchmark**: 2,021,090 conversions in ~1.0 second
+- **CSV benchmark**: 2,022,404 conversions in ~1.0 second
 - **Throughput**: ~2 million conversions/second
 
 SPP compiles to Fortran 77, giving performance comparable to compiled Fortran.

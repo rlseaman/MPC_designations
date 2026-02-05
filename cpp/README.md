@@ -137,6 +137,27 @@ Static methods:
 - `packPermanent(number) -> std::string` - Pack asteroid number
 - `unpackPermanent(packed) -> long` - Unpack to asteroid number
 
+Helper functions:
+
+- `toReportFormat(minimal) -> std::string` - Convert to 12-char MPC report format
+- `fromReportFormat(report) -> std::string` - Convert from 12-char report format
+- `hasFragment(designation) -> bool` - Check if has comet fragment suffix
+- `getFragment(designation) -> std::string` - Extract fragment (uppercase, e.g., "A", "AA")
+- `getParent(designation) -> std::string` - Get parent comet without fragment
+- `designationsEqual(d1, d2) -> bool` - Check if same object (compares packed forms)
+
+```cpp
+// Helper function examples
+std::string report = mpc::MPCDesignation::toReportFormat("0073Pa");  // "0073P      a"
+std::string minimal = mpc::MPCDesignation::fromReportFormat("0073P      a");  // "0073Pa"
+
+bool hasFrag = mpc::MPCDesignation::hasFragment("73P-A");  // true
+std::string frag = mpc::MPCDesignation::getFragment("73P-A");  // "A"
+std::string parent = mpc::MPCDesignation::getParent("73P-A");  // "73P"
+
+bool same = mpc::MPCDesignation::designationsEqual("73P-A", "0073Pa");  // true
+```
+
 #### Exception Class `MPCDesignationError`
 
 Thrown for invalid designations. Inherits from `std::runtime_error`.
@@ -174,10 +195,11 @@ Thrown for invalid designations. Inherits from `std::runtime_error`.
 
 ```bash
 # Run all tests
-make test
+make test-all
 
 # Run specific tests
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ entries)
 make test-roundtrip # Roundtrip verification
 
@@ -198,6 +220,7 @@ cpp/
 └── test/
     ├── test_csv.cpp        # CSV conversion tests
     ├── test_errors.cpp     # Error handling tests
+    ├── test_helpers.cpp    # Helper function tests
     └── test_roundtrip.cpp  # Roundtrip tests
 ```
 

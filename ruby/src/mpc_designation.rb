@@ -327,10 +327,34 @@ module MPCDesignation
       order_encoded = packed[4, 2]
       second_letter = packed[6]
 
+      # Asteroid provisionals: only I-L valid (1800-2199)
+      unless %w[I J K L].include?(century)
+        raise Error, "Invalid century code for asteroid provisional: #{century} (must be I-L for years 1800-2199)"
+      end
+
       raise Error, "Invalid century code: #{century}" unless CENTURY_CODES.key?(century)
 
       full_year = "#{CENTURY_CODES[century]}#{year}"
+      year_num = full_year.to_i
       order_num = decode_cycle_count(order_encoded)
+
+      # For pre-1925 designations, use A-prefix format (MPC canonical)
+      if year_num < 1925
+        first_digit = full_year[0]
+        rest_of_year = full_year[1..-1]
+        prefix = case first_digit
+                 when '1' then 'A'
+                 when '2' then 'B'
+                 else ''
+                 end
+        unless prefix.empty?
+          if order_num.zero?
+            return "#{prefix}#{rest_of_year} #{half_month}#{second_letter}"
+          else
+            return "#{prefix}#{rest_of_year} #{half_month}#{second_letter}#{order_num}"
+          end
+        end
+      end
 
       if order_num.zero?
         "#{full_year} #{half_month}#{second_letter}"
@@ -378,6 +402,12 @@ module MPCDesignation
       order_str = match[4]
 
       raise Error, "Invalid half-month letter: #{half_month}" unless valid_half_month?(half_month)
+
+      # Asteroid provisionals: only years 1800-2199 valid
+      year_int = year.to_i
+      if year_int < 1800 || year_int > 2199
+        raise Error, "Year out of range for asteroid provisional: #{year} (must be 1800-2199)"
+      end
 
       century = year[0, 2].to_i
       year_short = year[2, 2]
@@ -451,29 +481,40 @@ module MPCDesignation
     # Numbered comet designations
     # =============================================================================
 
+    # Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
     def unpack_comet_numbered(packed)
       packed = packed.strip
 
-      match = packed.match(/^(\d{4})([PD])$/)
+      # Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
+      match = packed.match(/^(\d{4})([PD])([a-z]{1,2})?$/)
       raise Error, "Invalid packed numbered comet designation: #{packed}" unless match
 
       number = match[1].to_i
       comet_type = match[2]
-      "#{number}#{comet_type}"
+      fragment = match[3] || ''
+
+      result = "#{number}#{comet_type}"
+      result += "-#{fragment.upcase}" unless fragment.empty?
+      result
     end
 
+    # Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
     def pack_comet_numbered(unpacked)
       unpacked = unpacked.strip
 
-      match = unpacked.match(/^(\d+)([PD])(?:\/[A-Za-z].*)?$/)
+      # Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
+      match = unpacked.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/)
       raise Error, "Invalid unpacked numbered comet designation: #{unpacked}" unless match
 
       number = match[1].to_i
       comet_type = match[2]
+      fragment = match[3] || ''
 
       raise Error, "Comet number out of range (1-9999): #{number}" if number < 1 || number > 9999
 
-      "#{format('%04d', number)}#{comet_type}"
+      result = "#{format('%04d', number)}#{comet_type}"
+      result += fragment.downcase unless fragment.empty?
+      result
     end
 
     # =============================================================================
@@ -849,6 +890,17 @@ module MPCDesignation
         end
       end
 
+      # Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+      if des.length == 6 || des.length == 7
+        if des.match(/^[0-9]{4}[PD][a-z]{1,2}$/)
+          result['format'] = 'packed'
+          result['type'] = 'comet_numbered'
+          frag_len = des.length - 5
+          result['subtype'] = frag_len == 1 ? 'comet numbered with fragment' : 'comet numbered with 2-letter fragment'
+          return result
+        end
+      end
+
       # Check for packed comet provisional (7 chars starting with century code)
       if des.length == 7
         if des.match(/^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/)
@@ -934,13 +986,20 @@ module MPCDesignation
         return result
       end
 
-      # Check for unpacked numbered periodic comet
-      if (match = des.match(/^(\d+)([PD])(?:\/[A-Za-z].*)?$/))
+      # Check for unpacked numbered periodic comet "1P" or "354P" or "73P-A"
+      if (match = des.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/))
         result['format'] = 'unpacked'
         result['type'] = 'comet_numbered'
         comet_type = match[2]
+        fragment = match[3] || ''
         type_desc = COMET_TYPE_DESCRIPTIONS[comet_type] || comet_type
-        result['subtype'] = "comet numbered #{type_desc}"
+        result['subtype'] = if fragment.empty?
+                              "comet numbered #{type_desc}"
+                            elsif fragment.length == 1
+                              'comet numbered with fragment'
+                            else
+                              'comet numbered with 2-letter fragment'
+                            end
         return result
       end
 
@@ -1019,6 +1078,247 @@ module MPCDesignation
       return designation.strip if info['format'] == 'unpacked'
 
       convert(designation)['output']
+    end
+
+    # =============================================================================
+    # Helper Functions for Format Conversion and Fragment Handling
+    # =============================================================================
+
+    # Convert minimal packed format to 12-character MPC report format.
+    # The 12-character format is used in MPC observation records (columns 1-12).
+    # For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+    def to_report_format(minimal)
+      minimal = minimal.strip
+      length = minimal.length
+
+      info = detect_format(minimal)
+
+      raise Error, "to_report_format requires packed format input: #{minimal}" unless info['format'] == 'packed'
+
+      # Initialize 12-char output with spaces
+      report = ' ' * 12
+
+      case info['type']
+      when 'permanent'
+        # Right-align 5-char designation
+        length.times { |i| report[12 - length + i] = minimal[i] }
+
+      when 'provisional', 'provisional_extended', 'survey'
+        # Right-align 7-char designation
+        length.times { |i| report[12 - length + i] = minimal[i] }
+
+      when 'comet_numbered'
+        # Numbered comet: first 5 chars (####P), fragment in cols 11-12
+        if length == 5
+          # No fragment
+          5.times { |i| report[i] = minimal[i] }
+        elsif length == 6
+          # Single-letter fragment
+          5.times { |i| report[i] = minimal[i] }
+          report[11] = minimal[5]
+        elsif length == 7
+          # Two-letter fragment
+          5.times { |i| report[i] = minimal[i] }
+          report[10] = minimal[5]
+          report[11] = minimal[6]
+        end
+
+      when 'comet_provisional', 'comet_full', 'comet_ancient', 'comet_bce'
+        # Right-align in 12-char field
+        length.times { |i| report[12 - length + i] = minimal[i] }
+
+      when 'satellite'
+        # Right-align 8-char designation
+        length.times { |i| report[12 - length + i] = minimal[i] }
+
+      else
+        raise Error, "Unsupported type for report format: #{info['type']}"
+      end
+
+      report
+    end
+
+    # Convert 12-character MPC report format to minimal packed format.
+    def from_report_format(report)
+      raise Error, "Report format too long: #{report}" if report.length > 12
+
+      # Pad to 12 chars if shorter
+      report = report.rjust(12)
+
+      # Check for numbered comet with fragment (fragment in cols 11-12)
+      first5 = report[0, 5]
+      middle = report[5, 5]
+      frag1 = report[10]
+      frag2 = report[11]
+
+      # Check if this is a numbered comet format
+      if first5 =~ /^[0-9]{4}[PD]$/ && middle.strip.empty?
+        result = first5
+        result += frag1 if frag1 >= 'a' && frag1 <= 'z'
+        result += frag2 if frag2 >= 'a' && frag2 <= 'z'
+        return result
+      end
+
+      # Standard case: just trim spaces
+      report.strip
+    end
+
+    # Check if a designation has a comet fragment suffix.
+    # Works with both packed and unpacked formats.
+    def has_fragment?(desig)
+      begin
+        info = detect_format(desig)
+      rescue Error
+        return false
+      end
+
+      dtype = info['type']
+
+      # Only comets can have fragments
+      return false unless %w[comet_numbered comet_provisional comet_full].include?(dtype)
+
+      desig = desig.strip
+      length = desig.length
+
+      if info['format'] == 'unpacked'
+        # Look for "-X" or "-XX" at end
+        return desig =~ /-[A-Z]{1,2}$/ ? true : false
+      else
+        # Packed format
+        case dtype
+        when 'comet_numbered'
+          # Check for lowercase after P/D (position 5+)
+          if length > 5
+            c = desig[5]
+            return c >= 'a' && c <= 'z'
+          end
+        when 'comet_provisional'
+          # 7-char: last char lowercase and not '0'
+          last_char = desig[length - 1]
+          return last_char >= 'a' && last_char <= 'z' && last_char != '0'
+        when 'comet_full'
+          last_char = desig[length - 1]
+          return last_char >= 'a' && last_char <= 'z' && last_char != '0'
+        end
+      end
+      false
+    end
+
+    # Extract the fragment suffix from a comet designation.
+    # Works with both packed and unpacked formats.
+    # Fragment is returned in uppercase (e.g., "A", "AA").
+    # Returns empty string if no fragment.
+    def get_fragment(desig)
+      info = detect_format(desig)
+      dtype = info['type']
+
+      # Only comets can have fragments
+      return '' unless %w[comet_numbered comet_provisional comet_full].include?(dtype)
+
+      desig = desig.strip
+      length = desig.length
+
+      if info['format'] == 'unpacked'
+        # Look for "-X" or "-XX" at end
+        match = desig.match(/-([A-Z]{1,2})$/)
+        return match[1] if match
+      else
+        # Packed format
+        case dtype
+        when 'comet_numbered'
+          # Fragment is lowercase after P/D
+          if length == 6
+            return desig[5].upcase
+          elsif length == 7
+            return desig[5, 2].upcase
+          end
+        when 'comet_provisional'
+          # 7-char: position 6 if lowercase and not '0'
+          # 8-char: positions 6-7 if lowercase
+          if length == 7
+            last_char = desig[6]
+            return last_char.upcase if last_char >= 'a' && last_char <= 'z' && last_char != '0'
+          elsif length == 8
+            frag = desig[6, 2]
+            return frag.upcase if frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z'
+          end
+        when 'comet_full'
+          # 8-char: position 7 if lowercase and not '0'
+          # 9-char: positions 7-8 if lowercase
+          if length == 8
+            last_char = desig[7]
+            return last_char.upcase if last_char >= 'a' && last_char <= 'z' && last_char != '0'
+          elsif length == 9
+            frag = desig[7, 2]
+            return frag.upcase if frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z'
+          end
+        end
+      end
+
+      ''
+    end
+
+    # Get the parent comet designation (without fragment suffix).
+    # Works with both packed and unpacked formats.
+    # Returns the designation in the same format (packed or unpacked) as input.
+    def get_parent(desig)
+      info = detect_format(desig)
+      dtype = info['type']
+
+      # Non-comets: return as-is
+      return desig.strip unless %w[comet_numbered comet_provisional comet_full].include?(dtype)
+
+      desig = desig.strip
+      length = desig.length
+
+      if info['format'] == 'unpacked'
+        # Remove "-X" or "-XX" suffix if present
+        return desig.sub(/-[A-Z]{1,2}$/, '')
+      else
+        # Packed format
+        case dtype
+        when 'comet_numbered'
+          # Remove lowercase fragment letters after P/D
+          if length > 5
+            c = desig[5]
+            return desig[0, 5] if c >= 'a' && c <= 'z'
+          end
+        when 'comet_provisional'
+          # 7-char: replace lowercase fragment with '0'
+          # 8-char: replace 2 lowercase with '0', truncate
+          if length == 7
+            last_char = desig[6]
+            return desig[0, 6] + '0' if last_char >= 'a' && last_char <= 'z' && last_char != '0'
+          elsif length == 8
+            c = desig[6]
+            return desig[0, 6] + '0' if c >= 'a' && c <= 'z'
+          end
+        when 'comet_full'
+          # 8-char: replace fragment with '0'
+          # 9-char: replace fragment with '0', truncate
+          if length == 8
+            last_char = desig[7]
+            return desig[0, 7] + '0' if last_char >= 'a' && last_char <= 'z' && last_char != '0'
+          elsif length == 9
+            c = desig[7]
+            return desig[0, 7] + '0' if c >= 'a' && c <= 'z'
+          end
+        end
+      end
+
+      desig
+    end
+
+    # Check if two designations refer to the same object.
+    # Normalizes both designations to packed format and compares them.
+    def designations_equal?(desig1, desig2)
+      begin
+        packed1 = pack(desig1)
+        packed2 = pack(desig2)
+        packed1 == packed2
+      rescue Error
+        false
+      end
     end
   end
 end

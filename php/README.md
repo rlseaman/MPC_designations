@@ -98,6 +98,14 @@ Main converter class with static methods.
 - `detectFormat(string $designation): FormatInfo` - Detect format without converting
 - `isValidDesignation(string $designation): bool` - Check if valid designation
 
+**Helper Methods:**
+- `toReportFormat(string $minimal): string` - Convert minimal packed to 12-char report format
+- `fromReportFormat(string $report): string` - Convert 12-char report format to minimal packed
+- `hasFragment(string $desig): bool` - Check if designation has comet fragment
+- `getFragment(string $desig): string` - Extract fragment suffix (uppercase)
+- `getParent(string $desig): string` - Get parent designation without fragment
+- `designationsEqual(string $d1, string $d2): bool` - Compare designations across formats
+
 #### `ConversionResult`
 
 Result of `convert()`:
@@ -115,6 +123,55 @@ Format detection result:
 #### `MPCDesignationException`
 
 Exception thrown for invalid designations.
+
+## Helper Function Examples
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+```php
+use MPC\MPCDesignation;
+
+// Minimal to 12-char report format
+MPCDesignation::toReportFormat('0073Pa');   // '0073P      a'
+MPCDesignation::toReportFormat('00001');    // '       00001'
+
+// 12-char report format to minimal
+MPCDesignation::fromReportFormat('0073P      a');  // '0073Pa'
+MPCDesignation::fromReportFormat('       00001');  // '00001'
+```
+
+### Fragment Extraction
+
+```php
+use MPC\MPCDesignation;
+
+// Check if designation has a fragment
+MPCDesignation::hasFragment('73P-A');   // true
+MPCDesignation::hasFragment('73P');     // false
+MPCDesignation::hasFragment('0073Pa');  // true (packed)
+
+// Extract fragment (uppercase)
+MPCDesignation::getFragment('73P-A');    // 'A'
+MPCDesignation::getFragment('73P-AA');   // 'AA'
+MPCDesignation::getFragment('0073Paa');  // 'AA'
+
+// Get parent comet
+MPCDesignation::getParent('73P-A');   // '73P'
+MPCDesignation::getParent('0073Pa');  // '0073P'
+```
+
+### Designation Comparison
+
+```php
+use MPC\MPCDesignation;
+
+// Same object, different formats
+MPCDesignation::designationsEqual('1995 XA', 'J95X00A');  // true
+MPCDesignation::designationsEqual('73P-A', '0073Pa');     // true
+
+// Different objects
+MPCDesignation::designationsEqual('73P-A', '73P-B');      // false
+```
 
 ## Supported Formats
 

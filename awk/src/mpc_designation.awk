@@ -162,7 +162,7 @@ function pack_provisional(desig,    year, half, second, cycle, century, century_
     return century_char sprintf("%02d", yy) half encode_cycle(cycle) second
 }
 
-function unpack_provisional(packed,    century_char, yy, half, cycle_enc, second, century, year, cycle) {
+function unpack_provisional(packed,    century_char, yy, half, cycle_enc, second, century, year, cycle, prefix, short_year) {
     century_char = substr(packed, 1, 1)
     yy = substr(packed, 2, 2)
     half = substr(packed, 4, 1)
@@ -172,6 +172,18 @@ function unpack_provisional(packed,    century_char, yy, half, cycle_enc, second
     century = CENTURY_TO_NUM[century_char]
     year = century * 100 + int(yy)
     cycle = decode_cycle(cycle_enc)
+
+    # Pre-1925 designations use A-prefix format
+    if (year < 1925) {
+        # A for 1xxx years, B for 2xxx years
+        prefix = (year < 2000) ? "A" : "B"
+        short_year = year % 1000  # Last 3 digits
+        if (cycle == 0) {
+            return prefix sprintf("%03d", short_year) " " half second
+        } else {
+            return prefix sprintf("%03d", short_year) " " half second cycle
+        }
+    }
 
     if (cycle == 0) {
         return year " " half second
@@ -204,17 +216,36 @@ function unpack_survey(packed,    prefix, num, survey) {
 # Comet encoding/decoding
 #==============================================================================
 
-function pack_numbered_comet(desig,    num, type) {
-    # Parse: "1P"
-    match(desig, /[PDCXA]$/)
-    type = substr(desig, RSTART, 1)
-    num = substr(desig, 1, RSTART - 1)
-    return sprintf("%04d", num) type
+function pack_numbered_comet(desig,    num, type, fragment, base_desig) {
+    # Parse: "1P", "73P-A", "73P-AA"
+    fragment = ""
+    base_desig = desig
+
+    # Check for fragment suffix
+    if (match(desig, /-[A-Z][A-Z]$/)) {
+        fragment = tolower(substr(desig, RSTART + 1, 2))
+        base_desig = substr(desig, 1, RSTART - 1)
+    } else if (match(desig, /-[A-Z]$/)) {
+        fragment = tolower(substr(desig, RSTART + 1, 1))
+        base_desig = substr(desig, 1, RSTART - 1)
+    }
+
+    match(base_desig, /[PD]$/)
+    type = substr(base_desig, RSTART, 1)
+    num = substr(base_desig, 1, RSTART - 1)
+    return sprintf("%04d", num) type fragment
 }
 
-function unpack_numbered_comet(packed,    num, type) {
+function unpack_numbered_comet(packed,    num, type, fragment, len) {
+    len = length(packed)
     num = int(substr(packed, 1, 4))
     type = substr(packed, 5, 1)
+
+    # Check for fragment (6 or 7 chars total)
+    if (len > 5) {
+        fragment = toupper(substr(packed, 6))
+        return num type "-" fragment
+    }
     return num type
 }
 
@@ -417,11 +448,16 @@ function detect_format(desig,    len, first, prefix, last) {
     len = length(desig)
     first = substr(desig, 1, 1)
 
-    # Packed permanent asteroid (5 chars, no slash or space)
-    if (len == 5 && index(desig, "/") == 0 && index(desig, " ") == 0) {
+    # Packed numbered comet with fragment (6 or 7 chars: 0073Pa or 0073Paa)
+    if ((len == 6 || len == 7) && desig ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+        return "packed_numbered_comet"
+    }
+
+    # Packed permanent asteroid (5 chars, no slash, space, or hyphen)
+    if (len == 5 && index(desig, "/") == 0 && index(desig, " ") == 0 && index(desig, "-") == 0) {
         last = substr(desig, 5, 1)
         # Check for numbered comet
-        if (last ~ /[PDCXA]/ && substr(desig, 1, 4) ~ /^[0-9]+$/) {
+        if (last ~ /[PD]/ && substr(desig, 1, 4) ~ /^[0-9]+$/) {
             return "packed_numbered_comet"
         }
         return "packed_permanent"
@@ -461,8 +497,8 @@ function detect_format(desig,    len, first, prefix, last) {
         return "unpacked_survey"
     }
 
-    # Unpacked numbered comet
-    if (desig ~ /^[0-9]+[PDCXA]$/) {
+    # Unpacked numbered comet (with optional fragment)
+    if (desig ~ /^[0-9]+[PD](-[A-Z]{1,2})?$/) {
         return "unpacked_numbered_comet"
     }
 
@@ -523,6 +559,167 @@ function convert_simple(desig,    fmt) {
     if (fmt == "unpacked_bce_comet") return pack_bce_comet(desig)
 
     return "ERROR: Unknown format: " desig
+}
+
+#==============================================================================
+# Pack/Unpack functions (ensure specific format)
+#==============================================================================
+
+function pack(desig,    fmt) {
+    fmt = detect_format(desig)
+    if (fmt ~ /^packed/) {
+        return desig
+    }
+    return convert_simple(desig)
+}
+
+function unpack(desig,    fmt) {
+    fmt = detect_format(desig)
+    if (fmt ~ /^unpacked/) {
+        return desig
+    }
+    return convert_simple(desig)
+}
+
+#==============================================================================
+# Helper functions for report format and fragment handling
+#==============================================================================
+
+# Convert minimal packed format to 12-character MPC report format
+function to_report_format(minimal,    fmt, len, base_part, fragment, padding) {
+    fmt = detect_format(minimal)
+
+    # If not packed, pack it first
+    if (fmt !~ /^packed/) {
+        minimal = pack(minimal)
+        fmt = detect_format(minimal)
+    }
+
+    len = length(minimal)
+
+    # Numbered comets: right-pad to 12 chars
+    # Handle fragments: "0073Pa" -> "0073P      a", "0073Paa" -> "0073P     aa"
+    if (fmt == "packed_numbered_comet") {
+        if (len > 5) {
+            base_part = substr(minimal, 1, 5)  # "0073P"
+            fragment = substr(minimal, 6)       # "a" or "aa"
+            padding = 12 - 5 - length(fragment)
+            return base_part sprintf("%" padding "s", "") fragment
+        }
+        return sprintf("%-12s", minimal)
+    }
+
+    # Everything else: left-pad to 12 chars
+    return sprintf("%12s", minimal)
+}
+
+# Convert 12-character MPC report format to minimal packed format
+function from_report_format(report,    trimmed, base_part, fragment) {
+    if (length(report) != 12) {
+        return "ERROR: Report format must be exactly 12 characters"
+    }
+
+    # Check for numbered comet format (starts with 4 digits + P/D)
+    if (report ~ /^[0-9]{4}[PD]/) {
+        base_part = substr(report, 1, 5)
+        # Trim spaces and get fragment if any
+        fragment = substr(report, 6)
+        gsub(/^[ ]+/, "", fragment)
+        gsub(/[ ]+$/, "", fragment)
+        return base_part fragment
+    }
+
+    # For everything else, just trim whitespace
+    trimmed = report
+    gsub(/^[ ]+/, "", trimmed)
+    gsub(/[ ]+$/, "", trimmed)
+    return trimmed
+}
+
+# Check if a comet designation has a fragment suffix
+function has_fragment(desig,    d) {
+    d = desig
+    gsub(/^[ ]+/, "", d)
+    gsub(/[ ]+$/, "", d)
+
+    # Unpacked format with fragment: "73P-A", "73P-AA", "D/1993 F2-A"
+    if (d ~ /-[A-Z]{1,2}$/) {
+        return 1
+    }
+
+    # Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+        return 1
+    }
+
+    # Packed provisional comet with fragment: "DJ93F02a" (8 chars, last char lowercase)
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+        return 1
+    }
+
+    return 0
+}
+
+# Get the fragment letter(s) from a comet designation (uppercase)
+function get_fragment(desig,    d, frag) {
+    d = desig
+    gsub(/^[ ]+/, "", d)
+    gsub(/[ ]+$/, "", d)
+
+    # Unpacked format: "73P-A" -> "A", "73P-AA" -> "AA"
+    if (match(d, /-([A-Z]{1,2})$/)) {
+        return substr(d, RSTART + 1)
+    }
+
+    # Packed numbered comet: "0073Pa" -> "A", "0073Paa" -> "AA"
+    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+        frag = substr(d, 6)
+        return toupper(frag)
+    }
+
+    # Packed provisional comet: "DJ93F02a" -> "A"
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+        return toupper(substr(d, 8, 1))
+    }
+
+    return ""
+}
+
+# Get the parent comet designation without fragment suffix
+function get_parent(desig,    d) {
+    d = desig
+    gsub(/^[ ]+/, "", d)
+    gsub(/[ ]+$/, "", d)
+
+    # Unpacked format: "73P-A" -> "73P"
+    if (match(d, /-[A-Z]{1,2}$/)) {
+        return substr(d, 1, RSTART - 1)
+    }
+
+    # Packed numbered comet: "0073Pa" -> "0073P"
+    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+        return substr(d, 1, 5)
+    }
+
+    # Packed provisional comet: "DJ93F02a" -> "DJ93F020"
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+        return substr(d, 1, 7) "0"
+    }
+
+    return d
+}
+
+# Check if two designations refer to the same object
+function designations_equal(desig1, desig2,    packed1, packed2) {
+    packed1 = pack(desig1)
+    packed2 = pack(desig2)
+
+    # Check for errors
+    if (packed1 ~ /^ERROR/ || packed2 ~ /^ERROR/) {
+        return 0
+    }
+
+    return (packed1 == packed2) ? 1 : 0
 }
 
 # Library only - no main block

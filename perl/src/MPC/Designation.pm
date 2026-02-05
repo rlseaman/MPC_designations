@@ -11,6 +11,8 @@ our @EXPORT_OK = qw(
     pack_comet_numbered unpack_comet_numbered
     pack_comet_full unpack_comet_full
     pack_satellite unpack_satellite
+    to_report_format from_report_format
+    has_fragment get_fragment get_parent designations_equal
 );
 
 our $VERSION = '1.0.0';
@@ -293,10 +295,35 @@ sub unpack_provisional {
     my $order_encoded = substr($packed, 4, 2);
     my $second_letter = substr($packed, 6, 1);
 
+    # Asteroid provisionals: only I-L valid (1800-2199)
+    unless ($century =~ /^[IJKL]$/) {
+        die "Invalid century code for asteroid provisional: $century (must be I-L for years 1800-2199)\n";
+    }
+
     die "Invalid century code: $century\n" unless exists $CENTURY_CODES{$century};
 
     my $full_year = $CENTURY_CODES{$century} . $year;
+    my $year_num = int($full_year);
     my $order_num = decode_cycle_count($order_encoded);
+
+    # For pre-1925 designations, use A-prefix format (MPC canonical)
+    if ($year_num < 1925) {
+        my $first_digit = substr($full_year, 0, 1);
+        my $rest_of_year = substr($full_year, 1);
+        my $prefix = '';
+        if ($first_digit eq '1') {
+            $prefix = 'A';
+        } elsif ($first_digit eq '2') {
+            $prefix = 'B';
+        }
+        if ($prefix ne '') {
+            if ($order_num == 0) {
+                return "$prefix$rest_of_year $half_month$second_letter";
+            } else {
+                return "$prefix$rest_of_year $half_month$second_letter$order_num";
+            }
+        }
+    }
 
     if ($order_num == 0) {
         return "$full_year $half_month$second_letter";
@@ -340,6 +367,12 @@ sub pack_provisional {
         my ($year, $half_month, $second_letter, $order_str) = ($1, $2, $3, $4);
 
         die "Invalid half-month letter: $half_month\n" unless is_valid_half_month($half_month);
+
+        # Asteroid provisionals: only years 1800-2199 valid
+        my $year_int = int($year);
+        if ($year_int < 1800 || $year_int > 2199) {
+            die "Year out of range for asteroid provisional: $year (must be 1800-2199)\n";
+        }
 
         my $century = int(substr($year, 0, 2));
         my $year_short = substr($year, 2, 2);
@@ -416,30 +449,41 @@ sub pack_comet_provisional {
     die "Invalid unpacked comet provisional designation: $unpacked\n";
 }
 
+# Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
 sub unpack_comet_numbered {
     my ($packed) = @_;
     $packed =~ s/^\s+|\s+$//g;
 
-    if ($packed =~ /^(\d{4})([PD])$/) {
+    # Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
+    if ($packed =~ /^(\d{4})([PD])([a-z]{1,2})?$/) {
         my $number = int($1);
         my $comet_type = $2;
-        return "$number$comet_type";
+        my $fragment = $3 // '';
+
+        my $result = "$number$comet_type";
+        $result .= "-" . uc($fragment) if $fragment ne '';
+        return $result;
     }
 
     die "Invalid packed numbered comet designation: $packed\n";
 }
 
+# Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
 sub pack_comet_numbered {
     my ($unpacked) = @_;
     $unpacked =~ s/^\s+|\s+$//g;
 
-    if ($unpacked =~ /^(\d+)([PD])(?:\/[A-Za-z].*)?$/) {
+    # Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
+    if ($unpacked =~ /^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
         my $number = int($1);
         my $comet_type = $2;
+        my $fragment = $3 // '';
 
         die "Comet number out of range (1-9999): $number\n" if $number < 1 || $number > 9999;
 
-        return sprintf("%04d%s", $number, $comet_type);
+        my $result = sprintf("%04d%s", $number, $comet_type);
+        $result .= lc($fragment) if $fragment ne '';
+        return $result;
     }
 
     die "Invalid unpacked numbered comet designation: $unpacked\n";
@@ -737,6 +781,15 @@ sub detect_format {
         }
     }
 
+    # Packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+    if (length($des) == 6 || length($des) == 7) {
+        if ($des =~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+            my $frag_len = length($des) - 5;
+            my $subtype = $frag_len == 1 ? 'comet numbered with fragment' : 'comet numbered with 2-letter fragment';
+            return { format => 'packed', type => 'comet_numbered', subtype => $subtype };
+        }
+    }
+
     # Packed provisional (7 chars)
     if (length($des) == 7) {
         if (substr($des, 0, 1) eq '_') {
@@ -793,9 +846,18 @@ sub detect_format {
         return { format => 'unpacked', type => 'comet_full', subtype => 'comet provisional' };
     }
 
-    # Unpacked numbered comet
-    if ($des =~ /^(\d+)([PD])(?:\/[A-Za-z].*)?$/) {
-        return { format => 'unpacked', type => 'comet_numbered', subtype => 'comet numbered' };
+    # Unpacked numbered comet "1P" or "354P" or "73P-A"
+    if ($des =~ /^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
+        my $fragment = $3 // '';
+        my $subtype;
+        if ($fragment eq '') {
+            $subtype = 'comet numbered';
+        } elsif (length($fragment) == 1) {
+            $subtype = 'comet numbered with fragment';
+        } else {
+            $subtype = 'comet numbered with 2-letter fragment';
+        }
+        return { format => 'unpacked', type => 'comet_numbered', subtype => $subtype };
     }
 
     die "Unable to detect designation format: $designation\n";
@@ -882,6 +944,265 @@ sub unpack {
     my $info = detect_format($designation);
     return $designation =~ s/^\s+|\s+$//gr if $info->{format} eq 'unpacked';
     return convert($designation)->{output};
+}
+
+# =============================================================================
+# Helper Functions for Format Conversion and Fragment Handling
+# =============================================================================
+
+# Convert minimal packed format to 12-character MPC report format.
+# The 12-character format is used in MPC observation records (columns 1-12).
+# For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+sub to_report_format {
+    my ($minimal) = @_;
+    $minimal =~ s/^\s+|\s+$//g;
+    my $length = length($minimal);
+
+    my $info = detect_format($minimal);
+
+    die "to_report_format requires packed format input: $minimal\n"
+        unless $info->{format} eq 'packed';
+
+    # Initialize 12-char output with spaces
+    my $report = ' ' x 12;
+
+    my $type = $info->{type};
+
+    if ($type eq 'permanent') {
+        # Right-align 5-char designation
+        substr($report, 12 - $length, $length) = $minimal;
+    }
+    elsif ($type eq 'provisional' || $type eq 'provisional_extended' || $type eq 'survey') {
+        # Right-align 7-char designation
+        substr($report, 12 - $length, $length) = $minimal;
+    }
+    elsif ($type eq 'comet_numbered') {
+        # Numbered comet: first 5 chars (####P), fragment in cols 11-12
+        if ($length == 5) {
+            # No fragment
+            substr($report, 0, 5) = $minimal;
+        } elsif ($length == 6) {
+            # Single-letter fragment
+            substr($report, 0, 5) = substr($minimal, 0, 5);
+            substr($report, 11, 1) = substr($minimal, 5, 1);
+        } elsif ($length == 7) {
+            # Two-letter fragment
+            substr($report, 0, 5) = substr($minimal, 0, 5);
+            substr($report, 10, 2) = substr($minimal, 5, 2);
+        }
+    }
+    elsif ($type eq 'comet_provisional' || $type eq 'comet_full' ||
+           $type eq 'comet_ancient' || $type eq 'comet_bce') {
+        # Right-align in 12-char field
+        substr($report, 12 - $length, $length) = $minimal;
+    }
+    elsif ($type eq 'satellite') {
+        # Right-align 8-char designation
+        substr($report, 12 - $length, $length) = $minimal;
+    }
+    else {
+        die "Unsupported type for report format: $type\n";
+    }
+
+    return $report;
+}
+
+# Convert 12-character MPC report format to minimal packed format.
+sub from_report_format {
+    my ($report) = @_;
+
+    die "Report format too long: $report\n" if length($report) > 12;
+
+    # Pad to 12 chars if shorter
+    $report = ' ' x (12 - length($report)) . $report while length($report) < 12;
+
+    # Check for numbered comet with fragment (fragment in cols 11-12)
+    my $first5 = substr($report, 0, 5);
+    my $middle = substr($report, 5, 5);
+    my $frag1 = substr($report, 10, 1);
+    my $frag2 = substr($report, 11, 1);
+
+    # Check if this is a numbered comet format
+    if ($first5 =~ /^[0-9]{4}[PD]$/) {
+        my $middle_trimmed = $middle;
+        $middle_trimmed =~ s/^\s+|\s+$//g;
+        if ($middle_trimmed eq '') {
+            my $result = $first5;
+            $result .= $frag1 if $frag1 ge 'a' && $frag1 le 'z';
+            $result .= $frag2 if $frag2 ge 'a' && $frag2 le 'z';
+            return $result;
+        }
+    }
+
+    # Standard case: just trim spaces
+    $report =~ s/^\s+|\s+$//g;
+    return $report;
+}
+
+# Check if a designation has a comet fragment suffix.
+# Works with both packed and unpacked formats.
+sub has_fragment {
+    my ($desig) = @_;
+
+    my $info;
+    eval { $info = detect_format($desig); };
+    return 0 if $@;
+
+    my $dtype = $info->{type};
+
+    # Only comets can have fragments
+    return 0 unless $dtype eq 'comet_numbered' || $dtype eq 'comet_provisional' || $dtype eq 'comet_full';
+
+    $desig =~ s/^\s+|\s+$//g;
+    my $length = length($desig);
+
+    if ($info->{format} eq 'unpacked') {
+        # Look for "-X" or "-XX" at end
+        return $desig =~ /-[A-Z]{1,2}$/ ? 1 : 0;
+    } else {
+        # Packed format
+        if ($dtype eq 'comet_numbered') {
+            # Check for lowercase after P/D (position 5+)
+            if ($length > 5) {
+                my $c = substr($desig, 5, 1);
+                return ($c ge 'a' && $c le 'z') ? 1 : 0;
+            }
+        } elsif ($dtype eq 'comet_provisional') {
+            # 7-char: last char lowercase and not '0'
+            my $last_char = substr($desig, $length - 1, 1);
+            return ($last_char ge 'a' && $last_char le 'z' && $last_char ne '0') ? 1 : 0;
+        } elsif ($dtype eq 'comet_full') {
+            my $last_char = substr($desig, $length - 1, 1);
+            return ($last_char ge 'a' && $last_char le 'z' && $last_char ne '0') ? 1 : 0;
+        }
+    }
+    return 0;
+}
+
+# Extract the fragment suffix from a comet designation.
+# Works with both packed and unpacked formats.
+# Fragment is returned in uppercase (e.g., "A", "AA").
+# Returns empty string if no fragment.
+sub get_fragment {
+    my ($desig) = @_;
+
+    my $info = detect_format($desig);
+    my $dtype = $info->{type};
+
+    # Only comets can have fragments
+    return '' unless $dtype eq 'comet_numbered' || $dtype eq 'comet_provisional' || $dtype eq 'comet_full';
+
+    $desig =~ s/^\s+|\s+$//g;
+    my $length = length($desig);
+
+    if ($info->{format} eq 'unpacked') {
+        # Look for "-X" or "-XX" at end
+        if ($desig =~ /-([A-Z]{1,2})$/) {
+            return $1;
+        }
+    } else {
+        # Packed format
+        if ($dtype eq 'comet_numbered') {
+            # Fragment is lowercase after P/D
+            if ($length == 6) {
+                return uc(substr($desig, 5, 1));
+            } elsif ($length == 7) {
+                return uc(substr($desig, 5, 2));
+            }
+        } elsif ($dtype eq 'comet_provisional') {
+            # 7-char: position 6 if lowercase and not '0'
+            # 8-char: positions 6-7 if lowercase
+            if ($length == 7) {
+                my $last_char = substr($desig, 6, 1);
+                return uc($last_char) if $last_char ge 'a' && $last_char le 'z' && $last_char ne '0';
+            } elsif ($length == 8) {
+                my $frag = substr($desig, 6, 2);
+                return uc($frag) if substr($frag, 0, 1) ge 'a' && substr($frag, 0, 1) le 'z' &&
+                                    substr($frag, 1, 1) ge 'a' && substr($frag, 1, 1) le 'z';
+            }
+        } elsif ($dtype eq 'comet_full') {
+            # 8-char: position 7 if lowercase and not '0'
+            # 9-char: positions 7-8 if lowercase
+            if ($length == 8) {
+                my $last_char = substr($desig, 7, 1);
+                return uc($last_char) if $last_char ge 'a' && $last_char le 'z' && $last_char ne '0';
+            } elsif ($length == 9) {
+                my $frag = substr($desig, 7, 2);
+                return uc($frag) if substr($frag, 0, 1) ge 'a' && substr($frag, 0, 1) le 'z' &&
+                                    substr($frag, 1, 1) ge 'a' && substr($frag, 1, 1) le 'z';
+            }
+        }
+    }
+
+    return '';
+}
+
+# Get the parent comet designation (without fragment suffix).
+# Works with both packed and unpacked formats.
+# Returns the designation in the same format (packed or unpacked) as input.
+sub get_parent {
+    my ($desig) = @_;
+
+    my $info = detect_format($desig);
+    my $dtype = $info->{type};
+
+    # Non-comets: return as-is
+    $desig =~ s/^\s+|\s+$//g;
+    return $desig unless $dtype eq 'comet_numbered' || $dtype eq 'comet_provisional' || $dtype eq 'comet_full';
+
+    my $length = length($desig);
+
+    if ($info->{format} eq 'unpacked') {
+        # Remove "-X" or "-XX" suffix if present
+        $desig =~ s/-[A-Z]{1,2}$//;
+        return $desig;
+    } else {
+        # Packed format
+        if ($dtype eq 'comet_numbered') {
+            # Remove lowercase fragment letters after P/D
+            if ($length > 5) {
+                my $c = substr($desig, 5, 1);
+                return substr($desig, 0, 5) if $c ge 'a' && $c le 'z';
+            }
+        } elsif ($dtype eq 'comet_provisional') {
+            # 7-char: replace lowercase fragment with '0'
+            # 8-char: replace 2 lowercase with '0', truncate
+            if ($length == 7) {
+                my $last_char = substr($desig, 6, 1);
+                return substr($desig, 0, 6) . '0' if $last_char ge 'a' && $last_char le 'z' && $last_char ne '0';
+            } elsif ($length == 8) {
+                my $c = substr($desig, 6, 1);
+                return substr($desig, 0, 6) . '0' if $c ge 'a' && $c le 'z';
+            }
+        } elsif ($dtype eq 'comet_full') {
+            # 8-char: replace fragment with '0'
+            # 9-char: replace fragment with '0', truncate
+            if ($length == 8) {
+                my $last_char = substr($desig, 7, 1);
+                return substr($desig, 0, 7) . '0' if $last_char ge 'a' && $last_char le 'z' && $last_char ne '0';
+            } elsif ($length == 9) {
+                my $c = substr($desig, 7, 1);
+                return substr($desig, 0, 7) . '0' if $c ge 'a' && $c le 'z';
+            }
+        }
+    }
+
+    return $desig;
+}
+
+# Check if two designations refer to the same object.
+# Normalizes both designations to packed format and compares them.
+sub designations_equal {
+    my ($desig1, $desig2) = @_;
+
+    my ($packed1, $packed2);
+    eval {
+        $packed1 = &pack($desig1);
+        $packed2 = &pack($desig2);
+    };
+    return 0 if $@;
+
+    return $packed1 eq $packed2 ? 1 : 0;
 }
 
 1;

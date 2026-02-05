@@ -86,6 +86,14 @@ public:
     // Validation
     static bool isValid(const std::string& designation) noexcept;
 
+    // Helper functions for format conversion and fragment handling
+    static std::string toReportFormat(const std::string& minimal);
+    static std::string fromReportFormat(const std::string& report);
+    static bool hasFragment(const std::string& designation);
+    static std::string getFragment(const std::string& designation);
+    static std::string getParent(const std::string& designation);
+    static bool designationsEqual(const std::string& d1, const std::string& d2);
+
     // Low-level functions for permanent asteroids
     static std::string packPermanent(long number);
     static long unpackPermanent(const std::string& packed);

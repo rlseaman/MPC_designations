@@ -32,7 +32,7 @@ make test-roundtrip CSV=../test-data/prov_unpack_to_pack.csv  # Run roundtrip te
 
 ## Performance
 
-Tested with 2,021,090 entries:
+Tested with 2,022,404 entries:
 
 | Operation | Time | Rate |
 |-----------|------|------|
@@ -45,12 +45,50 @@ Tested with 2,021,090 entries:
 - Provisional asteroids (standard and old-style A/B prefix)
 - Extended provisional (underscore format for cycle >= 620)
 - Survey designations (P-L, T-1, T-2, T-3)
-- Numbered comets
+- Numbered comets (including fragments like 73P-A, 73P-AA)
 - Provisional comets (including fragments)
 - Ancient comets (year < 1000)
 - Natural satellites
 
+## Helper Functions
+
+### Format Conversion
+
+```nim
+# Convert minimal packed format to 12-character MPC report format
+toReportFormat("0073Pa")   # "0073P      a"
+toReportFormat("00001")    # "       00001"
+
+# Convert 12-character MPC report format to minimal packed format
+fromReportFormat("0073P      a")  # "0073Pa"
+fromReportFormat("       00001")  # "00001"
+```
+
+### Fragment Handling
+
+```nim
+# Check if designation has a comet fragment
+hasFragment("73P-A")   # true
+hasFragment("73P")     # false
+
+# Extract fragment suffix (returns uppercase)
+getFragment("73P-A")   # "A"
+getFragment("73P-AA")  # "AA"
+
+# Get parent comet without fragment
+getParent("73P-A")     # "73P"
+getParent("0073Pa")    # "0073P"
+```
+
+### Designation Comparison
+
+```nim
+# Compare designations (normalizes to packed format)
+designationsEqual("1995 XA", "J95X00A")  # true (same object)
+designationsEqual("73P-A", "0073Pa")     # true (same object)
+designationsEqual("73P-A", "73P-B")      # false (different fragments)
+```
+
 ## Limitations
 
 - BCE years not supported (12 entries in test data)
-- Old-style unpacked format (A908 CJ) outputs as modern format (1908 CJ)

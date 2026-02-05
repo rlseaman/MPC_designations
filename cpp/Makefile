@@ -15,13 +15,14 @@ CLI = mpc_designation
 TEST_CSV = test_csv
 TEST_ERRORS = test_errors
 TEST_ROUNDTRIP = test_roundtrip
+TEST_HELPERS = test_helpers
 
 # Test data paths
 TEST_DATA_DIR = ../test-data
 CSV_FILE = $(TEST_DATA_DIR)/prov_unpack_to_pack.csv
 ERROR_FILE = $(TEST_DATA_DIR)/error_test_cases.csv
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all help
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all help
 
 # Default: build CLI
 all: $(CLI)
@@ -40,6 +41,9 @@ $(TEST_ERRORS): $(LIB_SRC) $(TEST_DIR)/test_errors.cpp
 $(TEST_ROUNDTRIP): $(LIB_SRC) $(TEST_DIR)/test_roundtrip.cpp
 	$(CXX) $(CXXFLAGS) -o $@ $^
 
+$(TEST_HELPERS): $(LIB_SRC) $(TEST_DIR)/test_helpers.cpp
+	$(CXX) $(CXXFLAGS) -o $@ $^
+
 # Ensure test data is decompressed
 $(CSV_FILE): $(CSV_FILE).gz
 	gunzip -k $<
@@ -49,7 +53,7 @@ test: test-errors test-csv
 	@echo ""
 	@echo "=== All C++ Tests Complete ==="
 
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-helpers test-csv test-roundtrip
 	@echo ""
 	@echo "=== All C++ Tests Complete ==="
 
@@ -68,9 +72,14 @@ test-roundtrip: $(TEST_ROUNDTRIP) $(CSV_FILE)
 	@echo "--- C++ Roundtrip Tests ---"
 	./$(TEST_ROUNDTRIP) $(CSV_FILE)
 
+# Run helper function tests
+test-helpers: $(TEST_HELPERS)
+	@echo "--- C++ Helper Tests ---"
+	./$(TEST_HELPERS)
+
 # Clean
 clean:
-	rm -f $(CLI) $(TEST_CSV) $(TEST_ERRORS) $(TEST_ROUNDTRIP)
+	rm -f $(CLI) $(TEST_CSV) $(TEST_ERRORS) $(TEST_ROUNDTRIP) $(TEST_HELPERS)
 
 # Help
 help:

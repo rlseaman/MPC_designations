@@ -129,6 +129,81 @@ Ensure a designation is in unpacked format.
 
 Check if a string is a valid MPC designation.
 
+### Helper Functions
+
+#### `MPCDesignation.to_report_format(minimal) -> String`
+
+Convert minimal packed format to 12-character MPC report format.
+
+#### `MPCDesignation.from_report_format(report) -> String`
+
+Convert 12-character MPC report format to minimal packed format.
+
+#### `MPCDesignation.has_fragment?(desig) -> Boolean`
+
+Check if a designation has a comet fragment suffix.
+
+#### `MPCDesignation.get_fragment(desig) -> String`
+
+Extract fragment suffix (uppercase) from a comet designation.
+
+#### `MPCDesignation.get_parent(desig) -> String`
+
+Get parent designation without fragment.
+
+#### `MPCDesignation.designations_equal?(d1, d2) -> Boolean`
+
+Compare designations across different formats.
+
+## Helper Function Examples
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+```ruby
+require_relative 'src/mpc_designation'
+
+# Minimal to 12-char report format
+MPCDesignation.to_report_format('0073Pa')   # '0073P      a'
+MPCDesignation.to_report_format('00001')    # '       00001'
+
+# 12-char report format to minimal
+MPCDesignation.from_report_format('0073P      a')  # '0073Pa'
+MPCDesignation.from_report_format('       00001')  # '00001'
+```
+
+### Fragment Extraction
+
+```ruby
+require_relative 'src/mpc_designation'
+
+# Check if designation has a fragment
+MPCDesignation.has_fragment?('73P-A')   # true
+MPCDesignation.has_fragment?('73P')     # false
+MPCDesignation.has_fragment?('0073Pa')  # true (packed)
+
+# Extract fragment (uppercase)
+MPCDesignation.get_fragment('73P-A')    # 'A'
+MPCDesignation.get_fragment('73P-AA')   # 'AA'
+MPCDesignation.get_fragment('0073Paa')  # 'AA'
+
+# Get parent comet
+MPCDesignation.get_parent('73P-A')   # '73P'
+MPCDesignation.get_parent('0073Pa')  # '0073P'
+```
+
+### Designation Comparison
+
+```ruby
+require_relative 'src/mpc_designation'
+
+# Same object, different formats
+MPCDesignation.designations_equal?('1995 XA', 'J95X00A')  # true
+MPCDesignation.designations_equal?('73P-A', '0073Pa')     # true
+
+# Different objects
+MPCDesignation.designations_equal?('73P-A', '73P-B')      # false
+```
+
 ### Exceptions
 
 #### `MPCDesignation::Error`

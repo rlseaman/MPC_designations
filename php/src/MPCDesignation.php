@@ -312,8 +312,27 @@ class MPCDesignation {
             throw new MPCDesignationException("Invalid century code: $century");
         }
 
+        // For asteroid provisionals, only I-L (1800-2199) are valid century codes
+        if ($century !== 'I' && $century !== 'J' && $century !== 'K' && $century !== 'L') {
+            throw new MPCDesignationException(
+                "Invalid century code for asteroid provisional: $century (must be I-L for years 1800-2199)"
+            );
+        }
+
         $fullYear = self::CENTURY_CODES[$century] . $year;
         $orderNum = self::decodeCycleCount($orderEncoded);
+
+        // Pre-1925 designations use A-prefix format (e.g., "A908 CJ" for J08C00J)
+        $fullYearInt = (int)$fullYear;
+        if ($fullYearInt < 1925) {
+            // Determine prefix: A for 1xxx, B for 2xxx (would be B0xx etc, but 2xxx years < 1925 don't exist)
+            $prefix = $fullYearInt < 2000 ? 'A' : 'B';
+            $shortYear = substr($fullYear, 1, 3); // Last 3 digits of year
+            if ($orderNum === 0) {
+                return "$prefix$shortYear $halfMonth$secondLetter";
+            }
+            return "$prefix$shortYear $halfMonth$secondLetter$orderNum";
+        }
 
         if ($orderNum === 0) {
             return "$fullYear $halfMonth$secondLetter";
@@ -375,6 +394,14 @@ class MPCDesignation {
         }
 
         $centuryCode = $reverseCenturyCodes[$century];
+
+        // Validate year range for asteroid provisionals (1800-2199)
+        $yearInt = (int)$year;
+        if ($yearInt < 1800 || $yearInt > 2199) {
+            throw new MPCDesignationException(
+                "Year out of range for asteroid provisional: $year (must be 1800-2199)"
+            );
+        }
 
         if ($orderStr === '') {
             $orderNum = 0;
@@ -504,30 +531,40 @@ class MPCDesignation {
     public static function unpackCometNumbered(string $packed): string {
         $p = trim($packed);
 
-        if (!preg_match('/^(\d{4})([PD])$/', $p, $matches)) {
+        if (!preg_match('/^(\d{4})([PD])([a-z]{1,2})?$/', $p, $matches)) {
             throw new MPCDesignationException("Invalid packed numbered comet designation");
         }
 
         $number = (int)$matches[1];
         $cometType = $matches[2];
+        $fragment = $matches[3] ?? '';
+
+        if ($fragment !== '') {
+            return "$number$cometType-" . strtoupper($fragment);
+        }
         return "$number$cometType";
     }
 
     public static function packCometNumbered(string $unpacked): string {
         $u = trim($unpacked);
 
-        if (!preg_match('/^(\d+)([PD])(?:\/[A-Za-z].*)?$/', $u, $matches)) {
+        if (!preg_match('/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $u, $matches)) {
             throw new MPCDesignationException("Invalid unpacked numbered comet designation");
         }
 
         $number = (int)$matches[1];
         $cometType = $matches[2];
+        $fragment = $matches[3] ?? '';
 
         if ($number < 1 || $number > 9999) {
             throw new MPCDesignationException("Comet number out of range (1-9999): $number");
         }
 
-        return str_pad((string)$number, 4, '0', STR_PAD_LEFT) . $cometType;
+        $result = str_pad((string)$number, 4, '0', STR_PAD_LEFT) . $cometType;
+        if ($fragment !== '') {
+            $result .= strtolower($fragment);
+        }
+        return $result;
     }
 
     // =========================================================================
@@ -886,6 +923,15 @@ class MPCDesignation {
             }
         }
 
+        // Check for packed numbered comet with fragment (6 or 7 chars: 0073Pa or 0073Paa)
+        if (strlen($des) === 6 || strlen($des) === 7) {
+            if (preg_match('/^[0-9]{4}[PD][a-z]{1,2}$/', $des)) {
+                $cometType = $des[4];
+                $typeDesc = self::COMET_TYPE_DESCRIPTIONS[$cometType] ?? $cometType;
+                return new FormatInfo('packed', 'comet_numbered', "comet numbered $typeDesc with fragment");
+            }
+        }
+
         // Check for packed provisional asteroid (7 chars)
         if (strlen($des) === 7) {
             if ($des[0] === '_') {
@@ -970,11 +1016,15 @@ class MPCDesignation {
             return new FormatInfo('unpacked', 'comet_full', $subtype);
         }
 
-        // Check for unpacked numbered periodic comet
-        if (preg_match('/^(\d+)([PD])(?:\/[A-Za-z].*)?$/', $des, $matches)) {
+        // Check for unpacked numbered periodic comet (with optional fragment)
+        if (preg_match('/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $des, $matches)) {
             $cometType = $matches[2];
+            $fragment = $matches[3] ?? '';
             $typeDesc = self::COMET_TYPE_DESCRIPTIONS[$cometType] ?? $cometType;
-            return new FormatInfo('unpacked', 'comet_numbered', "comet numbered $typeDesc");
+            $subtype = $fragment !== ''
+                ? "comet numbered $typeDesc with fragment"
+                : "comet numbered $typeDesc";
+            return new FormatInfo('unpacked', 'comet_numbered', $subtype);
         }
 
         throw new MPCDesignationException("Unable to detect designation format: $designation");
@@ -1054,6 +1104,146 @@ class MPCDesignation {
         try {
             self::detectFormat($designation);
             return true;
+        } catch (MPCDesignationException $e) {
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // Helper functions for report format and fragment handling
+    // =========================================================================
+
+    /**
+     * Convert a packed (minimal) designation to 12-character MPC report format.
+     * Pads asteroids/provisionals on the left, comets on the right.
+     */
+    public static function toReportFormat(string $designation): string {
+        $packed = self::pack($designation);
+        $info = self::detectFormat($packed);
+
+        // Numbered comets: right-pad to 12 chars (format: "0073P       ")
+        // Handle fragments: "0073Pa" -> "0073P      a", "0073Paa" -> "0073P     aa"
+        if ($info->type === 'comet_numbered') {
+            if (preg_match('/^(\d{4}[PD])([a-z]{1,2})?$/', $packed, $matches)) {
+                $basePart = $matches[1];  // "0073P"
+                $fragment = $matches[2] ?? '';
+                if ($fragment !== '') {
+                    // Fragment goes at the end, base part stays at beginning
+                    $padding = 12 - strlen($basePart) - strlen($fragment);
+                    return $basePart . str_repeat(' ', $padding) . $fragment;
+                }
+                return str_pad($basePart, 12);
+            }
+        }
+
+        // Everything else (asteroids, provisionals, surveys): left-pad to 12 chars
+        return str_pad($packed, 12, ' ', STR_PAD_LEFT);
+    }
+
+    /**
+     * Convert a 12-character MPC report format to minimal packed format.
+     * Strips padding from asteroids/provisionals and comets.
+     */
+    public static function fromReportFormat(string $reportFormat): string {
+        if (strlen($reportFormat) !== 12) {
+            throw new MPCDesignationException("Report format must be exactly 12 characters");
+        }
+
+        // Check for numbered comet format (starts with 4 digits + P/D)
+        if (preg_match('/^(\d{4}[PD])(\s*)([a-z]{0,2})$/', $reportFormat, $matches)) {
+            $basePart = $matches[1];
+            $fragment = $matches[3];
+            return $basePart . $fragment;
+        }
+
+        // For everything else, just trim whitespace
+        return trim($reportFormat);
+    }
+
+    /**
+     * Check if a comet designation has a fragment suffix.
+     * Works with both packed and unpacked formats.
+     */
+    public static function hasFragment(string $designation): bool {
+        $desig = trim($designation);
+
+        // Unpacked format with fragment: "73P-A", "73P-AA", "D/1993 F2-A"
+        if (preg_match('/-[A-Z]{1,2}$/', $desig)) {
+            return true;
+        }
+
+        // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+        if (preg_match('/^\d{4}[PD][a-z]{1,2}$/', $desig)) {
+            return true;
+        }
+
+        // Packed provisional comet with fragment: "DJ93F02a" (8 chars: type + provisional + fragment)
+        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]$/', $desig)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Get the fragment letter(s) from a comet designation.
+     * Returns uppercase letter(s) or empty string if no fragment.
+     */
+    public static function getFragment(string $designation): string {
+        $desig = trim($designation);
+
+        // Unpacked format: "73P-A" -> "A", "73P-AA" -> "AA"
+        if (preg_match('/-([A-Z]{1,2})$/', $desig, $matches)) {
+            return $matches[1];
+        }
+
+        // Packed numbered comet: "0073Pa" -> "A", "0073Paa" -> "AA"
+        if (preg_match('/^\d{4}[PD]([a-z]{1,2})$/', $desig, $matches)) {
+            return strtoupper($matches[1]);
+        }
+
+        // Packed provisional comet: "DJ93F02a" -> "A" (8 chars: type + provisional + fragment)
+        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z])$/', $desig, $matches)) {
+            return strtoupper($matches[1]);
+        }
+
+        return '';
+    }
+
+    /**
+     * Get the parent comet designation without fragment suffix.
+     * For non-comets or comets without fragments, returns the input as-is.
+     */
+    public static function getParent(string $designation): string {
+        $desig = trim($designation);
+
+        // Unpacked format: "73P-A" -> "73P"
+        if (preg_match('/^(.+)-[A-Z]{1,2}$/', $desig, $matches)) {
+            return $matches[1];
+        }
+
+        // Packed numbered comet: "0073Pa" -> "0073P"
+        if (preg_match('/^(\d{4}[PD])[a-z]{1,2}$/', $desig, $matches)) {
+            return $matches[1];
+        }
+
+        // Packed provisional comet: "DJ93F02a" -> "DJ93F020"
+        if (preg_match('/^([A-L]\d{2}[A-Z]\d{2})[a-z]$/', $desig, $matches)) {
+            return $matches[1] . '0';
+        }
+
+        return $desig;
+    }
+
+    /**
+     * Check if two designations refer to the same object.
+     * Normalizes both designations to packed format and compares them.
+     */
+    public static function designationsEqual(string $desig1, string $desig2): bool {
+        try {
+            $packed1 = self::pack($desig1);
+            $packed2 = self::pack($desig2);
+            return $packed1 === $packed2;
         } catch (MPCDesignationException $e) {
             return false;
         }

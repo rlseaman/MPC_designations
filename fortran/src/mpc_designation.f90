@@ -20,6 +20,9 @@ module mpc_designation
     public :: unpack_extended_provisional, unpack_ancient_comet_provisional
     public :: format_info, conversion_result
     public :: clear_error
+    ! Helper functions
+    public :: to_report_format, from_report_format
+    public :: has_fragment, get_fragment, get_parent, designations_equal
 
     ! Constants
     character(len=*), parameter, public :: VERSION = '1.0.0'
@@ -481,7 +484,17 @@ contains
             return
         end if
 
-        if (order_num == 0) then
+        ! Pre-1925 designations use A-prefix format
+        if (century_val * 100 + (ichar(year_str(1:1)) - ichar('0')) * 10 + &
+            (ichar(year_str(2:2)) - ichar('0')) < 1925) then
+            if (order_num == 0) then
+                write(unpacked, '(A1,I1,A2,A1,A1,A1)') 'A', mod(century_val, 10), &
+                    year_str, ' ', half_month, second_letter
+            else
+                write(unpacked, '(A1,I1,A2,A1,A1,A1,I0)') 'A', mod(century_val, 10), &
+                    year_str, ' ', half_month, second_letter, order_num
+            end if
+        else if (order_num == 0) then
             write(unpacked, '(I2,A2,A1,A1,A1)') century_val, year_str, ' ', half_month, second_letter
         else
             write(unpacked, '(I2,A2,A1,A1,A1,I0)') century_val, year_str, ' ', half_month, second_letter, order_num
@@ -617,18 +630,19 @@ contains
         call set_error('pack_comet_provisional not fully implemented')
     end function pack_comet_provisional
 
-    !> Unpack numbered comet
+    !> Unpack numbered comet (with optional fragment)
     function unpack_comet_numbered(packed) result(unpacked)
         character(len=*), intent(in) :: packed
-        character(len=10) :: unpacked
+        character(len=15) :: unpacked
         character(len=10) :: p
-        integer :: num, ios
-        character(len=1) :: ctype
+        integer :: num, ios, plen
+        character(len=1) :: ctype, frag1, frag2
 
         call clear_error()
         p = trim_str(packed)
+        plen = len_trim(p)
 
-        if (len_trim(p) /= 5) then
+        if (plen < 5 .or. plen > 7) then
             call set_error('Invalid packed numbered comet designation')
             unpacked = ''
             return
@@ -648,22 +662,39 @@ contains
             return
         end if
 
-        write(unpacked, '(I0,A1)') num, ctype
+        ! Check for fragment (6-7 chars)
+        if (plen >= 6 .and. is_lower(p(6:6))) then
+            frag1 = char(ichar(p(6:6)) - 32)  ! Convert to uppercase
+            if (plen == 7 .and. is_lower(p(7:7))) then
+                ! Two-letter fragment
+                frag2 = char(ichar(p(7:7)) - 32)
+                write(unpacked, '(I0,A1,A1,A1,A1)') num, ctype, '-', frag1, frag2
+            else
+                ! Single-letter fragment
+                write(unpacked, '(I0,A1,A1,A1)') num, ctype, '-', frag1
+            end if
+        else
+            write(unpacked, '(I0,A1)') num, ctype
+        end if
     end function unpack_comet_numbered
 
-    !> Pack numbered comet
+    !> Pack numbered comet (with optional fragment)
     function pack_comet_numbered(unpacked) result(packed)
         character(len=*), intent(in) :: unpacked
-        character(len=5) :: packed
+        character(len=7) :: packed
         character(len=20) :: u
-        integer :: i, num, ios
-        character(len=1) :: ctype
+        integer :: i, num, ios, dash_pos, ulen
+        character(len=1) :: ctype, frag1, frag2
 
         call clear_error()
         u = trim_str(unpacked)
+        ulen = len_trim(u)
+
+        ! Find the dash for fragment
+        dash_pos = index(u, '-')
 
         ! Find the P or D
-        do i = 1, len_trim(u)
+        do i = 1, ulen
             if (u(i:i) == 'P' .or. u(i:i) == 'D') then
                 ctype = u(i:i)
                 read(u(1:i-1), '(I10)', iostat=ios) num
@@ -677,7 +708,21 @@ contains
                     packed = ''
                     return
                 end if
-                write(packed, '(I4.4,A1)') num, ctype
+
+                ! Check for fragment
+                if (dash_pos > 0 .and. dash_pos < ulen) then
+                    frag1 = char(ichar(u(dash_pos+1:dash_pos+1)) + 32)  ! Convert to lowercase
+                    if (dash_pos + 2 <= ulen .and. is_upper(u(dash_pos+2:dash_pos+2))) then
+                        ! Two-letter fragment
+                        frag2 = char(ichar(u(dash_pos+2:dash_pos+2)) + 32)
+                        write(packed, '(I4.4,A1,A1,A1)') num, ctype, frag1, frag2
+                    else
+                        ! Single-letter fragment
+                        write(packed, '(I4.4,A1,A1)') num, ctype, frag1
+                    end if
+                else
+                    write(packed, '(I4.4,A1)') num, ctype
+                end if
                 return
             end if
         end do
@@ -877,7 +922,7 @@ contains
         character(len=*), intent(in) :: designation
         type(format_info) :: info
         character(len=80) :: des
-        integer :: dlen
+        integer :: dlen, i
         character(len=1) :: first
         logical :: valid
 
@@ -923,6 +968,18 @@ contains
                 info%dtype = 'comet_numbered'
                 info%subtype = 'comet numbered'
                 return
+            end if
+        end if
+
+        ! Packed numbered comet with fragment (6 or 7 chars)
+        if (dlen == 6 .or. dlen == 7) then
+            if (is_all_digits(des(1:4)) .and. (des(5:5) == 'P' .or. des(5:5) == 'D') .and. is_lower(des(6:6))) then
+                if (dlen == 6 .or. (dlen == 7 .and. is_lower(des(7:7)))) then
+                    info%format = 'packed'
+                    info%dtype = 'comet_numbered'
+                    info%subtype = 'comet numbered with fragment'
+                    return
+                end if
             end if
         end if
 
@@ -1014,13 +1071,33 @@ contains
             return
         end if
 
-        ! Unpacked numbered comet: "NP" or "ND"
-        if (dlen >= 2 .and. dlen <= 5) then
-            if (is_all_digits(des(1:dlen-1)) .and. (des(dlen:dlen) == 'P' .or. des(dlen:dlen) == 'D')) then
-                info%format = 'unpacked'
-                info%dtype = 'comet_numbered'
-                info%subtype = 'comet numbered'
-                return
+        ! Unpacked numbered comet: "NP" or "ND" or "NP-A" or "ND-AA"
+        ! Must NOT contain spaces (to distinguish from surveys like "2040 P-L")
+        if (dlen >= 2 .and. dlen <= 8 .and. index(des(1:dlen), ' ') == 0) then
+            ! Check for fragment: "73P-A" or "73P-AA"
+            i = index(des(1:dlen), '-')
+            if (i > 0 .and. i >= 3) then
+                if (is_all_digits(des(1:i-2)) .and. (des(i-1:i-1) == 'P' .or. des(i-1:i-1) == 'D')) then
+                    ! Check fragment is 1-2 uppercase letters
+                    if (dlen == i + 1 .and. is_upper(des(i+1:i+1))) then
+                        info%format = 'unpacked'
+                        info%dtype = 'comet_numbered'
+                        info%subtype = 'comet numbered with fragment'
+                        return
+                    else if (dlen == i + 2 .and. is_upper(des(i+1:i+1)) .and. is_upper(des(i+2:i+2))) then
+                        info%format = 'unpacked'
+                        info%dtype = 'comet_numbered'
+                        info%subtype = 'comet numbered with 2-letter fragment'
+                        return
+                    end if
+                end if
+            else if (dlen <= 5) then
+                if (is_all_digits(des(1:dlen-1)) .and. (des(dlen:dlen) == 'P' .or. des(dlen:dlen) == 'D')) then
+                    info%format = 'unpacked'
+                    info%dtype = 'comet_numbered'
+                    info%subtype = 'comet numbered'
+                    return
+                end if
             end if
         end if
 
@@ -1597,5 +1674,264 @@ contains
         century = year / 100
         packed = 'S' // get_century_letter(century) // u(5:6) // planet // encode_cycle_count(num) // '0'
     end function pack_satellite_impl
+
+    !> Convert minimal packed format to 12-character report format
+    function to_report_format(minimal) result(report)
+        character(len=*), intent(in) :: minimal
+        character(len=12) :: report
+        integer :: mlen, padding, i
+        character(len=20) :: m
+
+        m = trim_str(minimal)
+        mlen = len_trim(m)
+
+        ! Numbered comet with fragment (6-7 chars: ####P/Df or ####P/Dff)
+        if ((mlen == 6 .or. mlen == 7) .and. is_all_digits(m(1:4)) .and. &
+            (m(5:5) == 'P' .or. m(5:5) == 'D') .and. is_lower(m(6:6))) then
+            report(1:5) = m(1:5)
+            if (mlen == 6) then
+                report(6:11) = '      '
+                report(12:12) = m(6:6)
+            else
+                report(6:10) = '     '
+                report(11:12) = m(6:7)
+            end if
+            return
+        end if
+
+        ! Numbered comet without fragment (5 chars: ####P/D)
+        if (mlen == 5 .and. is_all_digits(m(1:4)) .and. &
+            (m(5:5) == 'P' .or. m(5:5) == 'D')) then
+            report(1:5) = m(1:5)
+            report(6:12) = '       '
+            return
+        end if
+
+        ! Standard format: right-align to 12 chars
+        padding = 12 - mlen
+        if (padding > 0) then
+            do i = 1, padding
+                report(i:i) = ' '
+            end do
+            report(padding+1:12) = m(1:mlen)
+        else
+            report = m(1:12)
+        end if
+    end function to_report_format
+
+    !> Convert 12-character report format to minimal packed format
+    function from_report_format(report) result(minimal)
+        character(len=*), intent(in) :: report
+        character(len=12) :: minimal
+        integer :: rlen, i, j
+        character(len=12) :: r
+
+        r = report
+        rlen = len(r)
+
+        ! Handle numbered comet with fragment in columns 11-12
+        if (rlen >= 5 .and. is_all_digits(r(1:4)) .and. &
+            (r(5:5) == 'P' .or. r(5:5) == 'D')) then
+            minimal(1:5) = r(1:5)
+            j = 6
+            do i = 6, rlen
+                if (r(i:i) /= ' ') then
+                    minimal(j:j) = r(i:i)
+                    j = j + 1
+                end if
+            end do
+            minimal(j:12) = ''
+            return
+        end if
+
+        ! Standard format: strip leading spaces
+        minimal = adjustl(r)
+    end function from_report_format
+
+    !> Check if designation has a comet fragment
+    logical function has_fragment(desig)
+        character(len=*), intent(in) :: desig
+        integer :: dlen, dash_pos, i
+        character(len=40) :: d
+
+        d = trim_str(desig)
+        dlen = len_trim(d)
+        has_fragment = .false.
+
+        if (dlen < 2) return
+
+        ! Unpacked format with dash
+        dash_pos = index(d(1:dlen), '-')
+        if (dash_pos > 0) then
+            ! Numbered comet with fragment
+            if (dash_pos >= 3 .and. (d(dash_pos-1:dash_pos-1) == 'P' .or. &
+                d(dash_pos-1:dash_pos-1) == 'D')) then
+                has_fragment = .true.
+                return
+            end if
+            ! Provisional comet with fragment
+            if (dlen >= 7 .and. d(2:2) == '/' .and. &
+                index(COMET_TYPES, d(1:1)) > 0) then
+                has_fragment = .true.
+                return
+            end if
+        end if
+
+        ! Packed numbered comet with fragment (6-7 chars)
+        if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
+            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            if (dlen == 6 .or. (dlen == 7 .and. is_lower(d(7:7)))) then
+                has_fragment = .true.
+                return
+            end if
+        end if
+
+        ! Packed provisional comet with fragment (8 chars ending in lowercase)
+        if (dlen == 8 .and. index(COMET_TYPES, d(1:1)) > 0 .and. &
+            index(CENTURY_LETTERS, d(2:2)) > 0 .and. is_lower(d(8:8))) then
+            has_fragment = .true.
+            return
+        end if
+
+        ! Packed provisional comet with 2-letter fragment (9 chars)
+        if (dlen == 9 .and. index(COMET_TYPES, d(1:1)) > 0 .and. &
+            index(CENTURY_LETTERS, d(2:2)) > 0 .and. &
+            is_lower(d(8:8)) .and. is_lower(d(9:9))) then
+            has_fragment = .true.
+            return
+        end if
+    end function has_fragment
+
+    !> Extract fragment suffix from comet designation (returns uppercase)
+    function get_fragment(desig) result(frag)
+        character(len=*), intent(in) :: desig
+        character(len=2) :: frag
+        integer :: dlen, dash_pos
+        character(len=40) :: d
+
+        d = trim_str(desig)
+        dlen = len_trim(d)
+        frag = ''
+
+        if (dlen < 2) return
+
+        ! Unpacked format with dash
+        dash_pos = index(d(1:dlen), '-')
+        if (dash_pos > 0 .and. dash_pos < dlen) then
+            if (is_upper(d(dash_pos+1:dash_pos+1))) then
+                frag(1:1) = d(dash_pos+1:dash_pos+1)
+                if (dash_pos + 2 <= dlen .and. is_upper(d(dash_pos+2:dash_pos+2))) then
+                    frag(2:2) = d(dash_pos+2:dash_pos+2)
+                end if
+            end if
+            return
+        end if
+
+        ! Packed numbered comet with fragment (6-7 chars)
+        if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
+            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            frag(1:1) = char(ichar(d(6:6)) - 32)
+            if (dlen == 7 .and. is_lower(d(7:7))) then
+                frag(2:2) = char(ichar(d(7:7)) - 32)
+            end if
+            return
+        end if
+
+        ! Packed provisional comet with fragment (8 chars)
+        if (dlen == 8 .and. index(COMET_TYPES, d(1:1)) > 0 .and. &
+            index(CENTURY_LETTERS, d(2:2)) > 0 .and. is_lower(d(8:8))) then
+            frag(1:1) = char(ichar(d(8:8)) - 32)
+            return
+        end if
+
+        ! Packed provisional comet with 2-letter fragment (9 chars)
+        if (dlen == 9 .and. index(COMET_TYPES, d(1:1)) > 0 .and. &
+            index(CENTURY_LETTERS, d(2:2)) > 0 .and. &
+            is_lower(d(8:8)) .and. is_lower(d(9:9))) then
+            frag(1:1) = char(ichar(d(8:8)) - 32)
+            frag(2:2) = char(ichar(d(9:9)) - 32)
+            return
+        end if
+    end function get_fragment
+
+    !> Get parent comet designation without fragment
+    function get_parent(desig) result(parent)
+        character(len=*), intent(in) :: desig
+        character(len=40) :: parent
+        integer :: dlen, dash_pos
+        character(len=40) :: d
+
+        d = trim_str(desig)
+        dlen = len_trim(d)
+        parent = d
+
+        if (dlen < 2) return
+
+        ! Unpacked format with dash
+        dash_pos = index(d(1:dlen), '-')
+        if (dash_pos > 0) then
+            ! Numbered comet with fragment
+            if (dash_pos >= 3 .and. (d(dash_pos-1:dash_pos-1) == 'P' .or. &
+                d(dash_pos-1:dash_pos-1) == 'D')) then
+                parent = d(1:dash_pos-1)
+                return
+            end if
+            ! Provisional comet with fragment
+            if (dlen >= 7 .and. d(2:2) == '/' .and. &
+                index(COMET_TYPES, d(1:1)) > 0) then
+                parent = d(1:dash_pos-1)
+                return
+            end if
+        end if
+
+        ! Packed numbered comet with fragment (6-7 chars)
+        if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
+            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            parent = d(1:5)
+            return
+        end if
+
+        ! Packed provisional comet with fragment (8-9 chars)
+        if ((dlen == 8 .or. dlen == 9) .and. index(COMET_TYPES, d(1:1)) > 0 .and. &
+            index(CENTURY_LETTERS, d(2:2)) > 0 .and. is_lower(d(8:8))) then
+            parent = d(1:7) // '0'
+            return
+        end if
+    end function get_parent
+
+    !> Check if two designations refer to the same object
+    logical function designations_equal(d1, d2)
+        character(len=*), intent(in) :: d1, d2
+        character(len=40) :: p1, p2
+        type(format_info) :: info
+
+        designations_equal = .false.
+
+        ! Convert d1 to packed format
+        info = detect_format(d1)
+        if (MPCDesignationError) then
+            call clear_error()
+            return
+        end if
+        if (info%format == 'unpacked') then
+            p1 = convert_simple(d1)
+        else
+            p1 = trim_str(d1)
+        end if
+
+        ! Convert d2 to packed format
+        info = detect_format(d2)
+        if (MPCDesignationError) then
+            call clear_error()
+            return
+        end if
+        if (info%format == 'unpacked') then
+            p2 = convert_simple(d2)
+        else
+            p2 = trim_str(d2)
+        end if
+
+        designations_equal = (trim(p1) == trim(p2))
+    end function designations_equal
 
 end module mpc_designation

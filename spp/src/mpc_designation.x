@@ -113,7 +113,7 @@ procedure mpc_detect (des, format, dtype)
 char	des[ARB]
 int	format, dtype
 
-int	len, i, strlen(), mpc_strchr(), mpc_strstr()
+int	len, i, dashpos, strlen(), mpc_strchr(), mpc_strstr()
 char	first, space
 bool	alldig, mpc_iscent()
 
@@ -169,6 +169,24 @@ begin
 		format = 1
 		dtype = 4
 		return
+	    }
+	}
+
+	# Packed numbered comet with fragment (6 or 7 chars)
+	if (len == 6 || len == 7) {
+	    alldig = true
+	    do i = 1, 4 {
+		if (!IS_DIGIT(des[i]))
+		    alldig = false
+	    }
+	    if (alldig && (des[5] == 'P' || des[5] == 'D') && IS_LOWER(des[6])) {
+		if (len == 7 && !IS_LOWER(des[7])) {
+		    # 7 chars but second fragment not lowercase - not valid
+		} else {
+		    format = 1
+		    dtype = 4
+		    return
+		}
 	    }
 	}
 
@@ -238,17 +256,46 @@ begin
 	    return
 	}
 
-	# Unpacked numbered comet
-	if (len >= 2 && len <= 5) {
-	    alldig = true
-	    do i = 1, len - 1 {
-		if (!IS_DIGIT(des[i]))
-		    alldig = false
+	# Unpacked numbered comet (with optional fragment like "73P-A" or "73P-AA")
+	if (len >= 2 && len <= 8) {
+	    # Check for fragment: "73P-A" or "73P-AA"
+	    dashpos = 0
+	    do i = 1, len {
+		if (des[i] == '-')
+		    dashpos = i
 	    }
-	    if (alldig && (des[len] == 'P' || des[len] == 'D')) {
-		format = 2
-		dtype = 4
-		return
+	    if (dashpos > 0 && dashpos >= 3) {
+		# Has dash, check format before dash
+		alldig = true
+		do i = 1, dashpos - 2 {
+		    if (!IS_DIGIT(des[i]))
+			alldig = false
+		}
+		if (alldig && (des[dashpos - 1] == 'P' || des[dashpos - 1] == 'D')) {
+		    # Check fragment is 1-2 uppercase letters
+		    if (len == dashpos + 1 && IS_UPPER(des[dashpos + 1])) {
+			format = 2
+			dtype = 4
+			return
+		    }
+		    if (len == dashpos + 2 && IS_UPPER(des[dashpos + 1]) && IS_UPPER(des[dashpos + 2])) {
+			format = 2
+			dtype = 4
+			return
+		    }
+		}
+	    } else if (len <= 5) {
+		# No fragment
+		alldig = true
+		do i = 1, len - 1 {
+		    if (!IS_DIGIT(des[i]))
+			alldig = false
+		}
+		if (alldig && (des[len] == 'P' || des[len] == 'D')) {
+		    format = 2
+		    dtype = 4
+		    return
+		}
 	    }
 	}
 
@@ -520,7 +567,21 @@ begin
 	year = mpc_centc (packed[1]) + (packed[2] - '0') * 10 + (packed[3] - '0')
 	order = mpc_deccyc (packed, 5)
 
-	if (order == 0) {
+	# Pre-1925 designations use A-prefix format
+	if (year < 1925) {
+	    if (order == 0) {
+		call sprintf (unpacked, maxch, "A%d %c%c")
+		    call pargi (mod(year, 1000))
+		    call pargc (packed[4])
+		    call pargc (packed[7])
+	    } else {
+		call sprintf (unpacked, maxch, "A%d %c%c%d")
+		    call pargi (mod(year, 1000))
+		    call pargc (packed[4])
+		    call pargc (packed[7])
+		    call pargi (order)
+	    }
+	} else if (order == 0) {
 	    call sprintf (unpacked, maxch, "%d %c%c")
 		call pargi (year)
 		call pargc (packed[4])
@@ -827,37 +888,63 @@ end
 
 
 #---------------------------------------------------------------------------
-# MPC_UNCNUM -- Unpack numbered comet
+# MPC_UNCNUM -- Unpack numbered comet (with optional fragment)
 
 procedure mpc_uncnum (packed, unpacked, maxch)
 
 char	packed[ARB], unpacked[ARB]
 int	maxch
 
-int	num
+int	num, len, strlen()
+char	frag1, frag2
 
 begin
+	len = strlen (packed)
 	num = (packed[1]-'0')*1000 + (packed[2]-'0')*100 +
 	      (packed[3]-'0')*10 + (packed[4]-'0')
 
-	call sprintf (unpacked, maxch, "%d%c")
-	    call pargi (num)
-	    call pargc (packed[5])
+	# Check for fragment (6 or 7 chars)
+	if (len >= 6 && IS_LOWER(packed[6])) {
+	    frag1 = packed[6] - 32  # Convert to uppercase
+	    if (len >= 7 && IS_LOWER(packed[7])) {
+		# Two-letter fragment
+		frag2 = packed[7] - 32
+		call sprintf (unpacked, maxch, "%d%c-%c%c")
+		    call pargi (num)
+		    call pargc (packed[5])
+		    call pargc (frag1)
+		    call pargc (frag2)
+	    } else {
+		# Single-letter fragment
+		call sprintf (unpacked, maxch, "%d%c-%c")
+		    call pargi (num)
+		    call pargc (packed[5])
+		    call pargc (frag1)
+	    }
+	} else {
+	    call sprintf (unpacked, maxch, "%d%c")
+		call pargi (num)
+		call pargc (packed[5])
+	}
 end
 
 
 #---------------------------------------------------------------------------
-# MPC_PKCNUM -- Pack numbered comet
+# MPC_PKCNUM -- Pack numbered comet (with optional fragment)
 
 procedure mpc_pkcnum (unpacked, packed, maxch)
 
 char	unpacked[ARB], packed[ARB]
 int	maxch
 
-int	num, i, len, strlen()
+int	num, i, len, dashpos, mpc_strchr(), strlen()
+char	ctype, frag1, frag2, dash
 
 begin
+	dash = '-'
 	len = strlen (unpacked)
+	dashpos = mpc_strchr (unpacked, dash)
+
 	num = 0
 	i = 1
 	while (IS_DIGIT(unpacked[i])) {
@@ -871,9 +958,35 @@ begin
 	    return
 	}
 
+	# Get comet type (P or D), it's right before the dash or at the end
+	if (dashpos > 0) {
+	    ctype = unpacked[dashpos - 1]
+	} else {
+	    ctype = unpacked[len]
+	}
+
+	# Build packed format
 	call sprintf (packed, maxch, "%04d%c")
 	    call pargi (num)
-	    call pargc (unpacked[len])
+	    call pargc (ctype)
+
+	# Add fragment if present (lowercase)
+	if (dashpos > 0) {
+	    frag1 = unpacked[dashpos + 1]
+	    if (IS_UPPER(frag1)) {
+		packed[6] = frag1 + 32  # Convert to lowercase
+		if (dashpos + 2 <= len && IS_UPPER(unpacked[dashpos + 2])) {
+		    # Two-letter fragment
+		    frag2 = unpacked[dashpos + 2]
+		    packed[7] = frag2 + 32
+		    packed[8] = EOS
+		} else {
+		    packed[7] = EOS
+		}
+	    } else {
+		packed[6] = EOS
+	    }
+	}
 end
 
 
@@ -1669,4 +1782,398 @@ begin
 	do i = len + n, n + 1, -1 {
 	    s[i] = s[i - n]
 	}
+end
+
+
+#---------------------------------------------------------------------------
+# Helper functions for format conversion and fragment handling
+#---------------------------------------------------------------------------
+
+# MPC_TOREP -- Convert minimal packed format to 12-character report format
+
+procedure mpc_torep (minimal, report, maxch)
+
+char	minimal[ARB], report[ARB]
+int	maxch
+
+int	len, i, padding, strlen()
+
+begin
+	len = strlen (minimal)
+
+	# Numbered comet with fragment (6-7 chars: ####P/Df or ####P/Dff)
+	if ((len == 6 || len == 7) &&
+	    IS_DIGIT(minimal[1]) && IS_DIGIT(minimal[2]) &&
+	    IS_DIGIT(minimal[3]) && IS_DIGIT(minimal[4]) &&
+	    (minimal[5] == 'P' || minimal[5] == 'D') && IS_LOWER(minimal[6])) {
+	    # Copy base (0073P)
+	    do i = 1, 5 {
+		report[i] = minimal[i]
+	    }
+	    if (len == 6) {
+		# Single fragment: "0073P      a"
+		do i = 6, 11 {
+		    report[i] = ' '
+		}
+		report[12] = minimal[6]
+	    } else {
+		# Double fragment: "0073P     aa"
+		do i = 6, 10 {
+		    report[i] = ' '
+		}
+		report[11] = minimal[6]
+		report[12] = minimal[7]
+	    }
+	    report[13] = EOS
+	    return
+	}
+
+	# Numbered comet without fragment (5 chars: ####P/D)
+	if (len == 5 && IS_DIGIT(minimal[1]) && IS_DIGIT(minimal[2]) &&
+	    IS_DIGIT(minimal[3]) && IS_DIGIT(minimal[4]) &&
+	    (minimal[5] == 'P' || minimal[5] == 'D')) {
+	    do i = 1, 5 {
+		report[i] = minimal[i]
+	    }
+	    do i = 6, 12 {
+		report[i] = ' '
+	    }
+	    report[13] = EOS
+	    return
+	}
+
+	# Standard format: right-align to 12 chars
+	padding = 12 - len
+	if (padding > 0) {
+	    do i = 1, padding {
+		report[i] = ' '
+	    }
+	    do i = 1, len {
+		report[padding + i] = minimal[i]
+	    }
+	    report[13] = EOS
+	} else {
+	    call strcpy (minimal, report, maxch)
+	}
+end
+
+
+# MPC_FROMREP -- Convert 12-character report format to minimal packed format
+
+procedure mpc_fromrep (report, minimal, maxch)
+
+char	report[ARB], minimal[ARB]
+int	maxch
+
+int	i, j, len, strlen()
+
+begin
+	len = strlen (report)
+
+	# Handle numbered comet with fragment in columns 11-12
+	if (len >= 5 && IS_DIGIT(report[1]) && IS_DIGIT(report[2]) &&
+	    IS_DIGIT(report[3]) && IS_DIGIT(report[4]) &&
+	    (report[5] == 'P' || report[5] == 'D')) {
+	    # Copy base
+	    do i = 1, 5 {
+		minimal[i] = report[i]
+	    }
+	    # Find fragment at end (skip spaces)
+	    j = 6
+	    do i = 6, len {
+		if (report[i] != ' ') {
+		    minimal[j] = report[i]
+		    j = j + 1
+		}
+	    }
+	    minimal[j] = EOS
+	    return
+	}
+
+	# Standard format: strip leading and trailing spaces
+	i = 1
+	while (i <= len && report[i] == ' ')
+	    i = i + 1
+
+	j = 1
+	while (i <= len && report[i] != ' ' && report[i] != EOS) {
+	    minimal[j] = report[i]
+	    i = i + 1
+	    j = j + 1
+	}
+	minimal[j] = EOS
+end
+
+
+# MPC_HASFRAG -- Check if designation has a comet fragment
+
+bool procedure mpc_hasfrag (desig)
+
+char	desig[ARB]
+
+int	len, dashpos, i, strlen()
+
+begin
+	len = strlen (desig)
+	if (len < 2)
+	    return (false)
+
+	# Unpacked format: "73P-A", "73P-AA", "D/1993 F2-A"
+	dashpos = 0
+	do i = 1, len {
+	    if (desig[i] == '-')
+		dashpos = i
+	}
+	if (dashpos > 0) {
+	    # Check if it's a numbered comet with fragment
+	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D')) {
+		# Check digits before type
+		i = 1
+		while (i < dashpos - 1 && IS_DIGIT(desig[i]))
+		    i = i + 1
+		if (i == dashpos - 1)
+		    return (true)
+	    }
+	    # Check if it's a provisional comet with fragment
+	    if (desig[2] == '/' && (desig[1] == 'P' || desig[1] == 'C' ||
+		desig[1] == 'D' || desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I'))
+		return (true)
+	}
+
+	# Packed numbered comet with fragment (6-7 chars)
+	if ((len == 6 || len == 7) &&
+	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
+	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
+	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    if (len == 6)
+		return (true)
+	    if (len == 7 && IS_LOWER(desig[7]))
+		return (true)
+	}
+
+	# Packed provisional comet with fragment (8 chars ending in lowercase)
+	if (len == 8 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' && IS_LOWER(desig[8])) {
+	    return (true)
+	}
+
+	# Packed provisional comet with 2-letter fragment (9 chars)
+	if (len == 9 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' &&
+	    IS_LOWER(desig[8]) && IS_LOWER(desig[9])) {
+	    return (true)
+	}
+
+	return (false)
+end
+
+
+# MPC_GETFRAG -- Extract fragment suffix from comet designation (returns uppercase)
+
+procedure mpc_getfrag (desig, frag, maxch)
+
+char	desig[ARB], frag[ARB]
+int	maxch
+
+int	len, dashpos, i, j, strlen()
+
+begin
+	len = strlen (desig)
+	frag[1] = EOS
+
+	if (len < 2)
+	    return
+
+	# Unpacked format: "73P-A", "73P-AA"
+	dashpos = 0
+	do i = 1, len {
+	    if (desig[i] == '-')
+		dashpos = i
+	}
+	if (dashpos > 0 && dashpos < len) {
+	    i = 1
+	    do j = dashpos + 1, len {
+		if (IS_UPPER(desig[j])) {
+		    frag[i] = desig[j]
+		    i = i + 1
+		} else if (IS_LOWER(desig[j])) {
+		    frag[i] = desig[j] - 32  # Convert to uppercase
+		    i = i + 1
+		}
+	    }
+	    frag[i] = EOS
+	    return
+	}
+
+	# Packed numbered comet with fragment (6-7 chars)
+	if ((len == 6 || len == 7) &&
+	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
+	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
+	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    frag[1] = desig[6] - 32
+	    if (len == 7 && IS_LOWER(desig[7])) {
+		frag[2] = desig[7] - 32
+		frag[3] = EOS
+	    } else {
+		frag[2] = EOS
+	    }
+	    return
+	}
+
+	# Packed provisional comet with fragment (8 chars)
+	if (len == 8 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' && IS_LOWER(desig[8])) {
+	    frag[1] = desig[8] - 32
+	    frag[2] = EOS
+	    return
+	}
+
+	# Packed provisional comet with 2-letter fragment (9 chars)
+	if (len == 9 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' &&
+	    IS_LOWER(desig[8]) && IS_LOWER(desig[9])) {
+	    frag[1] = desig[8] - 32
+	    frag[2] = desig[9] - 32
+	    frag[3] = EOS
+	    return
+	}
+end
+
+
+# MPC_GETPAR -- Get parent comet designation without fragment
+
+procedure mpc_getpar (desig, parent, maxch)
+
+char	desig[ARB], parent[ARB]
+int	maxch
+
+int	len, dashpos, i, strlen()
+
+begin
+	len = strlen (desig)
+
+	# Unpacked format: "73P-A" -> "73P"
+	dashpos = 0
+	do i = 1, len {
+	    if (desig[i] == '-')
+		dashpos = i
+	}
+	if (dashpos > 0) {
+	    # Check if this looks like a comet with fragment
+	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D')) {
+		do i = 1, dashpos - 1 {
+		    parent[i] = desig[i]
+		}
+		parent[dashpos] = EOS
+		return
+	    }
+	    # Provisional comet with fragment
+	    if (desig[2] == '/' && (desig[1] == 'P' || desig[1] == 'C' ||
+		desig[1] == 'D' || desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I')) {
+		do i = 1, dashpos - 1 {
+		    parent[i] = desig[i]
+		}
+		parent[dashpos] = EOS
+		return
+	    }
+	}
+
+	# Packed numbered comet with fragment (6-7 chars) -> return 5 chars
+	if ((len == 6 || len == 7) &&
+	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
+	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
+	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    do i = 1, 5 {
+		parent[i] = desig[i]
+	    }
+	    parent[6] = EOS
+	    return
+	}
+
+	# Packed provisional comet with fragment (8 chars) -> return with '0'
+	if (len == 8 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' && IS_LOWER(desig[8])) {
+	    do i = 1, 7 {
+		parent[i] = desig[i]
+	    }
+	    parent[8] = '0'
+	    parent[9] = EOS
+	    return
+	}
+
+	# Packed provisional comet with 2-letter fragment (9 chars)
+	if (len == 9 && (desig[1] == 'P' || desig[1] == 'C' || desig[1] == 'D' ||
+	    desig[1] == 'X' || desig[1] == 'A' || desig[1] == 'I') &&
+	    desig[2] >= 'A' && desig[2] <= 'L' &&
+	    IS_LOWER(desig[8]) && IS_LOWER(desig[9])) {
+	    do i = 1, 7 {
+		parent[i] = desig[i]
+	    }
+	    parent[8] = '0'
+	    parent[9] = EOS
+	    return
+	}
+
+	# No fragment, return as-is
+	call strcpy (desig, parent, maxch)
+end
+
+
+# MPC_DESEQ -- Check if two designations refer to the same object
+
+bool procedure mpc_deseq (d1, d2)
+
+char	d1[ARB], d2[ARB]
+
+char	p1[20], p2[20], tmp[20]
+int	i, len1, len2, format, dtype, strlen()
+
+begin
+	# Convert d1 to packed format
+	call mpc_detect (d1, format, dtype)
+	if (format == 2) {
+	    # Unpacked, convert to packed
+	    call mpc_convert (d1, p1, 20)
+	} else {
+	    # Already packed
+	    call strcpy (d1, p1, 20)
+	}
+
+	# Convert d2 to packed format
+	call mpc_detect (d2, format, dtype)
+	if (format == 2) {
+	    # Unpacked, convert to packed
+	    call mpc_convert (d2, p2, 20)
+	} else {
+	    # Already packed
+	    call strcpy (d2, p2, 20)
+	}
+
+	len1 = strlen (p1)
+	len2 = strlen (p2)
+
+	# If conversion failed, try comparing originals
+	if (len1 == 0) {
+	    call strcpy (d1, p1, 20)
+	    len1 = strlen (p1)
+	}
+	if (len2 == 0) {
+	    call strcpy (d2, p2, 20)
+	    len2 = strlen (p2)
+	}
+
+	if (len1 != len2)
+	    return (false)
+
+	do i = 1, len1 {
+	    if (p1[i] != p2[i])
+		return (false)
+	}
+
+	return (true)
 end
