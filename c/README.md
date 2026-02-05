@@ -137,8 +137,9 @@ Or simply copy `mpc_designation.c` and `mpc_designation.h` into your project.
 ### Constants
 
 ```c
-#define MPC_MAX_PACKED    16   // Max packed designation length
-#define MPC_MAX_UNPACKED  32   // Max unpacked designation length
+#define MPC_MAX_PACKED         16   // Max packed designation length
+#define MPC_MAX_UNPACKED       32   // Max unpacked designation length
+#define MPC_REPORT_FORMAT_SIZE 13   // 12-char MPC report format + null
 
 // Error codes
 #define MPC_OK            0    // Success
@@ -160,6 +161,18 @@ int mpc_convert_simple(const char *input, char *output, size_t output_size);
 
 // Conversion with format information
 int mpc_convert(const char *input, char *output, size_t output_size, mpc_info_t *info);
+
+// Format conversion (minimal <-> 12-char MPC report format)
+int mpc_to_report_format(const char *minimal, char *report, size_t outlen);
+int mpc_from_report_format(const char *report, char *minimal, size_t outlen);
+
+// Fragment helpers
+int mpc_has_fragment(const char *desig);
+int mpc_get_fragment(const char *desig, char *fragment, size_t outlen);
+int mpc_get_parent(const char *desig, char *parent, size_t outlen);
+
+// Comparison
+int mpc_designations_equal(const char *desig1, const char *desig2);
 
 // Error message
 const char *mpc_strerror(int err);
@@ -206,8 +219,102 @@ make test
 # Error handling tests
 make test-errors
 
-# Both
+# Fragment handling tests
+make test-fragments
+
+# Helper function tests
+make test-helpers
+
+# All tests
 make test-all
+```
+
+## Special Format Handling
+
+### Comet Fragments
+
+Numbered comets with fragments (e.g., 73P-A, 73P-AA) pack fragment letters as lowercase:
+
+```bash
+./mpc_designation '73P-A'     # Output: 0073Pa
+./mpc_designation '73P-AA'    # Output: 0073Paa
+./mpc_designation 0073Pa      # Output: 73P-A
+```
+
+Provisional comets with fragments use a 9-character format:
+
+```bash
+./mpc_designation 'D/1993 F2-A'   # Output: DJ93F02a
+./mpc_designation 'P/1930 J1-AA'  # Output: PJ30J01aa
+```
+
+Fragment letters include I (A-Z, AA-ZZ per MPC data).
+
+### Pre-1925 Asteroid Designations
+
+Asteroids before 1925 use the A-prefix format (MPC-created designations):
+
+```bash
+./mpc_designation J08C00J    # Output: A908 CJ (not 1908 CJ)
+./mpc_designation 'A908 CJ'  # Output: J08C00J
+```
+
+The A-prefix indicates an MPC-assigned designation for objects discovered before 1925.
+
+### Century Code Validation
+
+The library validates century codes:
+- Asteroids: 1800-2199 (century codes I, J, K, L)
+- Comets: 1000-2199 (century codes A through L)
+
+## Helper Functions
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+Convert between our minimal packed format and the 12-character MPC observation report format:
+
+```c
+char report[13], minimal[16];
+
+// Minimal to 12-char report format
+mpc_to_report_format("0073Pa", report, sizeof(report));
+// report = "0073P      a"
+
+// 12-char report format to minimal
+mpc_from_report_format("0073P      a", minimal, sizeof(minimal));
+// minimal = "0073Pa"
+```
+
+The 12-character format is used in MPC observation records (columns 1-12), where numbered comet fragments go in columns 11-12.
+
+### Fragment Extraction
+
+```c
+char fragment[4], parent[32];
+
+// Check if designation has a fragment
+if (mpc_has_fragment("73P-A")) {  // Returns 1
+    // Extract fragment (uppercase)
+    mpc_get_fragment("73P-A", fragment, sizeof(fragment));  // "A"
+    mpc_get_fragment("73P-AA", fragment, sizeof(fragment)); // "AA"
+
+    // Get parent comet (without fragment)
+    mpc_get_parent("73P-A", parent, sizeof(parent));   // "73P"
+    mpc_get_parent("0073Pa", parent, sizeof(parent));  // "0073P"
+}
+```
+
+### Designation Comparison
+
+Compare designations across different formats:
+
+```c
+// Same object, different formats
+mpc_designations_equal("1995 XA", "J95X00A");  // Returns 1
+mpc_designations_equal("73P-A", "0073Pa");     // Returns 1
+
+// Different objects
+mpc_designations_equal("73P-A", "73P-B");      // Returns 0
 ```
 
 ## Error Handling

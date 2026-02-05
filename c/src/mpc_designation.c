@@ -384,6 +384,11 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
     int century = year / 100;
     year_short = year % 100;
 
+    /* Asteroid provisionals only valid for centuries 18-21 (1800-2199) */
+    if (century < 18 || century > 21) {
+        return MPC_ERR_RANGE;
+    }
+
     int century_code_int = century_to_code(century);
     if (century_code_int < 0) return MPC_ERR_FORMAT;
     char century_code = (char)century_code_int;
@@ -411,6 +416,11 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
     return MPC_OK;
 }
 
+/*
+ * Unpack a provisional asteroid designation.
+ * For years < 1925, outputs A-prefix format (e.g., "A908 CJ" not "1908 CJ").
+ * Per MPC, A-prefix is the PRIMARY designation for pre-1925 objects.
+ */
 int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
     char buf[16];
     strncpy(buf, packed, sizeof(buf) - 1);
@@ -464,6 +474,11 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
     int century = code_to_century(century_code);
     if (century < 0) return MPC_ERR_FORMAT;
 
+    /* Asteroid provisionals only valid for centuries I-L (1800-2199) */
+    if (century_code < 'I' || century_code > 'L') {
+        return MPC_ERR_FORMAT;
+    }
+
     char year_str[3] = {buf[1], buf[2], '\0'};
     int year_short = atoi(year_str);
     char half_month = buf[3];
@@ -476,10 +491,23 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
 
     int full_year = century * 100 + year_short;
 
-    if (order_num == 0) {
-        snprintf(output, outlen, "%d %c%c", full_year, half_month, second_letter);
+    /* For years < 1925, output A-prefix format (MPC primary designation) */
+    if (full_year < 1925) {
+        /* A = first digit 1 (1800s, 1900s), B = first digit 2 (not applicable for < 1925) */
+        char prefix = (full_year < 2000) ? 'A' : 'B';
+        int rest_year = full_year % 1000;  /* e.g., 1908 -> 908, 1801 -> 801 */
+
+        if (order_num == 0) {
+            snprintf(output, outlen, "%c%03d %c%c", prefix, rest_year, half_month, second_letter);
+        } else {
+            snprintf(output, outlen, "%c%03d %c%c%d", prefix, rest_year, half_month, second_letter, order_num);
+        }
     } else {
-        snprintf(output, outlen, "%d %c%c%d", full_year, half_month, second_letter, order_num);
+        if (order_num == 0) {
+            snprintf(output, outlen, "%d %c%c", full_year, half_month, second_letter);
+        } else {
+            snprintf(output, outlen, "%d %c%c%d", full_year, half_month, second_letter, order_num);
+        }
     }
 
     return MPC_OK;
@@ -489,13 +517,17 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
 /* Comet provisional designations                                            */
 /* ========================================================================= */
 
+/*
+ * Pack a comet provisional designation.
+ * Fragment letters include all A-Z (including I, per MPC data).
+ */
 static int pack_comet_provisional(const char *unpacked, char *output, size_t outlen) {
     char buf[64];
     strncpy(buf, unpacked, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
     trim(buf);
 
-    if (outlen < 9) return MPC_ERR_BUFFER;
+    if (outlen < 10) return MPC_ERR_BUFFER;  /* Need room for 9 chars + null */
 
     int year;
     char half_month;
@@ -517,6 +549,11 @@ static int pack_comet_provisional(const char *unpacked, char *output, size_t out
 
     int century = year / 100;
     int year_short = year % 100;
+
+    /* Comet provisionals valid for centuries 10-21 (1000-2199) */
+    if (century < 10 || century > 21) {
+        return MPC_ERR_RANGE;
+    }
 
     int century_code_int = century_to_code(century);
     if (century_code_int < 0) return MPC_ERR_FORMAT;
@@ -557,6 +594,11 @@ static int pack_comet_provisional(const char *unpacked, char *output, size_t out
     return MPC_OK;
 }
 
+/*
+ * Unpack a comet provisional designation.
+ * Input: 7, 8, or 9 chars (9-char for 2-letter fragment on full comet desig)
+ * Fragment letters include all A-Z (including I, per MPC data).
+ */
 static int unpack_comet_provisional(const char *packed, char *output, size_t outlen) {
     char buf[16];
     strncpy(buf, packed, sizeof(buf) - 1);
@@ -564,12 +606,17 @@ static int unpack_comet_provisional(const char *packed, char *output, size_t out
     trim(buf);
 
     size_t len = strlen(buf);
-    if (len != 7 && len != 8) return MPC_ERR_FORMAT;
+    if (len < 7 || len > 9) return MPC_ERR_FORMAT;
     if (outlen < 20) return MPC_ERR_BUFFER;
 
     char century_code = buf[0];
     int century = code_to_century(century_code);
     if (century < 0) return MPC_ERR_FORMAT;
+
+    /* Comet provisionals valid for centuries A-L (1000-2199) */
+    if (century_code < 'A' || century_code > 'L') {
+        return MPC_ERR_FORMAT;
+    }
 
     char year_str[3] = {buf[1], buf[2], '\0'};
     int year_short = atoi(year_str);
@@ -581,13 +628,16 @@ static int unpack_comet_provisional(const char *packed, char *output, size_t out
 
     int full_year = century * 100 + year_short;
 
-    /* Fragment: 1 char for 7-char format, 2 chars for 8-char format */
+    /* Fragment: 1 char for 7-char format, 2 chars for 8 or 9-char format */
     char fragment[4] = {0};
     if (len == 7) {
         fragment[0] = buf[6];
     } else {
-        fragment[0] = buf[6];
-        fragment[1] = buf[7];
+        /* 8 or 9 chars - copy remaining chars as fragment */
+        size_t frag_len = len - 6;
+        for (size_t i = 0; i < frag_len && i < 3; i++) {
+            fragment[i] = buf[6 + i];
+        }
     }
 
     if (fragment[0] != '0') {
@@ -607,19 +657,30 @@ static int unpack_comet_provisional(const char *packed, char *output, size_t out
 /* Numbered comet designations                                               */
 /* ========================================================================= */
 
+/*
+ * Pack a numbered comet designation with optional fragment.
+ * Input: "1P", "73P-A", "73P-AA" (fragment letters include I, per MPC data)
+ * Output: "0001P", "0073Pa", "0073Paa"
+ */
 static int pack_comet_numbered(const char *unpacked, char *output, size_t outlen) {
     char buf[32];
     strncpy(buf, unpacked, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
     trim(buf);
 
-    if (outlen < 6) return MPC_ERR_BUFFER;
+    if (outlen < 8) return MPC_ERR_BUFFER;  /* Need room for 7 chars + null */
 
     int number;
     char comet_type;
+    char fragment[4] = {0};
 
-    if (sscanf(buf, "%d%c", &number, &comet_type) != 2) {
-        return MPC_ERR_FORMAT;
+    /* Try parsing with fragment: "73P-A" or "73P-AA" */
+    int parsed = sscanf(buf, "%d%c-%3s", &number, &comet_type, fragment);
+    if (parsed < 2) {
+        /* Try without fragment: "73P" */
+        if (sscanf(buf, "%d%c", &number, &comet_type) != 2) {
+            return MPC_ERR_FORMAT;
+        }
     }
 
     if (comet_type != 'P' && comet_type != 'D') {
@@ -630,28 +691,70 @@ static int pack_comet_numbered(const char *unpacked, char *output, size_t outlen
         return MPC_ERR_RANGE;
     }
 
-    snprintf(output, outlen, "%04d%c", number, comet_type);
+    /* Validate fragment if present: 1-2 uppercase letters (A-Z including I) */
+    if (fragment[0]) {
+        if (!isupper(fragment[0])) return MPC_ERR_FORMAT;
+        if (fragment[1] && !isupper(fragment[1])) return MPC_ERR_FORMAT;
+        if (fragment[2]) return MPC_ERR_FORMAT;  /* Too long */
+
+        /* Convert to lowercase and append */
+        char frag_lower[4];
+        frag_lower[0] = tolower(fragment[0]);
+        frag_lower[1] = fragment[1] ? tolower(fragment[1]) : '\0';
+        frag_lower[2] = '\0';
+        snprintf(output, outlen, "%04d%c%s", number, comet_type, frag_lower);
+    } else {
+        snprintf(output, outlen, "%04d%c", number, comet_type);
+    }
+
     return MPC_OK;
 }
 
+/*
+ * Unpack a numbered comet designation with optional fragment.
+ * Input: "0001P", "0073Pa", "0073Paa" (5, 6, or 7 chars)
+ * Output: "1P", "73P-A", "73P-AA"
+ */
 static int unpack_comet_numbered(const char *packed, char *output, size_t outlen) {
     char buf[16];
     strncpy(buf, packed, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
     trim(buf);
 
-    if (strlen(buf) != 5) return MPC_ERR_FORMAT;
-    if (outlen < 8) return MPC_ERR_BUFFER;
+    size_t len = strlen(buf);
+    if (len < 5 || len > 7) return MPC_ERR_FORMAT;
+    if (outlen < 12) return MPC_ERR_BUFFER;
 
-    char num_str[5] = {buf[0], buf[1], buf[2], buf[3], '\0'};
-    int number = atoi(num_str);
+    /* Validate: first 4 chars are digits, 5th is P or D */
+    for (int i = 0; i < 4; i++) {
+        if (!isdigit(buf[i])) return MPC_ERR_FORMAT;
+    }
+
     char comet_type = buf[4];
-
     if (comet_type != 'P' && comet_type != 'D') {
         return MPC_ERR_FORMAT;
     }
 
-    snprintf(output, outlen, "%d%c", number, comet_type);
+    /* Validate fragment chars if present (must be lowercase a-z) */
+    for (size_t i = 5; i < len; i++) {
+        if (!islower(buf[i])) return MPC_ERR_FORMAT;
+    }
+
+    char num_str[5] = {buf[0], buf[1], buf[2], buf[3], '\0'};
+    int number = atoi(num_str);
+
+    if (len == 5) {
+        /* No fragment */
+        snprintf(output, outlen, "%d%c", number, comet_type);
+    } else {
+        /* Has fragment - convert to uppercase */
+        char frag_upper[4];
+        frag_upper[0] = toupper(buf[5]);
+        frag_upper[1] = (len > 6) ? toupper(buf[6]) : '\0';
+        frag_upper[2] = '\0';
+        snprintf(output, outlen, "%d%c-%s", number, comet_type, frag_upper);
+    }
+
     return MPC_OK;
 }
 
@@ -1131,13 +1234,31 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             }
             return MPC_OK;
         }
-        /* Check for packed numbered comet */
+        /* Check for packed numbered comet (no fragment) */
         if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
             (buf[4] == 'P' || buf[4] == 'D')) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
             snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(buf[4]));
             return MPC_OK;
+        }
+    }
+
+    /* Check for packed numbered comet with fragment (6 or 7 chars) */
+    if (len == 6 || len == 7) {
+        if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
+            (buf[4] == 'P' || buf[4] == 'D') && islower(buf[5])) {
+            /* Validate remaining chars are lowercase */
+            int valid = 1;
+            for (size_t i = 5; i < len; i++) {
+                if (!islower(buf[i])) { valid = 0; break; }
+            }
+            if (valid) {
+                info->format = MPC_FORMAT_PACKED;
+                info->type = MPC_TYPE_COMET_NUMBERED;
+                snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s with fragment", get_comet_type_name(buf[4]));
+                return MPC_OK;
+            }
         }
     }
 
@@ -1162,20 +1283,31 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             snprintf(info->subtype, sizeof(info->subtype), "survey (Trojan T-%c)", buf[1]);
             return MPC_OK;
         }
-        /* Standard provisional */
-        if (buf[0] >= 'A' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
+        /* Standard provisional (asteroids only I-L for 1800-2199) */
+        if (buf[0] >= 'I' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
             isupper(buf[3]) && isupper(buf[6])) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PROVISIONAL;
             strcpy(info->subtype, "provisional");
             return MPC_OK;
         }
-        /* Comet provisional - note: packed comet provisional doesn't include type */
-        if (buf[0] >= 'I' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
+        /* Comet provisional (A-L for 1000-2199) */
+        if (buf[0] >= 'A' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
             isupper(buf[3]) && (islower(buf[6]) || buf[6] == '0')) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_PROVISIONAL;
             strcpy(info->subtype, "comet provisional");
+            return MPC_OK;
+        }
+    }
+
+    /* Check for packed comet provisional with 2-letter fragment (8 chars) */
+    if (len == 8) {
+        if (buf[0] >= 'A' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
+            isupper(buf[3]) && islower(buf[6]) && islower(buf[7])) {
+            info->format = MPC_FORMAT_PACKED;
+            info->type = MPC_TYPE_COMET_PROVISIONAL;
+            strcpy(info->subtype, "comet provisional with 2-letter fragment");
             return MPC_OK;
         }
     }
@@ -1304,8 +1436,34 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Check for unpacked numbered comet: "1P" or "354P" - must be exactly digits followed by P/D */
+    /* Check for unpacked numbered comet: "1P", "354P", "73P-A", "73P-AA" */
     int chars_consumed = 0;
+    char frag_buf[4] = {0};
+    if (sscanf(buf, "%d%c-%3s%n", &comet_num, &comet_type, frag_buf, &chars_consumed) >= 2) {
+        /* With fragment */
+        if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0 &&
+            (size_t)chars_consumed == len) {
+            /* Validate fragment is 1-2 uppercase letters */
+            int valid_frag = 1;
+            if (frag_buf[0]) {
+                if (!isupper(frag_buf[0])) valid_frag = 0;
+                if (frag_buf[1] && !isupper(frag_buf[1])) valid_frag = 0;
+                if (frag_buf[2]) valid_frag = 0;  /* Too long */
+            }
+            if (valid_frag) {
+                info->format = MPC_FORMAT_UNPACKED;
+                info->type = MPC_TYPE_COMET_NUMBERED;
+                if (frag_buf[0]) {
+                    snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s with fragment", get_comet_type_name(comet_type));
+                } else {
+                    snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(comet_type));
+                }
+                return MPC_OK;
+            }
+        }
+    }
+    /* Try without fragment */
+    chars_consumed = 0;
     if (sscanf(buf, "%d%c%n", &comet_num, &comet_type, &chars_consumed) == 2) {
         /* Ensure entire string was consumed (no trailing content) */
         if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0 &&
@@ -1617,4 +1775,369 @@ int mpc_is_valid_chars(const char *input) {
         }
     }
     return 1;
+}
+
+/* ========================================================================= */
+/* Format conversion functions (minimal <-> 12-char report format)           */
+/* ========================================================================= */
+
+int mpc_to_report_format(const char *minimal, char *report, size_t outlen) {
+    if (minimal == NULL || report == NULL) return MPC_ERR_INVALID;
+    if (outlen < 13) return MPC_ERR_BUFFER;
+
+    char buf[32];
+    strncpy(buf, minimal, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    trim(buf);
+
+    size_t len = strlen(buf);
+
+    /* Initialize output with spaces */
+    memset(report, ' ', 12);
+    report[12] = '\0';
+
+    /* Detect format and convert */
+    mpc_info_t info;
+    int err = mpc_detect_format(buf, &info);
+    if (err != MPC_OK) return err;
+
+    if (info.format != MPC_FORMAT_PACKED) {
+        /* Must be packed format to convert to report format */
+        return MPC_ERR_FORMAT;
+    }
+
+    switch (info.type) {
+        case MPC_TYPE_PERMANENT:
+            /* Right-align 5-char designation in columns 6-10 (positions 5-9) */
+            memcpy(report + 12 - len, buf, len);
+            break;
+
+        case MPC_TYPE_PROVISIONAL:
+        case MPC_TYPE_PROVISIONAL_EXTENDED:
+        case MPC_TYPE_SURVEY:
+            /* Right-align 7-char designation in columns 6-12 (positions 5-11) */
+            memcpy(report + 12 - len, buf, len);
+            break;
+
+        case MPC_TYPE_COMET_NUMBERED:
+            /* Numbered comet: 0073P -> columns 1-5, fragment in 11-12 */
+            /* 5 chars (no fragment) or 6-7 chars (with fragment) */
+            if (len == 5) {
+                memcpy(report, buf, 5);
+            } else if (len == 6) {
+                /* Single-letter fragment: 0073Pa -> 0073P      a */
+                memcpy(report, buf, 5);       /* "0073P" in cols 1-5 */
+                report[11] = buf[5];          /* 'a' in col 12 */
+            } else if (len == 7) {
+                /* Two-letter fragment: 0073Paa -> 0073P     aa */
+                memcpy(report, buf, 5);       /* "0073P" in cols 1-5 */
+                report[10] = buf[5];          /* first letter in col 11 */
+                report[11] = buf[6];          /* second letter in col 12 */
+            } else {
+                return MPC_ERR_FORMAT;
+            }
+            break;
+
+        case MPC_TYPE_COMET_PROVISIONAL:
+            /* Comet provisional: 7 or 8 chars */
+            /* Right-align in 12-char field */
+            if (len <= 12) {
+                memcpy(report + 12 - len, buf, len);
+            }
+            break;
+
+        case MPC_TYPE_COMET_FULL:
+            /* Full comet with provisional: 8 or 12 chars */
+            if (len <= 12) {
+                memcpy(report + 12 - len, buf, len);
+            }
+            break;
+
+        case MPC_TYPE_COMET_ANCIENT:
+        case MPC_TYPE_COMET_BCE:
+            /* 8-char format */
+            if (len <= 12) {
+                memcpy(report + 12 - len, buf, len);
+            }
+            break;
+
+        case MPC_TYPE_SATELLITE:
+            /* 8-char format */
+            if (len <= 12) {
+                memcpy(report + 12 - len, buf, len);
+            }
+            break;
+
+        default:
+            return MPC_ERR_FORMAT;
+    }
+
+    return MPC_OK;
+}
+
+int mpc_from_report_format(const char *report, char *minimal, size_t outlen) {
+    if (report == NULL || minimal == NULL) return MPC_ERR_INVALID;
+    if (outlen < MPC_MAX_PACKED) return MPC_ERR_BUFFER;
+
+    /* Check input length */
+    size_t len = strlen(report);
+    if (len > 12) return MPC_ERR_FORMAT;
+
+    char buf[16];
+    memset(buf, ' ', 12);
+    buf[12] = '\0';
+
+    /* Right-pad input if shorter than 12 */
+    memcpy(buf + 12 - len, report, len);
+
+    /* Check for numbered comet with fragment (fragment in cols 11-12) */
+    /* Pattern: ####P or ####D in cols 1-5, possible fragment in cols 11-12 */
+    if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
+        (buf[4] == 'P' || buf[4] == 'D')) {
+        /* Check if cols 6-10 are spaces and col 11 or 12 has lowercase */
+        int has_fragment = 0;
+        for (int i = 5; i < 10; i++) {
+            if (buf[i] != ' ') break;
+            if (i == 9) has_fragment = 1;  /* Cols 6-10 are spaces */
+        }
+
+        if (has_fragment && (islower(buf[10]) || islower(buf[11]))) {
+            /* Extract comet base + fragment */
+            char result[8];
+            memcpy(result, buf, 5);  /* ####P */
+            int pos = 5;
+            if (islower(buf[10])) result[pos++] = buf[10];
+            if (islower(buf[11])) result[pos++] = buf[11];
+            result[pos] = '\0';
+            strcpy(minimal, result);
+            return MPC_OK;
+        }
+    }
+
+    /* Standard case: trim and return */
+    trim(buf);
+    if (strlen(buf) == 0) return MPC_ERR_FORMAT;
+
+    strcpy(minimal, buf);
+    return MPC_OK;
+}
+
+/* ========================================================================= */
+/* Fragment helper functions                                                 */
+/* ========================================================================= */
+
+int mpc_has_fragment(const char *desig) {
+    if (desig == NULL) return 0;
+
+    mpc_info_t info;
+    if (mpc_detect_format(desig, &info) != MPC_OK) return 0;
+
+    /* Only comets can have fragments */
+    if (info.type != MPC_TYPE_COMET_NUMBERED &&
+        info.type != MPC_TYPE_COMET_PROVISIONAL &&
+        info.type != MPC_TYPE_COMET_FULL) {
+        return 0;
+    }
+
+    char buf[32];
+    strncpy(buf, desig, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    trim(buf);
+
+    size_t len = strlen(buf);
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        /* Look for "-X" or "-XX" at end */
+        const char *dash = strrchr(buf, '-');
+        if (dash && strlen(dash) >= 2 && strlen(dash) <= 3) {
+            if (isupper(dash[1])) {
+                if (dash[2] == '\0' || isupper(dash[2])) {
+                    return 1;
+                }
+            }
+        }
+    } else {
+        /* Packed format */
+        if (info.type == MPC_TYPE_COMET_NUMBERED) {
+            /* Numbered comet: check for lowercase after P/D */
+            if (len > 5 && islower(buf[5])) return 1;
+        } else if (info.type == MPC_TYPE_COMET_PROVISIONAL ||
+                   info.type == MPC_TYPE_COMET_FULL) {
+            /* Check last char(s) for lowercase (not '0') */
+            if (len >= 8 && islower(buf[len - 1]) && buf[len - 1] != '0') {
+                return 1;
+            }
+        }
+    }
+
+    return 0;
+}
+
+int mpc_get_fragment(const char *desig, char *fragment, size_t outlen) {
+    if (desig == NULL || fragment == NULL) return MPC_ERR_INVALID;
+    if (outlen < 3) return MPC_ERR_BUFFER;
+
+    fragment[0] = '\0';
+
+    mpc_info_t info;
+    int err = mpc_detect_format(desig, &info);
+    if (err != MPC_OK) return err;
+
+    /* Only comets can have fragments */
+    if (info.type != MPC_TYPE_COMET_NUMBERED &&
+        info.type != MPC_TYPE_COMET_PROVISIONAL &&
+        info.type != MPC_TYPE_COMET_FULL) {
+        return MPC_OK;  /* No fragment, but not an error */
+    }
+
+    char buf[32];
+    strncpy(buf, desig, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    trim(buf);
+
+    size_t len = strlen(buf);
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        /* Look for "-X" or "-XX" at end */
+        const char *dash = strrchr(buf, '-');
+        if (dash && strlen(dash) >= 2 && strlen(dash) <= 3) {
+            if (isupper(dash[1])) {
+                if (dash[2] == '\0') {
+                    fragment[0] = dash[1];
+                    fragment[1] = '\0';
+                    return MPC_OK;
+                } else if (isupper(dash[2]) && dash[3] == '\0') {
+                    fragment[0] = dash[1];
+                    fragment[1] = dash[2];
+                    fragment[2] = '\0';
+                    return MPC_OK;
+                }
+            }
+        }
+    } else {
+        /* Packed format */
+        if (info.type == MPC_TYPE_COMET_NUMBERED) {
+            /* Numbered comet: fragment is lowercase after P/D */
+            if (len == 6 && islower(buf[5])) {
+                fragment[0] = toupper(buf[5]);
+                fragment[1] = '\0';
+            } else if (len == 7 && islower(buf[5]) && islower(buf[6])) {
+                fragment[0] = toupper(buf[5]);
+                fragment[1] = toupper(buf[6]);
+                fragment[2] = '\0';
+            }
+        } else if (info.type == MPC_TYPE_COMET_PROVISIONAL) {
+            /* 7-char: last char if lowercase and not '0' */
+            /* 8-char: last two chars if lowercase */
+            if (len == 7 && islower(buf[6]) && buf[6] != '0') {
+                fragment[0] = toupper(buf[6]);
+                fragment[1] = '\0';
+            } else if (len == 8 && islower(buf[6]) && islower(buf[7])) {
+                fragment[0] = toupper(buf[6]);
+                fragment[1] = toupper(buf[7]);
+                fragment[2] = '\0';
+            }
+        } else if (info.type == MPC_TYPE_COMET_FULL) {
+            /* 8-char: check position 7 for single fragment */
+            /* 9-char: check positions 7-8 for double fragment */
+            if (len == 8 && islower(buf[7]) && buf[7] != '0') {
+                fragment[0] = toupper(buf[7]);
+                fragment[1] = '\0';
+            } else if (len == 9 && islower(buf[7]) && islower(buf[8])) {
+                fragment[0] = toupper(buf[7]);
+                fragment[1] = toupper(buf[8]);
+                fragment[2] = '\0';
+            }
+        }
+    }
+
+    return MPC_OK;
+}
+
+int mpc_get_parent(const char *desig, char *parent, size_t outlen) {
+    if (desig == NULL || parent == NULL) return MPC_ERR_INVALID;
+    if (outlen < MPC_MAX_UNPACKED) return MPC_ERR_BUFFER;
+
+    mpc_info_t info;
+    int err = mpc_detect_format(desig, &info);
+    if (err != MPC_OK) return err;
+
+    /* Only comets can have fragments */
+    if (info.type != MPC_TYPE_COMET_NUMBERED &&
+        info.type != MPC_TYPE_COMET_PROVISIONAL &&
+        info.type != MPC_TYPE_COMET_FULL) {
+        /* Not a comet - copy as-is */
+        strncpy(parent, desig, outlen - 1);
+        parent[outlen - 1] = '\0';
+        trim(parent);
+        return MPC_OK;
+    }
+
+    char buf[32];
+    strncpy(buf, desig, sizeof(buf) - 1);
+    buf[sizeof(buf) - 1] = '\0';
+    trim(buf);
+
+    size_t len = strlen(buf);
+
+    if (info.format == MPC_FORMAT_UNPACKED) {
+        /* Remove "-X" or "-XX" suffix if present */
+        char *dash = strrchr(buf, '-');
+        if (dash && strlen(dash) >= 2 && strlen(dash) <= 3) {
+            if (isupper(dash[1])) {
+                if (dash[2] == '\0' || (isupper(dash[2]) && dash[3] == '\0')) {
+                    *dash = '\0';  /* Truncate at dash */
+                }
+            }
+        }
+        strcpy(parent, buf);
+    } else {
+        /* Packed format */
+        if (info.type == MPC_TYPE_COMET_NUMBERED) {
+            /* Remove lowercase fragment letters */
+            if (len > 5 && islower(buf[5])) {
+                buf[5] = '\0';
+            }
+            strcpy(parent, buf);
+        } else if (info.type == MPC_TYPE_COMET_PROVISIONAL) {
+            /* Remove fragment: 7 chars with lowercase at end, or 8 chars */
+            if (len == 7 && islower(buf[6]) && buf[6] != '0') {
+                buf[6] = '0';  /* Replace fragment with '0' */
+            } else if (len == 8 && islower(buf[6]) && islower(buf[7])) {
+                buf[6] = '0';
+                buf[7] = '\0';
+            }
+            strcpy(parent, buf);
+        } else if (info.type == MPC_TYPE_COMET_FULL) {
+            /* Full comet: T + provisional */
+            if (len == 8 && islower(buf[7]) && buf[7] != '0') {
+                buf[7] = '0';
+            } else if (len == 9 && islower(buf[7]) && islower(buf[8])) {
+                buf[7] = '0';
+                buf[8] = '\0';
+            }
+            strcpy(parent, buf);
+        } else {
+            strcpy(parent, buf);
+        }
+    }
+
+    return MPC_OK;
+}
+
+/* ========================================================================= */
+/* Comparison functions                                                      */
+/* ========================================================================= */
+
+int mpc_designations_equal(const char *desig1, const char *desig2) {
+    if (desig1 == NULL || desig2 == NULL) return 0;
+
+    /* Convert both to packed format for comparison */
+    char packed1[MPC_MAX_PACKED];
+    char packed2[MPC_MAX_PACKED];
+
+    if (mpc_pack(desig1, packed1, sizeof(packed1)) != MPC_OK) return 0;
+    if (mpc_pack(desig2, packed2, sizeof(packed2)) != MPC_OK) return 0;
+
+    return strcmp(packed1, packed2) == 0 ? 1 : 0;
 }

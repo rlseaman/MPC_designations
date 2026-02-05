@@ -146,11 +146,66 @@ except MPCDesignationError as e:
     print(f"Invalid designation: {e}")
 ```
 
+## Comet Fragment Handling
+
+The library supports comet fragment designations:
+
+### Numbered Comets with Fragments
+
+Numbered comets (like 73P) can have fragments:
+
+```python
+convert_simple('73P-A')    # Returns '0073Pa'
+convert_simple('73P-AA')   # Returns '0073Paa'
+convert_simple('0073Pa')   # Returns '73P-A'
+convert_simple('0073Paa')  # Returns '73P-AA'
+```
+
+### Provisional Comets with Fragments
+
+Provisional comets can also have fragments:
+
+```python
+convert_simple('P/1930 J1-A')   # Returns 'PJ30J01a'
+convert_simple('P/1930 J1-AA')  # Returns 'PJ30J01aa'
+convert_simple('PJ30J01aa')     # Returns 'P/1930 J1-AA'
+```
+
+Fragment letters include all A-Z (including I, per MPC data).
+
+## Pre-1925 Designations
+
+For years before 1925, the library outputs A-prefix format per MPC convention:
+
+```python
+convert_simple('I01A00A')  # Returns 'A801 AA' (not '1801 AA')
+convert_simple('J08C00J')  # Returns 'A908 CJ' (not '1908 CJ')
+convert_simple('A908 CJ')  # Returns 'J08C00J'
+```
+
+The A-prefix format is the MPC-assigned primary designation for pre-1925 objects.
+
+## Century Code Validation
+
+The library validates century codes:
+
+- **Asteroids**: Only I-L (years 1800-2199)
+- **Comets**: A-L (years 1000-2199, including historical comets)
+
+```python
+convert_simple('1800 AA')    # Valid - minimum asteroid year
+convert_simple('C/1014 C1')  # Valid - historical comet from 1014 CE
+convert_simple('1700 AA')    # Error - year before 1800 for asteroids
+```
+
 ## Testing
 
 ```bash
 # Run error handling tests
 python test/test_errors.py ../test-data/error_test_cases.csv
+
+# Run fragment handling tests
+python test/test_fragments.py
 
 # Run conversion tests (requires decompressing test data)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz

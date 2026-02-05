@@ -498,6 +498,9 @@ def unpack_provisional(packed: str) -> str:
     Unpack a provisional asteroid designation.
     Input: 7-character packed format
     Output: unpacked format like "1995 XA" or "2024 AB12"
+
+    For years < 1925, outputs A-prefix format (e.g., "A908 CJ" not "1908 CJ").
+    Per MPC, A-prefix is the PRIMARY designation for pre-1925 objects.
     """
     packed = packed.strip()
 
@@ -516,16 +519,35 @@ def unpack_provisional(packed: str) -> str:
     order_encoded = packed[4:6]
     second_letter = packed[6]
 
-    if century not in CENTURY_CODES:
-        raise MPCDesignationError(f"Invalid century code: {century}")
+    # Asteroid provisionals only valid for centuries I-L (1800-2199)
+    if century not in ('I', 'J', 'K', 'L'):
+        raise MPCDesignationError(f"Invalid century code for asteroid provisional: {century} (must be I-L)")
 
-    full_year = f"{CENTURY_CODES[century]}{year}"
+    full_year_int = CENTURY_CODES[century] * 100 + int(year)
     order_num = decode_cycle_count(order_encoded)
 
-    if order_num == 0:
-        return f"{full_year} {half_month}{second_letter}"
+    # For years < 1925, output A-prefix format (MPC primary designation)
+    if full_year_int < 1925:
+        # A = first digit 1 (1800s, 1900s), B = first digit 2 (2000s - not applicable for < 1925)
+        first_digit = str(full_year_int)[0]
+        rest_year = str(full_year_int)[1:]
+        if first_digit == '1':
+            prefix = 'A'
+        elif first_digit == '2':
+            prefix = 'B'
+        else:
+            prefix = 'A'  # Fallback
+
+        if order_num == 0:
+            return f"{prefix}{rest_year} {half_month}{second_letter}"
+        else:
+            return f"{prefix}{rest_year} {half_month}{second_letter}{order_num}"
     else:
-        return f"{full_year} {half_month}{second_letter}{order_num}"
+        full_year = str(full_year_int)
+        if order_num == 0:
+            return f"{full_year} {half_month}{second_letter}"
+        else:
+            return f"{full_year} {half_month}{second_letter}{order_num}"
 
 
 def pack_provisional(unpacked: str) -> str:
@@ -583,8 +605,13 @@ def pack_provisional(unpacked: str) -> str:
 
     century = year[0:2]
     year_short = year[2:4]
+    century_int = int(century)
 
-    if int(century) not in REVERSE_CENTURY_CODES:
+    # Asteroid provisionals only valid for centuries 18-21 (1800-2199)
+    if century_int < 18 or century_int > 21:
+        raise MPCDesignationError(f"Invalid century for asteroid provisional: {year} (must be 1800-2199)")
+
+    if century_int not in REVERSE_CENTURY_CODES:
         raise MPCDesignationError(f"Invalid century in year: {year}")
 
     century_code = REVERSE_CENTURY_CODES[int(century)]
@@ -605,13 +632,15 @@ def pack_provisional(unpacked: str) -> str:
 def unpack_comet_provisional(packed: str) -> str:
     """
     Unpack a comet provisional designation.
-    Input: 7 or 8 character packed format
-    Output: unpacked format like "1995 O1" or "1995 O1-B"
+    Input: 7, 8, or 9 character packed format
+    Output: unpacked format like "1995 O1", "1995 O1-B", or "1930 J1-AA"
+
+    Fragment letters include all A-Z (including I, per MPC data).
     """
     packed = packed.strip()
     length = len(packed)
 
-    if length not in (7, 8):
+    if length not in (7, 8, 9):
         raise MPCDesignationError(f"Invalid packed comet provisional designation length: {packed}")
 
     century = packed[0]
@@ -619,14 +648,15 @@ def unpack_comet_provisional(packed: str) -> str:
     half_month = packed[3]
     order_encoded = packed[4:6]
 
-    # Fragment: 1 char for 7-char format, 2 chars for 8-char format
+    # Fragment: 1 char for 7-char format, 2 chars for 8 or 9-char format
     if length == 7:
         fragment = packed[6]
     else:
-        fragment = packed[6:8]
+        fragment = packed[6:length]  # 2 chars for 8-char, or more for 9-char
 
+    # Comet provisionals valid for centuries A-L (1000-2199)
     if century not in CENTURY_CODES:
-        raise MPCDesignationError(f"Invalid century code: {century}")
+        raise MPCDesignationError(f"Invalid century code for comet provisional: {century} (must be A-L)")
 
     full_year = f"{CENTURY_CODES[century]}{year}"
     order_num = decode_cycle_count(order_encoded)
@@ -645,7 +675,9 @@ def pack_comet_provisional(unpacked: str) -> str:
     """
     Pack a comet provisional designation.
     Input: unpacked format like "1995 O1" or "1994 P1-B" or "1930 J1-AA"
-    Output: 7 or 8 character packed format
+    Output: 7, 8, or 9 character packed format
+
+    Fragment letters include all A-Z (including I, per MPC data).
     """
     unpacked = unpacked.strip()
 
@@ -665,8 +697,13 @@ def pack_comet_provisional(unpacked: str) -> str:
 
     century = year[0:2]
     year_short = year[2:4]
+    century_int = int(century)
 
-    if int(century) not in REVERSE_CENTURY_CODES:
+    # Comet provisionals valid for centuries 10-21 (1000-2199)
+    if century_int < 10 or century_int > 21:
+        raise MPCDesignationError(f"Invalid century for comet provisional: {year} (must be 1000-2199)")
+
+    if century_int not in REVERSE_CENTURY_CODES:
         raise MPCDesignationError(f"Invalid century in year: {year}")
 
     century_code = REVERSE_CENTURY_CODES[int(century)]
@@ -688,40 +725,56 @@ def pack_comet_provisional(unpacked: str) -> str:
 def unpack_comet_numbered(packed: str) -> str:
     """
     Unpack a numbered periodic comet designation.
-    Input: 5-character packed format like "0001P" or "0354P"
-    Output: unpacked format like "1P" or "354P"
+    Input: 5, 6, or 7 character packed format like "0001P", "0073Pa", or "0073Paa"
+    Output: unpacked format like "1P", "73P-A", or "73P-AA"
+
+    Fragment letters include all A-Z (including I, per MPC data).
     """
     packed = packed.strip()
 
-    match = re.match(r'^(\d{4})([PD])$', packed)
+    # Match numbered comet with optional fragment: 0073P, 0073Pa, 0073Paa
+    match = re.match(r'^(\d{4})([PD])([a-z]{1,2})?$', packed)
     if not match:
         raise MPCDesignationError(f"Invalid packed numbered comet designation: {packed}")
 
     number = int(match.group(1))
     comet_type = match.group(2)
-    return f"{number}{comet_type}"
+    fragment = match.group(3)
+
+    result = f"{number}{comet_type}"
+    if fragment:
+        result += f"-{fragment.upper()}"
+
+    return result
 
 
 def pack_comet_numbered(unpacked: str) -> str:
     """
     Pack a numbered periodic comet designation.
-    Input: unpacked format like "1P" or "354P"
-    Output: 5-character packed format like "0001P"
+    Input: unpacked format like "1P", "73P-A", or "73P-AA"
+    Output: 5, 6, or 7 character packed format like "0001P", "0073Pa", "0073Paa"
+
+    Fragment letters include all A-Z (including I, per MPC data).
     """
     unpacked = unpacked.strip()
 
-    # Match "1P" or "354P" or "1P/Halley" (with optional name after slash)
-    match = re.match(r'^(\d+)([PD])(?:/[A-Za-z].*)?$', unpacked)
+    # Match "1P", "73P-A", "73P-AA", or "1P/Halley" (with optional name after slash)
+    match = re.match(r'^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked numbered comet designation: {unpacked}")
 
     number = int(match.group(1))
     comet_type = match.group(2)
+    fragment = match.group(3)
 
     if number < 1 or number > 9999:
         raise MPCDesignationError(f"Comet number out of range (1-9999): {number}")
 
-    return f"{number:04d}{comet_type}"
+    result = f"{number:04d}{comet_type}"
+    if fragment:
+        result += fragment.lower()
+
+    return result
 
 
 # =============================================================================
@@ -1127,8 +1180,8 @@ def detect_format(designation: str) -> Dict[str, Any]:
                 result['type'] = 'provisional_extended'
                 result['subtype'] = 'provisional (extended format, cycle >=620)'
                 return result
-        # Standard provisional or survey
-        if re.match(r'^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$', des):
+        # Standard provisional or survey (asteroids only I-L for 1800-2199)
+        if re.match(r'^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$', des):
             result['format'] = 'packed'
             result['type'] = 'provisional'
             result['subtype'] = 'provisional'
@@ -1144,22 +1197,32 @@ def detect_format(designation: str) -> Dict[str, Any]:
             result['subtype'] = f'survey (Trojan T-{des[1]})'
             return result
 
-    # Check for packed numbered comet (5 chars ending in P or D)
-    if len(des) == 5:
-        if re.match(r'^[0-9]{4}[PD]$', des):
+    # Check for packed numbered comet (5, 6, or 7 chars: ####P, ####Pa, ####Paa)
+    if len(des) in (5, 6, 7):
+        if re.match(r'^[0-9]{4}[PD]([a-z]{1,2})?$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_numbered'
             comet_type = des[4]
             type_desc = COMET_TYPE_DESCRIPTIONS.get(comet_type, comet_type)
-            result['subtype'] = f'comet numbered {type_desc}'
+            if len(des) > 5:
+                result['subtype'] = f'comet numbered {type_desc} with fragment'
+            else:
+                result['subtype'] = f'comet numbered {type_desc}'
             return result
 
-    # Check for packed comet provisional (7 chars starting with century code)
+    # Check for packed comet provisional (7 or 8 chars starting with century code)
+    # 7-char: J95O010 (no fragment or single char), 8-char: J95O01aa (2-letter fragment)
     if len(des) == 7:
-        if re.match(r'^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', des):
+        if re.match(r'^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_provisional'
             result['subtype'] = 'comet provisional'
+            return result
+    if len(des) == 8:
+        if re.match(r'^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2}$', des):
+            result['format'] = 'packed'
+            result['type'] = 'comet_provisional'
+            result['subtype'] = 'comet provisional with 2-letter fragment'
             return result
 
     # --- UNPACKED FORMATS ---
@@ -1237,14 +1300,18 @@ def detect_format(designation: str) -> Dict[str, Any]:
                 result['subtype'] = f"comet provisional ({type_desc})"
         return result
 
-    # Check for unpacked numbered periodic comet "1P" or "354P"
-    match = re.match(r'^(\d+)([PD])(?:/[A-Za-z].*)?$', des)
+    # Check for unpacked numbered periodic comet "1P", "354P", "73P-A", "73P-AA"
+    match = re.match(r'^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', des)
     if match:
         result['format'] = 'unpacked'
         result['type'] = 'comet_numbered'
         comet_type = match.group(2)
+        fragment = match.group(3)
         type_desc = COMET_TYPE_DESCRIPTIONS.get(comet_type, comet_type)
-        result['subtype'] = f'comet numbered {type_desc}'
+        if fragment:
+            result['subtype'] = f'comet numbered {type_desc} with fragment'
+        else:
+            result['subtype'] = f'comet numbered {type_desc}'
         return result
 
     raise MPCDesignationError(f"Unable to detect designation format: {designation}")

@@ -327,6 +327,133 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen);
 int mpc_unpack_provisional(const char *packed, char *output, size_t outlen);
 
 /* =============================================================================
+ * FORMAT CONVERSION FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * MPC 12-character report format buffer size.
+ * The report format is always exactly 12 characters (plus null terminator).
+ */
+#define MPC_REPORT_FORMAT_SIZE 13
+
+/*
+ * Convert minimal packed format to 12-character MPC report format.
+ *
+ * The 12-character format is used in MPC observation records (columns 1-12).
+ * For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+ *
+ * Examples:
+ *   "0073Pa"  -> "0073P      a" (numbered comet with single fragment)
+ *   "0073Paa" -> "0073P     aa" (numbered comet with double fragment)
+ *   "00001"   -> "     00001  " (numbered asteroid)
+ *   "J95X00A" -> "     J95X00A" (provisional asteroid)
+ *   "CJ95O010"-> "    CJ95O010" (provisional comet - no fragment)
+ *
+ * Parameters:
+ *   minimal - Input minimal packed designation
+ *   report  - Buffer to receive 12-character format (must be >= 13 bytes)
+ *   outlen  - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_to_report_format(const char *minimal, char *report, size_t outlen);
+
+/*
+ * Convert 12-character MPC report format to minimal packed format.
+ *
+ * Parameters:
+ *   report  - Input 12-character format designation
+ *   minimal - Buffer to receive minimal packed designation
+ *   outlen  - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_from_report_format(const char *report, char *minimal, size_t outlen);
+
+/* =============================================================================
+ * FRAGMENT HELPER FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * Check if a designation has a comet fragment suffix.
+ *
+ * Works with both packed and unpacked formats.
+ *
+ * Parameters:
+ *   desig - Designation to check (packed or unpacked)
+ *
+ * Returns:
+ *   1 if has fragment, 0 if no fragment or not a comet
+ */
+int mpc_has_fragment(const char *desig);
+
+/*
+ * Extract the fragment suffix from a comet designation.
+ *
+ * Works with both packed and unpacked formats.
+ * Fragment is returned in uppercase (e.g., "A", "AA").
+ *
+ * Parameters:
+ *   desig    - Designation to extract fragment from
+ *   fragment - Buffer to receive fragment (uppercase)
+ *   outlen   - Size of output buffer (3 bytes minimum for "AA\0")
+ *
+ * Returns:
+ *   MPC_OK on success (fragment buffer filled, may be empty string if no fragment)
+ *   MPC_ERR_FORMAT if not a valid designation
+ */
+int mpc_get_fragment(const char *desig, char *fragment, size_t outlen);
+
+/*
+ * Get the parent comet designation (without fragment suffix).
+ *
+ * Works with both packed and unpacked formats.
+ * Returns the designation in the same format (packed or unpacked) as input.
+ *
+ * Examples:
+ *   "73P-A"   -> "73P"
+ *   "0073Pa"  -> "0073P"
+ *   "73P"     -> "73P" (no change)
+ *   "C/1995 O1-A" -> "C/1995 O1"
+ *
+ * Parameters:
+ *   desig  - Designation to get parent from
+ *   parent - Buffer to receive parent designation
+ *   outlen - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success
+ *   MPC_ERR_FORMAT if not a valid comet designation
+ */
+int mpc_get_parent(const char *desig, char *parent, size_t outlen);
+
+/* =============================================================================
+ * COMPARISON FUNCTIONS
+ * ============================================================================= */
+
+/*
+ * Check if two designations refer to the same object.
+ *
+ * This function normalizes both designations to a canonical form
+ * and compares them, handling different formats (packed/unpacked).
+ *
+ * Examples:
+ *   mpc_designations_equal("1995 XA", "J95X00A") -> 1 (same object)
+ *   mpc_designations_equal("73P", "0073P") -> 1 (same object)
+ *   mpc_designations_equal("73P-A", "73P-B") -> 0 (different fragments)
+ *
+ * Parameters:
+ *   desig1 - First designation
+ *   desig2 - Second designation
+ *
+ * Returns:
+ *   1 if same object, 0 if different or invalid
+ */
+int mpc_designations_equal(const char *desig1, const char *desig2);
+
+/* =============================================================================
  * UTILITY FUNCTIONS
  * ============================================================================= */
 
