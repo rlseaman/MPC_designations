@@ -488,12 +488,32 @@ namespace MPC
                 throw new MPCDesignationException($"Invalid century code: {centuryCode}");
             }
 
+            // Validate century code for asteroids: only I-L (1800-2199) are valid
+            if (centuryCode < 'I' || centuryCode > 'L')
+            {
+                throw new MPCDesignationException($"Invalid century code for asteroid: {centuryCode} (must be I-L)");
+            }
+
             int yearShort = int.Parse(p.Substring(1, 2));
             char hm = p[3];
             int orderNum = DecodeCycleCount(p.Substring(4, 2));
             char sl = p[6];
 
             int fullYear = century * 100 + yearShort;
+
+            // Pre-1925 designations use A-prefix format
+            if (fullYear < 1925)
+            {
+                string fullYearStr = fullYear.ToString();
+                char firstDigit = fullYearStr[0];
+                string yearSuffix = fullYearStr.Substring(1);
+                char prefix = firstDigit == '1' ? 'A' : 'B';
+                if (orderNum == 0)
+                {
+                    return $"{prefix}{yearSuffix} {hm}{sl}";
+                }
+                return $"{prefix}{yearSuffix} {hm}{sl}{orderNum}";
+            }
 
             if (orderNum == 0)
             {
@@ -583,7 +603,8 @@ namespace MPC
         {
             string u = Trim(unpacked);
 
-            var match = Regex.Match(u, @"^(\d+)([PD])(?:/[A-Za-z].*)?$");
+            // Match "1P", "73P-A", "73P-AA", "1P/Halley" (with optional fragment and/or name)
+            var match = Regex.Match(u, @"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
             if (!match.Success)
             {
                 throw new MPCDesignationException("Invalid unpacked numbered comet designation");
@@ -591,20 +612,27 @@ namespace MPC
 
             int number = int.Parse(match.Groups[1].Value);
             char cometType = match.Groups[2].Value[0];
+            string fragment = match.Groups[3].Success ? match.Groups[3].Value : "";
 
             if (number < 1 || number > 9999)
             {
                 throw new MPCDesignationException($"Comet number out of range (1-9999): {number}");
             }
 
-            return $"{number:D4}{cometType}";
+            string result = $"{number:D4}{cometType}";
+            if (!string.IsNullOrEmpty(fragment))
+            {
+                result += fragment.ToLower();
+            }
+            return result;
         }
 
         private static string UnpackCometNumbered(string packed)
         {
             string p = Trim(packed);
 
-            var match = Regex.Match(p, @"^(\d{4})([PD])$");
+            // Match numbered comet with optional fragment: "0073P", "0073Pa", "0073Paa"
+            var match = Regex.Match(p, @"^(\d{4})([PD])([a-z]{1,2})?$");
             if (!match.Success)
             {
                 throw new MPCDesignationException("Invalid packed numbered comet designation");
@@ -612,7 +640,12 @@ namespace MPC
 
             int number = int.Parse(match.Groups[1].Value);
             char cometType = match.Groups[2].Value[0];
+            string fragment = match.Groups[3].Success ? match.Groups[3].Value : "";
 
+            if (!string.IsNullOrEmpty(fragment))
+            {
+                return $"{number}{cometType}-{fragment.ToUpper()}";
+            }
             return $"{number}{cometType}";
         }
 
@@ -1044,6 +1077,16 @@ namespace MPC
                 }
             }
 
+            // Check for packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
+            if ((len == 6 || len == 7) && des.Take(4).All(char.IsDigit) &&
+                (des[4] == 'P' || des[4] == 'D') && des.Skip(5).All(char.IsLower))
+            {
+                info.Format = Format.Packed;
+                info.Type = DesignationType.CometNumbered;
+                info.Subtype = $"comet numbered {GetCometTypeName(des[4])} with fragment";
+                return info;
+            }
+
             // Check for packed provisional (7 chars)
             if (len == 7)
             {
@@ -1171,14 +1214,17 @@ namespace MPC
                 return info;
             }
 
-            // Check for unpacked numbered comet
-            var numberedMatch = Regex.Match(des, @"^(\d+)([PD])(?:/[A-Za-z].*)?$");
+            // Check for unpacked numbered comet with optional fragment
+            var numberedMatch = Regex.Match(des, @"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
             if (numberedMatch.Success)
             {
                 char cometType = numberedMatch.Groups[2].Value[0];
+                string fragment = numberedMatch.Groups[3].Success ? numberedMatch.Groups[3].Value : "";
                 info.Format = Format.Unpacked;
                 info.Type = DesignationType.CometNumbered;
-                info.Subtype = $"comet numbered {GetCometTypeName(cometType)}";
+                info.Subtype = !string.IsNullOrEmpty(fragment)
+                    ? $"comet numbered {GetCometTypeName(cometType)} with fragment"
+                    : $"comet numbered {GetCometTypeName(cometType)}";
                 return info;
             }
 
@@ -1267,6 +1313,198 @@ namespace MPC
             {
                 DetectFormat(designation);
                 return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // =========================================================================
+        // Helper functions for format conversion and fragment handling
+        // =========================================================================
+
+        /// <summary>
+        /// Convert minimal packed format to 12-character MPC observation report format.
+        /// The 12-char format is used in MPC observation records (columns 1-12).
+        /// </summary>
+        public static string ToReportFormat(string minimal)
+        {
+            string m = Trim(minimal);
+
+            // Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
+            var match = Regex.Match(m, @"^(\d{4}[PD])([a-z]{1,2})?$");
+            if (match.Success)
+            {
+                string basePart = match.Groups[1].Value;  // "0073P"
+                string fragment = match.Groups[2].Success ? match.Groups[2].Value : "";
+                if (!string.IsNullOrEmpty(fragment))
+                {
+                    // Put fragment in columns 11-12, comet designation left-aligned
+                    int padding = 12 - basePart.Length - fragment.Length;
+                    return basePart + new string(' ', padding) + fragment;
+                }
+                // Numbered comet without fragment, left-aligned with trailing spaces
+                return basePart.PadRight(12);
+            }
+
+            // All other formats: right-align in 12 characters
+            return m.PadLeft(12);
+        }
+
+        /// <summary>
+        /// Convert 12-character MPC report format to minimal packed format.
+        /// </summary>
+        public static string FromReportFormat(string report)
+        {
+            if (report.Length != 12)
+            {
+                throw new MPCDesignationException("Report format must be exactly 12 characters");
+            }
+
+            // Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
+            var match = Regex.Match(report, @"^(\d{4}[PD])(\s*)([a-z]{0,2})$");
+            if (match.Success)
+            {
+                string basePart = match.Groups[1].Value;  // "0073P"
+                string fragment = match.Groups[3].Value;
+                if (!string.IsNullOrEmpty(fragment))
+                {
+                    return basePart + fragment;
+                }
+                return basePart;
+            }
+
+            // All other formats: just trim whitespace
+            return report.Trim();
+        }
+
+        /// <summary>
+        /// Check if designation has a comet fragment suffix.
+        /// Works with both packed and unpacked formats.
+        /// </summary>
+        public static bool HasFragment(string designation)
+        {
+            string d = Trim(designation);
+
+            // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+            if (Regex.IsMatch(d, @"^\d+[PD]-[A-Z]{1,2}(?:/.*)?$"))
+            {
+                return true;
+            }
+
+            // Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+            if (Regex.IsMatch(d, @"^[PCDXAI]/\d+ [A-Z]\d+-[A-Z]{1,2}$"))
+            {
+                return true;
+            }
+
+            // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+            if (Regex.IsMatch(d, @"^\d{4}[PD][a-z]{1,2}$"))
+            {
+                return true;
+            }
+
+            // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa" (8-9 chars)
+            if (Regex.IsMatch(d, @"^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]{1,2}$"))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Extract fragment suffix from comet designation.
+        /// Returns uppercase fragment (e.g., "A", "AA"), empty string if no fragment.
+        /// Works with both packed and unpacked formats.
+        /// </summary>
+        public static string GetFragment(string designation)
+        {
+            string d = Trim(designation);
+
+            // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+            var match = Regex.Match(d, @"^\d+[PD]-([A-Z]{1,2})(?:/.*)?$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            // Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+            match = Regex.Match(d, @"^[PCDXAI]/\d+ [A-Z]\d+-([A-Z]{1,2})$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+            match = Regex.Match(d, @"^\d{4}[PD]([a-z]{1,2})$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value.ToUpper();
+            }
+
+            // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa"
+            match = Regex.Match(d, @"^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z]{1,2})$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value.ToUpper();
+            }
+
+            return "";
+        }
+
+        /// <summary>
+        /// Get parent comet designation without fragment suffix.
+        /// Returns in same format (packed or unpacked) as input.
+        /// </summary>
+        public static string GetParent(string designation)
+        {
+            string d = Trim(designation);
+
+            // Unpacked numbered comet with fragment: "73P-A" -> "73P"
+            var match = Regex.Match(d, @"^(\d+[PD])-[A-Z]{1,2}((?:/.*)?)$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value + match.Groups[2].Value;
+            }
+
+            // Unpacked provisional comet with fragment: "D/1993 F2-A" -> "D/1993 F2"
+            match = Regex.Match(d, @"^([PCDXAI]/\d+ [A-Z]\d+)-[A-Z]{1,2}$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            // Packed numbered comet with fragment: "0073Pa" -> "0073P"
+            match = Regex.Match(d, @"^(\d{4}[PD])[a-z]{1,2}$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value;
+            }
+
+            // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+            match = Regex.Match(d, @"^([PCDXAI][A-L]\d{2}[A-Z]\d{2})[a-z]{1,2}$");
+            if (match.Success)
+            {
+                return match.Groups[1].Value + "0";
+            }
+
+            // No fragment found, return as-is
+            return d;
+        }
+
+        /// <summary>
+        /// Check if two designations refer to the same object.
+        /// Normalizes both to packed format before comparing.
+        /// </summary>
+        public static bool DesignationsEqual(string d1, string d2)
+        {
+            try
+            {
+                string packed1 = Pack(d1);
+                string packed2 = Pack(d2);
+                return packed1 == packed2;
             }
             catch
             {

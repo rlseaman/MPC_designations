@@ -210,7 +210,7 @@ Updated test cases:
 - [x] AWK (awk/src/mpc_designation.awk)
 - [ ] Bash
 - [x] C++ (cpp/src/mpc_designation.cpp)
-- [ ] C#
+- [x] C# (csharp/src/MpcDesignation.cs)
 - [ ] Forth
 - [x] Fortran (fortran/src/mpc_designation.f90)
 - [ ] Haskell
@@ -271,18 +271,17 @@ Packed 8-char: ^[A-L]\d{2}[A-Z]\d{2}[a-z]{2}$
 The following languages still need helper functions and test_helpers with 77 test cases:
 
 **Remaining (in approximate performance order)**:
-1. C# - .NET JIT
-2. Haskell - compiled functional
-3. Forth - stack-based
-4. R - interpreted
-5. Octave/MATLAB - interpreted
-6. Bash - shell scripting
+1. Haskell - compiled functional
+2. Forth - stack-based
+3. R - interpreted
+4. Octave/MATLAB - interpreted
+5. Bash - shell scripting
 
 **Completed** (helper functions + test_helpers + README documentation):
-- C, Go, Java, JavaScript, Kotlin, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
+- C, C#, Go, Java, JavaScript, Kotlin, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
 - AWK, C++, Fortran, Julia, Nim, SPP/IRAF, Swift
 
-**README Documentation Status**: All 18 completed language implementations have been reviewed and updated with:
+**README Documentation Status**: All 19 completed language implementations have been reviewed and updated with:
 - Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)
 - Full API documentation including all 6 helper functions
 - Makefile targets verified to match documented test commands

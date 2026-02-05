@@ -135,6 +135,27 @@ Methods:
 - `PackPermanent(number) -> string` - Pack asteroid number
 - `UnpackPermanent(packed) -> long` - Unpack to asteroid number
 
+Helper Functions:
+
+- `ToReportFormat(minimal) -> string` - Convert minimal packed to 12-char MPC report format
+- `FromReportFormat(report) -> string` - Convert 12-char report format to minimal packed
+- `HasFragment(designation) -> bool` - Check if designation has a comet fragment suffix
+- `GetFragment(designation) -> string` - Extract fragment suffix (uppercase, e.g., "A", "AA")
+- `GetParent(designation) -> string` - Get parent comet without fragment
+- `DesignationsEqual(d1, d2) -> bool` - Check if same object (compares packed forms)
+
+```csharp
+// Helper function examples
+string report = MPCDesignation.ToReportFormat("0073Pa");  // "0073P      a"
+string minimal = MPCDesignation.FromReportFormat("0073P      a");  // "0073Pa"
+
+bool hasFrag = MPCDesignation.HasFragment("73P-A");  // true
+string frag = MPCDesignation.GetFragment("73P-A");  // "A"
+string parent = MPCDesignation.GetParent("73P-A");  // "73P"
+
+bool same = MPCDesignation.DesignationsEqual("73P-A", "0073Pa");  // true
+```
+
 #### Exception Class `MPCDesignationException`
 
 Thrown for invalid designations. Inherits from `System.Exception`.
@@ -157,8 +178,10 @@ Thrown for invalid designations. Inherits from `System.Exception`.
 | Type | Unpacked | Packed |
 |------|----------|--------|
 | Numbered | 1P | 0001P |
+| Numbered (fragment) | 73P-A | 0073Pa |
+| Numbered (2-letter fragment) | 73P-AA | 0073Paa |
 | Provisional | C/1995 O1 | CJ95O010 |
-| With fragment | D/1993 F2-B | DJ93F02b |
+| Provisional (fragment) | D/1993 F2-B | DJ93F02b |
 | Ancient | C/240 V1 | C240V010 |
 | BCE | C/-146 P1 | C.53P010 |
 
@@ -172,10 +195,11 @@ Thrown for invalid designations. Inherits from `System.Exception`.
 
 ```bash
 # Run all tests
-make test
+make test-all
 
 # Run specific tests
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ entries)
 make test-roundtrip # Roundtrip verification
 

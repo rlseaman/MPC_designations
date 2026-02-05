@@ -1,6 +1,6 @@
 # C# MPC Designation Converter Makefile
 
-.PHONY: all build clean test test-csv test-errors test-roundtrip test-all help
+.PHONY: all build clean test test-csv test-errors test-helpers test-roundtrip test-all help
 
 # Test data paths
 TEST_DATA_DIR := ../test-data
@@ -18,11 +18,11 @@ build:
 	dotnet build -c Release
 
 # Run all tests
-test: test-errors test-csv
+test: test-errors test-helpers test-csv
 	@echo ""
 	@echo "=== All C# Tests Complete ==="
 
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-helpers test-csv test-roundtrip
 	@echo ""
 	@echo "=== All C# Tests Complete ==="
 
@@ -35,6 +35,11 @@ test-csv: $(CSV_FILE)
 test-errors:
 	@echo "--- C# Error Tests ---"
 	dotnet run --project test/TestErrors.csproj -c Release -- $(ERROR_FILE)
+
+# Run helper function tests
+test-helpers:
+	@echo "--- C# Helper Tests ---"
+	dotnet run --project test/TestHelpers.csproj -c Release
 
 # Run roundtrip tests
 test-roundtrip: $(CSV_FILE)
@@ -53,10 +58,11 @@ help:
 	@echo "Targets:"
 	@echo "  all           Build CLI tool (default)"
 	@echo "  build         Build the project"
-	@echo "  test          Run error and CSV tests"
+	@echo "  test          Run error, helper, and CSV tests"
 	@echo "  test-all      Run all tests including roundtrip"
+	@echo "  test-errors   Run error handling tests (94 cases)"
+	@echo "  test-helpers  Run helper function tests (77 cases)"
 	@echo "  test-csv      Run CSV conversion tests (2M+ entries)"
-	@echo "  test-errors   Run error handling tests"
 	@echo "  test-roundtrip Run roundtrip tests"
 	@echo "  clean         Remove built files"
 	@echo "  help          Show this help"
