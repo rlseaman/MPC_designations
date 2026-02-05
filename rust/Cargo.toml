@@ -29,6 +29,10 @@ path = "src/bin/test_roundtrip.rs"
 name = "test_errors"
 path = "src/bin/test_errors.rs"
 
+[[bin]]
+name = "test_helpers"
+path = "src/bin/test_helpers.rs"
+
 [dependencies]
 regex = "1"
 lazy_static = "1"

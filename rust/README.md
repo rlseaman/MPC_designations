@@ -169,11 +169,88 @@ Ensure a designation is in unpacked format.
 
 Check if a string is a valid MPC designation.
 
+### Helper Functions
+
+#### `to_report_format(minimal: &str) -> Result<String>`
+
+Convert minimal packed format to 12-character MPC report format.
+
+```rust
+use mpc_designation::to_report_format;
+
+let report = to_report_format("0073Pa").unwrap();  // "0073P      a"
+let report = to_report_format("00001").unwrap();   // "       00001"
+```
+
+#### `from_report_format(report: &str) -> Result<String>`
+
+Convert 12-character MPC report format to minimal packed format.
+
+```rust
+use mpc_designation::from_report_format;
+
+let minimal = from_report_format("0073P      a").unwrap();  // "0073Pa"
+let minimal = from_report_format("       00001").unwrap();  // "00001"
+```
+
+#### `has_fragment(desig: &str) -> bool`
+
+Check if a designation has a comet fragment suffix.
+
+```rust
+use mpc_designation::has_fragment;
+
+assert!(has_fragment("73P-A"));      // true
+assert!(!has_fragment("73P"));       // false
+assert!(has_fragment("0073Pa"));     // true (packed)
+```
+
+#### `get_fragment(desig: &str) -> Result<String>`
+
+Extract the fragment suffix from a comet designation (uppercase).
+
+```rust
+use mpc_designation::get_fragment;
+
+let frag = get_fragment("73P-A").unwrap();    // "A"
+let frag = get_fragment("0073Paa").unwrap();  // "AA"
+let frag = get_fragment("73P").unwrap();      // ""
+```
+
+#### `get_parent(desig: &str) -> Result<String>`
+
+Get the parent comet designation without fragment suffix.
+
+```rust
+use mpc_designation::get_parent;
+
+let parent = get_parent("73P-A").unwrap();    // "73P"
+let parent = get_parent("0073Paa").unwrap();  // "0073P"
+```
+
+#### `designations_equal(desig1: &str, desig2: &str) -> bool`
+
+Check if two designations refer to the same object.
+
+```rust
+use mpc_designation::designations_equal;
+
+assert!(designations_equal("1995 XA", "J95X00A"));  // true
+assert!(designations_equal("73P-A", "0073Pa"));    // true
+assert!(!designations_equal("73P-A", "73P-B"));    // false
+```
+
 ## Testing
 
 ```bash
-# Build and run conversion tests
+# Build and run conversion tests (2M+ cases)
 make test
+
+# Run error handling tests (94 cases)
+make test-errors
+
+# Run helper function tests (77 cases)
+make test-helpers
 
 # Run round-trip tests
 make test-roundtrip

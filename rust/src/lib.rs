@@ -410,12 +410,37 @@ fn unpack_provisional(packed: &str) -> Result<String> {
     let order_encoded: String = chars[4..6].iter().collect();
     let second_letter = chars[6];
 
+    // Asteroid provisionals: only I-L valid (1800-2199)
+    if century != 'I' && century != 'J' && century != 'K' && century != 'L' {
+        return Err(MPCDesignationError::new(format!(
+            "Invalid century code for asteroid provisional: {} (must be I-L for years 1800-2199)", century
+        )));
+    }
+
     let century_val = CENTURY_CODES.get(&century).ok_or_else(|| {
         MPCDesignationError::new(format!("Invalid century code: {}", century))
     })?;
 
     let full_year = format!("{}{}", century_val, year);
+    let year_num: u32 = full_year.parse().unwrap();
     let order_num = decode_cycle_count(&order_encoded)?;
+
+    // For pre-1925 designations, use A-prefix format (MPC canonical)
+    if year_num < 1925 {
+        let first_digit = full_year.chars().next().unwrap();
+        let rest_of_year: String = full_year.chars().skip(1).collect();
+        let prefix = match first_digit {
+            '1' => "A",
+            '2' => "B",
+            _ => "",
+        };
+        if !prefix.is_empty() {
+            if order_num == 0 {
+                return Ok(format!("{}{} {}{}", prefix, rest_of_year, half_month, second_letter));
+            }
+            return Ok(format!("{}{} {}{}{}", prefix, rest_of_year, half_month, second_letter, order_num));
+        }
+    }
 
     if order_num == 0 {
         Ok(format!("{} {}{}", full_year, half_month, second_letter))
@@ -467,6 +492,14 @@ fn pack_provisional(unpacked: &str) -> Result<String> {
 
         if !is_valid_half_month(half_month) {
             return Err(MPCDesignationError::new(format!("Invalid half-month letter: {}", half_month)));
+        }
+
+        // Asteroid provisionals: only years 1800-2199 valid
+        let year_int: u32 = year.parse().unwrap();
+        if year_int < 1800 || year_int > 2199 {
+            return Err(MPCDesignationError::new(format!(
+                "Year out of range for asteroid provisional: {} (must be 1800-2199)", year
+            )));
         }
 
         let century: u32 = year[0..2].parse().unwrap();
@@ -570,32 +603,50 @@ fn pack_comet_provisional(unpacked: &str) -> Result<String> {
 // Numbered comet designations
 // =============================================================================
 
+/// Unpack a numbered comet designation.
+/// Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
 fn unpack_comet_numbered(packed: &str) -> Result<String> {
     let packed = packed.trim();
 
-    if let Some(caps) = regex_captures!(r"^(\d{4})([PD])$", packed) {
+    // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
+    if let Some(caps) = regex_captures!(r"^(\d{4})([PD])([a-z]{1,2})?$", packed) {
         let number: u32 = caps[1].parse().unwrap();
         let comet_type = &caps[2];
-        return Ok(format!("{}{}", number, comet_type));
+        let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
+
+        let mut result = format!("{}{}", number, comet_type);
+        if !fragment.is_empty() {
+            result.push('-');
+            result.push_str(&fragment.to_uppercase());
+        }
+        return Ok(result);
     }
 
     Err(MPCDesignationError::new(format!("Invalid packed numbered comet designation: {}", packed)))
 }
 
+/// Pack a numbered comet designation.
+/// Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
 fn pack_comet_numbered(unpacked: &str) -> Result<String> {
     let unpacked = unpacked.trim();
 
-    if let Some(caps) = regex_captures!(r"^(\d+)([PD])(?:/[A-Za-z].*)?$", unpacked) {
+    // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
+    if let Some(caps) = regex_captures!(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", unpacked) {
         let number: u32 = caps[1].parse().map_err(|_| {
             MPCDesignationError::new(format!("Invalid comet number: {}", &caps[1]))
         })?;
         let comet_type = &caps[2];
+        let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
 
         if number < 1 || number > 9999 {
             return Err(MPCDesignationError::new(format!("Comet number out of range (1-9999): {}", number)));
         }
 
-        return Ok(format!("{:04}{}", number, comet_type));
+        let mut result = format!("{:04}{}", number, comet_type);
+        if !fragment.is_empty() {
+            result.push_str(&fragment.to_lowercase());
+        }
+        return Ok(result);
     }
 
     Err(MPCDesignationError::new(format!("Invalid unpacked numbered comet designation: {}", unpacked)))
@@ -1009,12 +1060,27 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
         }
     }
 
-    // Check for packed numbered comet
+    // Check for packed numbered comet (with optional fragment)
     if des.len() == 5 {
         if regex_captures!(r"^[0-9]{4}[PD]$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_numbered".to_string();
             info.subtype = "comet numbered".to_string();
+            return Ok(info);
+        }
+    }
+
+    // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+    if des.len() == 6 || des.len() == 7 {
+        if regex_captures!(r"^[0-9]{4}[PD][a-z]{1,2}$", des).is_some() {
+            info.format = "packed".to_string();
+            info.designation_type = "comet_numbered".to_string();
+            let frag_len = des.len() - 5;
+            if frag_len == 1 {
+                info.subtype = "comet numbered with fragment".to_string();
+            } else {
+                info.subtype = "comet numbered with 2-letter fragment".to_string();
+            }
             return Ok(info);
         }
     }
@@ -1084,11 +1150,20 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
         return Ok(info);
     }
 
-    // Check for unpacked numbered comet
-    if regex_captures!(r"^(\d+)([PD])(?:/[A-Za-z].*)?$", des).is_some() {
+    // Check for unpacked numbered comet (with optional fragment)
+    if let Some(caps) = regex_captures!(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des) {
         info.format = "unpacked".to_string();
         info.designation_type = "comet_numbered".to_string();
-        info.subtype = "comet numbered".to_string();
+        let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
+        if !fragment.is_empty() {
+            if fragment.len() == 1 {
+                info.subtype = "comet numbered with fragment".to_string();
+            } else {
+                info.subtype = "comet numbered with 2-letter fragment".to_string();
+            }
+        } else {
+            info.subtype = "comet numbered".to_string();
+        }
         return Ok(info);
     }
 
@@ -1166,6 +1241,351 @@ pub fn unpack(designation: &str) -> Result<String> {
 /// Check if a string is a valid MPC designation
 pub fn is_valid_designation(designation: &str) -> bool {
     detect_format(designation).is_ok()
+}
+
+// =============================================================================
+// Helper Functions for Format Conversion and Fragment Handling
+// =============================================================================
+
+/// Convert minimal packed format to 12-character MPC report format.
+/// The 12-character format is used in MPC observation records (columns 1-12).
+/// For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+///
+/// # Examples
+/// ```
+/// use mpc_designation::to_report_format;
+/// assert_eq!(to_report_format("0073Pa").unwrap(), "0073P      a");
+/// assert_eq!(to_report_format("00001").unwrap(), "       00001");
+/// ```
+pub fn to_report_format(minimal: &str) -> Result<String> {
+    let minimal = minimal.trim();
+    let length = minimal.len();
+
+    let info = detect_format(minimal)?;
+
+    if info.format != "packed" {
+        return Err(MPCDesignationError::new(format!(
+            "to_report_format requires packed format input: {}", minimal
+        )));
+    }
+
+    let mut report = [' '; 12];
+
+    match info.designation_type.as_str() {
+        "permanent" => {
+            // Right-align 5-char designation
+            for (i, c) in minimal.chars().enumerate() {
+                report[12 - length + i] = c;
+            }
+        }
+        "provisional" | "provisional_extended" | "survey" => {
+            // Right-align 7-char designation
+            for (i, c) in minimal.chars().enumerate() {
+                report[12 - length + i] = c;
+            }
+        }
+        "comet_numbered" => {
+            // Numbered comet: first 5 chars (####P), fragment in cols 11-12
+            let chars: Vec<char> = minimal.chars().collect();
+            if length == 5 {
+                // No fragment
+                for i in 0..5 {
+                    report[i] = chars[i];
+                }
+            } else if length == 6 {
+                // Single-letter fragment
+                for i in 0..5 {
+                    report[i] = chars[i];
+                }
+                report[11] = chars[5];
+            } else if length == 7 {
+                // Two-letter fragment
+                for i in 0..5 {
+                    report[i] = chars[i];
+                }
+                report[10] = chars[5];
+                report[11] = chars[6];
+            }
+        }
+        "comet_provisional" | "comet_full" | "comet_ancient" | "comet_bce" => {
+            // Right-align in 12-char field
+            for (i, c) in minimal.chars().enumerate() {
+                report[12 - length + i] = c;
+            }
+        }
+        "satellite" => {
+            // Right-align 8-char designation
+            for (i, c) in minimal.chars().enumerate() {
+                report[12 - length + i] = c;
+            }
+        }
+        _ => {
+            return Err(MPCDesignationError::new(format!(
+                "Unsupported type for report format: {}", info.designation_type
+            )));
+        }
+    }
+
+    Ok(report.iter().collect())
+}
+
+/// Convert 12-character MPC report format to minimal packed format.
+///
+/// # Examples
+/// ```
+/// use mpc_designation::from_report_format;
+/// assert_eq!(from_report_format("0073P      a").unwrap(), "0073Pa");
+/// assert_eq!(from_report_format("       00001").unwrap(), "00001");
+/// ```
+pub fn from_report_format(report: &str) -> Result<String> {
+    let mut report = report.to_string();
+
+    if report.len() > 12 {
+        return Err(MPCDesignationError::new(format!(
+            "Report format too long: {}", report
+        )));
+    }
+
+    // Pad to 12 chars if shorter
+    while report.len() < 12 {
+        report.insert(0, ' ');
+    }
+
+    let chars: Vec<char> = report.chars().collect();
+
+    // Check for numbered comet with fragment (fragment in cols 11-12)
+    // Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+    let first5: String = chars[0..5].iter().collect();
+    let middle: String = chars[5..10].iter().collect();
+    let frag1 = chars[10];
+    let frag2 = chars[11];
+
+    // Check if this is a numbered comet format
+    if regex_captures!(r"^[0-9]{4}[PD]$", &first5).is_some() && middle.trim().is_empty() {
+        let mut result = first5;
+        if frag1 >= 'a' && frag1 <= 'z' {
+            result.push(frag1);
+        }
+        if frag2 >= 'a' && frag2 <= 'z' {
+            result.push(frag2);
+        }
+        return Ok(result);
+    }
+
+    // Standard case: just trim spaces
+    Ok(report.trim().to_string())
+}
+
+/// Check if a designation has a comet fragment suffix.
+/// Works with both packed and unpacked formats.
+///
+/// # Examples
+/// ```
+/// use mpc_designation::has_fragment;
+/// assert_eq!(has_fragment("73P-A"), true);
+/// assert_eq!(has_fragment("73P"), false);
+/// assert_eq!(has_fragment("0073Pa"), true);
+/// ```
+pub fn has_fragment(desig: &str) -> bool {
+    let info = match detect_format(desig) {
+        Ok(i) => i,
+        Err(_) => return false,
+    };
+
+    let dtype = &info.designation_type;
+
+    // Only comets can have fragments
+    if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+        return false;
+    }
+
+    let desig = desig.trim();
+    let length = desig.len();
+
+    if info.format == "unpacked" {
+        // Look for "-X" or "-XX" at end
+        return regex_captures!(r".*-[A-Z]{1,2}$", desig).is_some();
+    } else {
+        // Packed format
+        if dtype == "comet_numbered" {
+            // Check for lowercase after P/D (position 5+)
+            if length > 5 {
+                let c = desig.chars().nth(5).unwrap();
+                return c >= 'a' && c <= 'z';
+            }
+        } else if dtype == "comet_provisional" {
+            // 7-char: last char lowercase and not '0'
+            let last_char = desig.chars().last().unwrap();
+            return last_char >= 'a' && last_char <= 'z' && last_char != '0';
+        } else if dtype == "comet_full" {
+            let last_char = desig.chars().last().unwrap();
+            return last_char >= 'a' && last_char <= 'z' && last_char != '0';
+        }
+    }
+    false
+}
+
+/// Extract the fragment suffix from a comet designation.
+/// Works with both packed and unpacked formats.
+/// Fragment is returned in uppercase (e.g., "A", "AA").
+/// Returns empty string if no fragment.
+///
+/// # Examples
+/// ```
+/// use mpc_designation::get_fragment;
+/// assert_eq!(get_fragment("73P-A").unwrap(), "A");
+/// assert_eq!(get_fragment("0073Paa").unwrap(), "AA");
+/// assert_eq!(get_fragment("73P").unwrap(), "");
+/// ```
+pub fn get_fragment(desig: &str) -> Result<String> {
+    let info = detect_format(desig)?;
+    let dtype = &info.designation_type;
+
+    // Only comets can have fragments
+    if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+        return Ok(String::new());
+    }
+
+    let desig = desig.trim();
+    let length = desig.len();
+
+    if info.format == "unpacked" {
+        // Look for "-X" or "-XX" at end
+        if let Some(caps) = regex_captures!(r"-([A-Z]{1,2})$", desig) {
+            return Ok(caps[1].to_string());
+        }
+    } else {
+        // Packed format
+        if dtype == "comet_numbered" {
+            // Fragment is lowercase after P/D
+            if length == 6 {
+                return Ok(desig.chars().nth(5).unwrap().to_uppercase().to_string());
+            } else if length == 7 {
+                return Ok(desig[5..7].to_uppercase());
+            }
+        } else if dtype == "comet_provisional" {
+            // 7-char: position 6 if lowercase and not '0'
+            // 8-char: positions 6-7 if lowercase
+            if length == 7 {
+                let last_char = desig.chars().nth(6).unwrap();
+                if last_char >= 'a' && last_char <= 'z' && last_char != '0' {
+                    return Ok(last_char.to_uppercase().to_string());
+                }
+            } else if length == 8 {
+                let frag = &desig[6..8];
+                let chars: Vec<char> = frag.chars().collect();
+                if chars[0] >= 'a' && chars[0] <= 'z' && chars[1] >= 'a' && chars[1] <= 'z' {
+                    return Ok(frag.to_uppercase());
+                }
+            }
+        } else if dtype == "comet_full" {
+            // 8-char: position 7 if lowercase and not '0'
+            // 9-char: positions 7-8 if lowercase
+            if length == 8 {
+                let last_char = desig.chars().nth(7).unwrap();
+                if last_char >= 'a' && last_char <= 'z' && last_char != '0' {
+                    return Ok(last_char.to_uppercase().to_string());
+                }
+            } else if length == 9 {
+                let frag = &desig[7..9];
+                let chars: Vec<char> = frag.chars().collect();
+                if chars[0] >= 'a' && chars[0] <= 'z' && chars[1] >= 'a' && chars[1] <= 'z' {
+                    return Ok(frag.to_uppercase());
+                }
+            }
+        }
+    }
+
+    Ok(String::new())
+}
+
+/// Get the parent comet designation (without fragment suffix).
+/// Works with both packed and unpacked formats.
+/// Returns the designation in the same format (packed or unpacked) as input.
+///
+/// # Examples
+/// ```
+/// use mpc_designation::get_parent;
+/// assert_eq!(get_parent("73P-A").unwrap(), "73P");
+/// assert_eq!(get_parent("0073Paa").unwrap(), "0073P");
+/// ```
+pub fn get_parent(desig: &str) -> Result<String> {
+    let info = detect_format(desig)?;
+    let dtype = &info.designation_type;
+
+    // Non-comets: return as-is
+    if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+        return Ok(desig.trim().to_string());
+    }
+
+    let desig = desig.trim();
+    let length = desig.len();
+
+    if info.format == "unpacked" {
+        // Remove "-X" or "-XX" suffix if present
+        if let Some(caps) = regex_captures!(r"^(.+)-[A-Z]{1,2}$", desig) {
+            return Ok(caps[1].to_string());
+        }
+    } else {
+        // Packed format
+        if dtype == "comet_numbered" {
+            // Remove lowercase fragment letters after P/D
+            if length > 5 {
+                let c = desig.chars().nth(5).unwrap();
+                if c >= 'a' && c <= 'z' {
+                    return Ok(desig[0..5].to_string());
+                }
+            }
+        } else if dtype == "comet_provisional" {
+            // 7-char: replace lowercase fragment with '0'
+            // 8-char: replace 2 lowercase with '0', truncate
+            if length == 7 {
+                let last_char = desig.chars().nth(6).unwrap();
+                if last_char >= 'a' && last_char <= 'z' && last_char != '0' {
+                    return Ok(format!("{}0", &desig[0..6]));
+                }
+            } else if length == 8 {
+                let c = desig.chars().nth(6).unwrap();
+                if c >= 'a' && c <= 'z' {
+                    return Ok(format!("{}0", &desig[0..6]));
+                }
+            }
+        } else if dtype == "comet_full" {
+            // 8-char: replace fragment with '0'
+            // 9-char: replace fragment with '0', truncate
+            if length == 8 {
+                let last_char = desig.chars().nth(7).unwrap();
+                if last_char >= 'a' && last_char <= 'z' && last_char != '0' {
+                    return Ok(format!("{}0", &desig[0..7]));
+                }
+            } else if length == 9 {
+                let c = desig.chars().nth(7).unwrap();
+                if c >= 'a' && c <= 'z' {
+                    return Ok(format!("{}0", &desig[0..7]));
+                }
+            }
+        }
+    }
+
+    Ok(desig.to_string())
+}
+
+/// Check if two designations refer to the same object.
+/// This function normalizes both designations to packed format and compares them,
+/// handling different formats (packed/unpacked).
+///
+/// # Examples
+/// ```
+/// use mpc_designation::designations_equal;
+/// assert_eq!(designations_equal("1995 XA", "J95X00A"), true);
+/// assert_eq!(designations_equal("73P-A", "0073Pa"), true);
+/// assert_eq!(designations_equal("73P-A", "73P-B"), false);
+/// ```
+pub fn designations_equal(desig1: &str, desig2: &str) -> bool {
+    match (pack(desig1), pack(desig2)) {
+        (Ok(p1), Ok(p2)) => p1 == p2,
+        _ => false,
+    }
 }
 
 #[cfg(test)]
