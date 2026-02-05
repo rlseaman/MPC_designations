@@ -217,14 +217,17 @@ Fragment letters include all A-Z (including I, per MPC data).
 # Build all
 make
 
-# Run error handling tests
+# Run error handling tests (94 test cases)
 make test-errors
 
-# Run helper function tests
+# Run helper function tests (77 test cases)
 make test-helpers
 
 # Run conversion tests (2M+ test cases)
 make test
+
+# Run roundtrip tests (verifies pack(unpack(x)) == x and unpack(pack(x)) == x)
+make test-roundtrip
 
 # Run all tests
 make test-all
