@@ -270,6 +270,11 @@ The following languages still need helper functions and test_helpers with 77 tes
 8. Octave/MATLAB - interpreted
 9. Bash - shell scripting
 
-**Completed**:
+**Completed** (helper functions + test_helpers + README documentation):
 - C, Go, Java, JavaScript, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
 - AWK, C++, Fortran, Nim, SPP/IRAF
+
+**README Documentation Status**: All 16 completed language implementations have been reviewed and updated with:
+- Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)
+- Full API documentation including all 6 helper functions
+- Makefile targets verified to match documented test commands
