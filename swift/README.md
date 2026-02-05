@@ -63,13 +63,13 @@ print(info.subtype)  // "comet provisional (non-periodic)"
 
 ```bash
 # Run all tests
-make test
+make test-all
 
-# Run only error tests (quick)
-make test-errors
-
-# Run only CSV conversion tests
-make test-csv
+# Run specific tests
+make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
+make test-csv       # Conversion tests (2M+ entries)
+make test-roundtrip # Roundtrip verification
 ```
 
 ## Supported Designations
@@ -106,6 +106,27 @@ The implementation should work with the Windows Swift toolchain.
 ### Detection
 
 - `detectFormat(_ designation: String) throws -> FormatInfo` - Detect format and type
+
+### Helper Functions
+
+- `toReportFormat(_ minimal: String) throws -> String` - Convert minimal packed to 12-char MPC report format
+- `fromReportFormat(_ report: String) throws -> String` - Convert 12-char report format to minimal packed
+- `hasFragment(_ designation: String) -> Bool` - Check if designation has a comet fragment suffix
+- `getFragment(_ designation: String) -> String` - Extract fragment suffix (uppercase, e.g., "A", "AA")
+- `getParent(_ designation: String) -> String` - Get parent comet without fragment
+- `designationsEqual(_ d1: String, _ d2: String) -> Bool` - Check if same object (compares packed forms)
+
+```swift
+// Helper function examples
+let report = try toReportFormat("0073Pa")  // "0073P      a"
+let minimal = try fromReportFormat("0073P      a")  // "0073Pa"
+
+let hasFrag = hasFragment("73P-A")  // true
+let frag = getFragment("73P-A")  // "A"
+let parent = getParent("73P-A")  // "73P"
+
+let same = designationsEqual("73P-A", "0073Pa")  // true
+```
 
 ### Error Handling
 

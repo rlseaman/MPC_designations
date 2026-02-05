@@ -11,7 +11,7 @@ BINDIR = .
 # Read version from root VERSION file
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "1.0.0")
 
-.PHONY: all clean test test-csv test-errors test-roundtrip
+.PHONY: all clean test test-csv test-errors test-helpers test-roundtrip test-all
 
 # Default: build the CLI tool
 all: mpc_designation
@@ -43,6 +43,13 @@ test_roundtrip: $(SRCDIR)/MPCDesignation.swift $(TESTDIR)/test_roundtrip.swift $
 	@cp $(TESTDIR)/test_roundtrip_main.swift .build/test_roundtrip/main.swift
 	$(SWIFTC) $(SWIFTFLAGS) -o $@ .build/test_roundtrip/*.swift
 
+test_helpers: $(SRCDIR)/MPCDesignation.swift $(TESTDIR)/test_helpers.swift $(TESTDIR)/test_helpers_main.swift
+	@mkdir -p .build/test_helpers
+	@cp $(SRCDIR)/MPCDesignation.swift .build/test_helpers/
+	@cp $(TESTDIR)/test_helpers.swift .build/test_helpers/
+	@cp $(TESTDIR)/test_helpers_main.swift .build/test_helpers/main.swift
+	$(SWIFTC) $(SWIFTFLAGS) -o $@ .build/test_helpers/*.swift
+
 # Run CSV conversion tests
 test-csv: test_csv ../test-data/prov_unpack_to_pack.csv
 	./test_csv ../test-data/prov_unpack_to_pack.csv
@@ -55,15 +62,19 @@ test-errors: test_errors ../test-data/error_test_cases.csv
 test-roundtrip: test_roundtrip ../test-data/prov_unpack_to_pack.csv
 	./test_roundtrip ../test-data/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers: test_helpers
+	./test_helpers
+
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Alias
 test: test-all
 
 # Clean build artifacts
 clean:
-	rm -f mpc_designation test_csv test_errors test_roundtrip
+	rm -f mpc_designation test_csv test_errors test_helpers test_roundtrip
 	rm -rf *.dSYM .build
 
 # Run without building (interpreted mode)

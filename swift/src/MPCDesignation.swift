@@ -99,8 +99,8 @@ struct Patterns {
     static let oldStyleUnpacked = try! NSRegularExpression(pattern: #"^[AB](\d)(\d{2}) ([A-Z])([A-Z])$"#)
     static let provisionalUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])([A-Z])(\d*)$"#)
     static let cometProvUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$"#)
-    static let cometNumberedPacked = try! NSRegularExpression(pattern: #"^(\d{4})([PD])$"#)
-    static let cometNumberedUnpacked = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#)
+    static let cometNumberedPacked = try! NSRegularExpression(pattern: #"^(\d{4})([PD])([a-z]{1,2})?$"#)
+    static let cometNumberedUnpacked = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
     static let satelliteUnpacked = try! NSRegularExpression(pattern: #"^S/(\d{4}) ([JSUN]) (\d+)$"#)
     static let cometFullUnpacked = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) (.+)$"#)
     static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
@@ -118,7 +118,7 @@ struct Patterns {
     static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$"#)
     static let packedProvisional = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
-    static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD]$"#)
+    static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD][a-z]{0,2}$"#)
     static let packedCometProv = try! NSRegularExpression(pattern: #"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$"#)
 
     // Detect format patterns - unpacked
@@ -127,7 +127,7 @@ struct Patterns {
     static let unpackedOldStyle = try! NSRegularExpression(pattern: #"^[AB]\d{3} [A-Z][A-Z]$"#)
     static let unpackedProvisional = try! NSRegularExpression(pattern: #"^\d{4} [A-Z][A-Z]\d*$"#)
     static let unpackedCometFull = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$"#)
-    static let unpackedCometNumbered = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/[A-Za-z].*)?$"#)
+    static let unpackedCometNumbered = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
 
     // Unpack patterns
     static let asteroidStylePacked = try! NSRegularExpression(pattern: #"^\d{4} ([A-Z])(.)"#)
@@ -458,12 +458,31 @@ func unpackProvisional(_ packed: String) throws -> String {
     let orderEncoded = String(chars[4...5])
     let secondLetter = chars[6]
 
+    // Validate century code for asteroids: must be I-L (1800-2199)
+    guard century >= "I" && century <= "L" else {
+        throw MPCDesignationError.invalidFormat("Invalid century code for asteroid: \(century) (must be I-L)")
+    }
+
     guard let centuryValue = CENTURY_CODES[century] else {
         throw MPCDesignationError.invalidFormat("Invalid century code: \(century)")
     }
 
     let fullYear = "\(centuryValue)\(year)"
+    guard let yearInt = Int(fullYear) else {
+        throw MPCDesignationError.invalidFormat("Invalid year: \(fullYear)")
+    }
     let orderNum = try decodeCycleCount(orderEncoded)
+
+    // Pre-1925: output A-prefix format (A for 1xxx, B for 2xxx)
+    if yearInt < 1925 {
+        let prefix: Character = fullYear.first == "1" ? "A" : "B"
+        let yearSuffix = String(fullYear.dropFirst())  // e.g., "908" from "1908"
+        if orderNum == 0 {
+            return "\(prefix)\(yearSuffix) \(halfMonth)\(secondLetter)"
+        } else {
+            return "\(prefix)\(yearSuffix) \(halfMonth)\(secondLetter)\(orderNum)"
+        }
+    }
 
     if orderNum == 0 {
         return "\(fullYear) \(halfMonth)\(secondLetter)"
@@ -656,6 +675,13 @@ func unpackCometNumbered(_ packed: String) throws -> String {
     let number = Int(String(p[Range(match.range(at: 1), in: p)!]))!
     let cometType = String(p[Range(match.range(at: 2), in: p)!])
 
+    // Check for fragment
+    if match.range(at: 3).location != NSNotFound,
+       let fragmentRange = Range(match.range(at: 3), in: p) {
+        let fragment = String(p[fragmentRange]).uppercased()
+        return "\(number)\(cometType)-\(fragment)"
+    }
+
     return "\(number)\(cometType)"
 }
 
@@ -663,7 +689,7 @@ func unpackCometNumbered(_ packed: String) throws -> String {
 func packCometNumbered(_ unpacked: String) throws -> String {
     let u = unpacked.trimmingCharacters(in: .whitespaces)
 
-    // Match "1P" or "354P" or "1P/Halley"
+    // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
     guard let match = Patterns.cometNumberedUnpacked.firstMatch(in: u, range: NSRange(u.startIndex..., in: u)) else {
         throw MPCDesignationError.invalidFormat("Invalid unpacked numbered comet designation: \(unpacked)")
     }
@@ -673,6 +699,13 @@ func packCometNumbered(_ unpacked: String) throws -> String {
 
     guard number >= 1 && number <= 9999 else {
         throw MPCDesignationError.outOfRange("Comet number out of range (1-9999): \(number)")
+    }
+
+    // Check for fragment
+    if match.range(at: 3).location != NSNotFound,
+       let fragmentRange = Range(match.range(at: 3), in: u) {
+        let fragment = String(u[fragmentRange]).lowercased()
+        return String(format: "%04d%@%@", number, cometType, fragment)
     }
 
     return String(format: "%04d%@", number, cometType)
@@ -1129,14 +1162,19 @@ func detectFormat(_ designation: String) throws -> FormatInfo {
         }
     }
 
-    // Check for packed numbered comet (5 chars ending in P or D)
-    if des.count == 5 {
+    // Check for packed numbered comet (5-7 chars ending in P or D, optionally with fragment)
+    if des.count >= 5 && des.count <= 7 {
         if Patterns.packedCometNumbered.firstMatch(in: des, range: NSRange(des.startIndex..., in: des)) != nil {
             result.format = "packed"
             result.type = "comet_numbered"
-            let cometType = des.last!
+            let chars = Array(des)
+            let cometType = chars[4]
             let typeDesc = COMET_TYPE_DESCRIPTIONS[cometType] ?? String(cometType)
-            result.subtype = "comet numbered \(typeDesc)"
+            if des.count > 5 {
+                result.subtype = "comet numbered \(typeDesc) with fragment"
+            } else {
+                result.subtype = "comet numbered \(typeDesc)"
+            }
             return result
         }
     }
@@ -1333,6 +1371,215 @@ func unpack(_ designation: String) throws -> String {
     }
 
     return try convert(designation).output
+}
+
+// MARK: - Helper Functions
+
+/// Convert minimal packed format to 12-character MPC observation report format
+func toReportFormat(_ minimal: String) throws -> String {
+    let m = minimal.trimmingCharacters(in: .whitespaces)
+    let length = m.count
+
+    // Check if it's a numbered comet (5-7 chars with P or D at position 4)
+    if length >= 5 && length <= 7 {
+        let chars = Array(m)
+        if chars[0].isNumber && chars[1].isNumber && chars[2].isNumber && chars[3].isNumber &&
+           (chars[4] == "P" || chars[4] == "D") {
+            // Numbered comet: "0073P" -> "0073P       "
+            // With fragment: "0073Pa" -> "0073P      a", "0073Paa" -> "0073P     aa"
+            let prefix = String(chars[0...4])  // e.g., "0073P"
+            if length == 5 {
+                return prefix + "       "  // 7 spaces
+            } else if length == 6 {
+                let frag = String(chars[5])
+                return prefix + "      " + frag  // 6 spaces + 1 char
+            } else {  // length == 7
+                let frag = String(chars[5...6])
+                return prefix + "     " + frag  // 5 spaces + 2 chars
+            }
+        }
+    }
+
+    // All other designations: right-pad with spaces to 12 chars
+    if length > 12 {
+        throw MPCDesignationError.invalidFormat("Designation too long for report format: \(minimal)")
+    }
+
+    // Right-align the designation in 12 characters
+    return String(repeating: " ", count: 12 - length) + m
+}
+
+/// Convert 12-character MPC report format to minimal packed format
+func fromReportFormat(_ report: String) throws -> String {
+    guard report.count == 12 else {
+        throw MPCDesignationError.invalidFormat("Report format must be 12 characters: \(report)")
+    }
+
+    // Check if it's a numbered comet (first 4 chars are digits, 5th is P or D)
+    let chars = Array(report)
+    if chars[0].isNumber && chars[1].isNumber && chars[2].isNumber && chars[3].isNumber &&
+       (chars[4] == "P" || chars[4] == "D") {
+        // Numbered comet format: columns 11-12 may have fragment letters
+        let prefix = String(chars[0...4])  // e.g., "0073P"
+        let suffix = String(chars[5...11]).trimmingCharacters(in: .whitespaces)
+        if suffix.isEmpty {
+            return prefix
+        } else {
+            return prefix + suffix
+        }
+    }
+
+    // All other formats: just trim leading/trailing spaces
+    return report.trimmingCharacters(in: .whitespaces)
+}
+
+/// Pre-compiled patterns for helper functions
+struct HelperPatterns {
+    static let unpackedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d+)([PD])-([A-Z]{1,2})(?:/.*)?$"#)
+    static let unpackedNumberedComet = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/.*)?$"#)
+    static let packedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d{4})([PD])([a-z]{1,2})$"#)
+    static let packedNumberedComet = try! NSRegularExpression(pattern: #"^(\d{4})([PD])$"#)
+    static let unpackedProvCometWithFrag = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$"#)
+    static let packedProvCometWithFrag = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L]\d{2}[A-Z]\d{2})([a-z]{1,2})$"#)
+}
+
+/// Check if a designation has a comet fragment suffix
+func hasFragment(_ designation: String) -> Bool {
+    let d = designation.trimmingCharacters(in: .whitespaces)
+
+    // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    if HelperPatterns.unpackedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)) != nil {
+        return true
+    }
+
+    // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    if HelperPatterns.packedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)) != nil {
+        return true
+    }
+
+    // Unpacked provisional comet with fragment: "D/1993 F2-A"
+    if HelperPatterns.unpackedProvCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)) != nil {
+        return true
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" (ends with lowercase, not digit or 0)
+    if d.count == 8 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[7] != "0" {
+            return true
+        }
+    }
+
+    // Packed provisional comet with 2-letter fragment: "DJ93F02aa"
+    if d.count == 9 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[8].isLowercase {
+            return true
+        }
+    }
+
+    return false
+}
+
+/// Extract fragment suffix from a comet designation (returns uppercase)
+func getFragment(_ designation: String) -> String {
+    let d = designation.trimmingCharacters(in: .whitespaces)
+
+    // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    if let match = HelperPatterns.unpackedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let fragRange = Range(match.range(at: 3), in: d) {
+        return String(d[fragRange])
+    }
+
+    // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    if let match = HelperPatterns.packedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let fragRange = Range(match.range(at: 3), in: d) {
+        return String(d[fragRange]).uppercased()
+    }
+
+    // Unpacked provisional comet with fragment: "D/1993 F2-A"
+    if let match = HelperPatterns.unpackedProvCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let fragRange = Range(match.range(at: 4), in: d) {
+        return String(d[fragRange])
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" (8 chars, ends with lowercase)
+    if d.count == 8 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[7] != "0" {
+            return String(chars[7]).uppercased()
+        }
+    }
+
+    // Packed provisional comet with 2-letter fragment: "DJ93F02aa"
+    if d.count == 9 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[8].isLowercase {
+            return String(chars[7...8]).uppercased()
+        }
+    }
+
+    return ""
+}
+
+/// Get parent comet designation without fragment suffix
+func getParent(_ designation: String) -> String {
+    let d = designation.trimmingCharacters(in: .whitespaces)
+
+    // Unpacked numbered comet with fragment: "73P-A" -> "73P"
+    if let match = HelperPatterns.unpackedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let numRange = Range(match.range(at: 1), in: d),
+       let typeRange = Range(match.range(at: 2), in: d) {
+        return String(d[numRange]) + String(d[typeRange])
+    }
+
+    // Packed numbered comet with fragment: "0073Pa" -> "0073P"
+    if let match = HelperPatterns.packedNumberedCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let numRange = Range(match.range(at: 1), in: d),
+       let typeRange = Range(match.range(at: 2), in: d) {
+        return String(d[numRange]) + String(d[typeRange])
+    }
+
+    // Unpacked provisional comet with fragment: "D/1993 F2-A" -> "D/1993 F2"
+    if let match = HelperPatterns.unpackedProvCometWithFrag.firstMatch(in: d, range: NSRange(d.startIndex..., in: d)),
+       let numRange = Range(match.range(at: 1), in: d),
+       let typeRange = Range(match.range(at: 2), in: d),
+       let provRange = Range(match.range(at: 3), in: d) {
+        let numPart = String(d[numRange])
+        let typePart = String(d[typeRange])
+        let provPart = String(d[provRange])
+        return "\(numPart)\(typePart)/\(provPart)"
+    }
+
+    // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+    if d.count == 8 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[7] != "0" {
+            return String(chars[0...6]) + "0"
+        }
+    }
+
+    // Packed provisional comet with 2-letter fragment: "DJ93F02aa" -> "DJ93F020"
+    if d.count == 9 {
+        let chars = Array(d)
+        if COMET_TYPES.contains(chars[0]) && chars[7].isLowercase && chars[8].isLowercase {
+            return String(chars[0...6]) + "0"
+        }
+    }
+
+    // No fragment, return as-is
+    return d
+}
+
+/// Check if two designations refer to the same object (compares packed forms)
+func designationsEqual(_ d1: String, _ d2: String) -> Bool {
+    do {
+        let packed1 = try pack(d1)
+        let packed2 = try pack(d2)
+        return packed1 == packed2
+    } catch {
+        return false
+    }
 }
 
 // MARK: - Command-Line Interface

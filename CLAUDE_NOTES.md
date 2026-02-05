@@ -4,6 +4,19 @@ This document captures the context and rationale for changes made to the TCL imp
 These notes should inform updates to all other language implementations (Python, C, Go, Java,
 Rust, JavaScript, etc.) to ensure consistent behavior across the library.
 
+## ⚠️ IMPORTANT: Before Marking a Language Complete
+
+When adding helper functions to a language, you MUST verify ALL of these changes are implemented:
+
+1. **Numbered comet fragments**: `73P-A` ↔ `0073Pa`, `73P-AA` ↔ `0073Paa`
+2. **Provisional comet two-letter fragments**: `P/1930 J1-AA` ↔ `PJ30J01aa`
+3. **Fragment letter I is NOT skipped**: Accept A-Z (including I) for fragments
+4. **Pre-1925 A-prefix unpacking**: `J08C00J` → `A908 CJ` (NOT `1908 CJ`)
+5. **Century code validation**: Asteroids require I-L (1800-2199), comets allow A-L (1000-2199)
+6. **Helper functions**: All 6 functions with 77 test cases
+
+Run ALL tests before marking complete: `make test-all` (error, helper, csv, roundtrip)
+
 ## Summary of Changes
 
 ### 1. Numbered Comet Fragment Support
@@ -207,26 +220,24 @@ Updated test cases:
 - [ ] Octave/MATLAB
 - [ ] R
 - [x] SPP/IRAF (spp/src/mpc_designation.x)
-- [ ] Swift
+- [x] Swift (swift/src/MPCDesignation.swift)
 
 **Test file**: Each library should have a `test_helpers` test with 77 test cases covering all functions.
 
 ## Implementation Checklist for Remaining Languages
 
-When updating AWK, Bash, C++, C#, Forth, Fortran, Haskell, Julia, Kotlin, Nim, Octave, R, SPP, Swift:
+**⚠️ See the "IMPORTANT: Before Marking a Language Complete" section at the top of this file.**
 
-- [ ] Add numbered comet fragment support (pack/unpack)
-- [ ] Add two-letter fragment support for provisional comets
-- [ ] Include letter I in fragment validation (A-Z, not A-H,J-Z)
-- [ ] Update unpackProvisional to output A-prefix format for years < 1925
-- [ ] Add century code validation:
-  - Asteroids: I-L only (1800-2199)
-  - Comets: A-L (1000-2199)
-- [ ] Update regex patterns to match new formats
-- [ ] Add/update fragment test cases
-- [ ] Validate against updated prov_unpack_to_pack.csv (2,022,404 entries)
-- [ ] Add helper functions (to_report_format, from_report_format, has_fragment, get_fragment, get_parent, designations_equal)
-- [ ] Add test_helpers test with 77 test cases
+For each remaining language, verify these specific implementation details:
+
+- [ ] **Numbered comet fragments**: Update pack/unpack patterns and logic for 5-7 char formats
+- [ ] **Provisional comet two-letter fragments**: Ensure 8-9 char packed formats work
+- [ ] **Fragment letter I**: Regex should use `[A-Z]` not `[A-HJ-Z]` for fragments
+- [ ] **Pre-1925 A-prefix**: In `unpackProvisional`, if year < 1925, output `A{3-digit-year}` format
+- [ ] **Century code validation**: In `unpackProvisional`, reject century codes A-H for asteroids
+- [ ] **6 helper functions**: `to_report_format`, `from_report_format`, `has_fragment`, `get_fragment`, `get_parent`, `designations_equal`
+- [ ] **test_helpers**: Create test file with 77 test cases (see c/test/test_helpers.c for reference)
+- [ ] **Run all tests**: `make test-all` must pass (error, helper, csv, roundtrip)
 
 ## Key Regex Patterns (Reference)
 
@@ -260,19 +271,18 @@ Packed 8-char: ^[A-L]\d{2}[A-Z]\d{2}[a-z]{2}$
 The following languages still need helper functions and test_helpers with 77 test cases:
 
 **Remaining (in approximate performance order)**:
-1. Swift - compiled, high performance
-2. Julia - JIT compiled, designed for numerical computing
-3. Kotlin - JVM with JIT
-4. C# - .NET JIT
-5. Haskell - compiled functional
-6. Forth - stack-based
-7. R - interpreted
-8. Octave/MATLAB - interpreted
-9. Bash - shell scripting
+1. Julia - JIT compiled, designed for numerical computing
+2. Kotlin - JVM with JIT
+3. C# - .NET JIT
+4. Haskell - compiled functional
+5. Forth - stack-based
+6. R - interpreted
+7. Octave/MATLAB - interpreted
+8. Bash - shell scripting
 
 **Completed** (helper functions + test_helpers + README documentation):
 - C, Go, Java, JavaScript, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
-- AWK, C++, Fortran, Nim, SPP/IRAF
+- AWK, C++, Fortran, Nim, SPP/IRAF, Swift
 
 **README Documentation Status**: All 16 completed language implementations have been reviewed and updated with:
 - Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)
