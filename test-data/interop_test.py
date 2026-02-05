@@ -33,6 +33,9 @@ from mpc_designation import (
 # TCL library path
 TCL_SRC = os.path.join(SCRIPT_DIR, '..', 'tcl', 'src', 'mpc_designation.tcl')
 
+# C CLI path
+C_CLI = os.path.join(SCRIPT_DIR, '..', 'c', 'mpc_designation')
+
 
 def run_tcl_with_input(func_name: str, input_val: str, preserve_whitespace: bool = False) -> Tuple[bool, str]:
     """Run a TCL function with a single input, handling escaping properly."""
@@ -165,6 +168,41 @@ def get_tcl_version() -> str:
     return output if success else "unknown"
 
 
+def run_c_convert(input_val: str) -> Tuple[bool, str]:
+    """Run C CLI to convert a designation."""
+    try:
+        result = subprocess.run(
+            [C_CLI, input_val],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode != 0:
+            return False, f"ERROR: {result.stderr.strip()}"
+        return True, result.stdout.strip()
+    except subprocess.TimeoutExpired:
+        return False, "TIMEOUT"
+    except FileNotFoundError:
+        return False, "C CLI not found - run 'make' in c/ directory"
+    except Exception as e:
+        return False, str(e)
+
+
+def get_c_version() -> str:
+    """Get C library version by checking the VERSION file."""
+    try:
+        version_path = os.path.join(SCRIPT_DIR, '..', 'VERSION')
+        with open(version_path, 'r') as f:
+            return f.read().strip()
+    except Exception:
+        return "unknown"
+
+
+def c_cli_available() -> bool:
+    """Check if C CLI is available."""
+    return os.path.exists(C_CLI) and os.access(C_CLI, os.X_OK)
+
+
 class TestResult:
     """Container for test results."""
     def __init__(self, name: str):
@@ -178,14 +216,17 @@ class TestResult:
     def record_pass(self):
         self.passed += 1
 
-    def record_fail(self, input_val: str, python_out: str, tcl_out: str, detail: str = ""):
+    def record_fail(self, input_val: str, python_out: str, tcl_out: str, detail: str = "", c_out: str = None):
         self.failed += 1
-        self.errors.append({
+        error = {
             'input': input_val,
             'python': python_out,
             'tcl': tcl_out,
             'detail': detail
-        })
+        }
+        if c_out is not None:
+            error['c'] = c_out
+        self.errors.append(error)
 
     @property
     def total(self) -> int:
@@ -198,10 +239,12 @@ class TestResult:
         return 0
 
 
-def test_csv_conversions(csv_path: str, limit: Optional[int] = None) -> TestResult:
+def test_csv_conversions(csv_path: str, limit: Optional[int] = None, include_c: bool = True) -> TestResult:
     """Test pack/unpack conversions against CSV test data."""
     result = TestResult("CSV Conversion Tests")
     result.start_time = time.time()
+
+    has_c = include_c and c_cli_available()
 
     with open(csv_path, 'r') as f:
         reader = csv.DictReader(f)
@@ -231,15 +274,27 @@ def test_csv_conversions(csv_path: str, limit: Optional[int] = None) -> TestResu
             if not tcl_success:
                 tcl_packed = f"ERROR: {tcl_packed}"
 
+            # Test C pack (convert unpacked -> should get packed)
+            c_packed = None
+            if has_c:
+                c_success, c_packed = run_c_convert(unpacked)
+                if not c_success:
+                    c_packed = f"ERROR: {c_packed}"
+
             # Compare pack results
-            if py_packed == packed and tcl_packed == packed:
+            all_match = py_packed == packed and tcl_packed == packed
+            if has_c:
+                all_match = all_match and c_packed == packed
+
+            if all_match:
                 result.record_pass()
             else:
                 result.record_fail(
                     unpacked,
                     py_packed,
                     tcl_packed,
-                    f"Expected: {packed}"
+                    f"Expected: {packed}",
+                    c_out=c_packed
                 )
 
             # Test Python unpack
@@ -253,15 +308,27 @@ def test_csv_conversions(csv_path: str, limit: Optional[int] = None) -> TestResu
             if not tcl_success:
                 tcl_unpacked = f"ERROR: {tcl_unpacked}"
 
+            # Test C unpack (convert packed -> should get unpacked)
+            c_unpacked = None
+            if has_c:
+                c_success, c_unpacked = run_c_convert(packed)
+                if not c_success:
+                    c_unpacked = f"ERROR: {c_unpacked}"
+
             # Compare unpack results
-            if py_unpacked == unpacked and tcl_unpacked == unpacked:
+            all_match = py_unpacked == unpacked and tcl_unpacked == unpacked
+            if has_c:
+                all_match = all_match and c_unpacked == unpacked
+
+            if all_match:
                 result.record_pass()
             else:
                 result.record_fail(
                     packed,
                     py_unpacked,
                     tcl_unpacked,
-                    f"Expected: {unpacked}"
+                    f"Expected: {unpacked}",
+                    c_out=c_unpacked
                 )
 
             if count % 10000 == 0:
@@ -271,10 +338,12 @@ def test_csv_conversions(csv_path: str, limit: Optional[int] = None) -> TestResu
     return result
 
 
-def test_error_cases(csv_path: str) -> TestResult:
+def test_error_cases(csv_path: str, include_c: bool = True) -> TestResult:
     """Test error handling consistency between implementations."""
     result = TestResult("Error Handling Tests")
     result.start_time = time.time()
+
+    has_c = include_c and c_cli_available()
 
     with open(csv_path, 'r') as f:
         reader = csv.DictReader(f)
@@ -282,6 +351,7 @@ def test_error_cases(csv_path: str) -> TestResult:
         for row in reader:
             input_val = row.get('input')
             expected = row.get('expected_error')
+            subcategory = row.get('subcategory', '')
 
             # Skip comment lines or malformed rows
             if input_val is None or expected is None:
@@ -292,6 +362,9 @@ def test_error_cases(csv_path: str) -> TestResult:
             input_val = input_val.replace('\\n', '\n')
             input_val = input_val.replace('\\r', '\r')
             input_val = input_val.replace('\\x00', '\x00')
+
+            # C has known limitation with null bytes (C strings terminate at null)
+            c_skip = has_c and ('null' in subcategory.lower())
 
             # Test Python
             try:
@@ -304,28 +377,46 @@ def test_error_cases(csv_path: str) -> TestResult:
             tcl_success, tcl_output = run_tcl_with_input('MPCDesignation::convertSimple', input_val)
             tcl_is_error = not tcl_success or tcl_output.startswith("ERROR:")
 
-            # Both should agree on error/success
+            # Test C (if available and not skipped)
+            c_is_error = None
+            if has_c and not c_skip:
+                c_success, c_output = run_c_convert(input_val)
+                c_is_error = not c_success or c_output.startswith("ERROR:")
+
+            # All implementations should agree on error/success
             if expected == 'valid':
-                # Both should succeed
-                if not py_is_error and not tcl_is_error:
+                # All should succeed
+                all_ok = not py_is_error and not tcl_is_error
+                if has_c and not c_skip:
+                    all_ok = all_ok and not c_is_error
+
+                if all_ok:
                     result.record_pass()
                 else:
+                    c_status = "SKIP" if c_skip else ("ERROR" if c_is_error else "OK") if c_is_error is not None else None
                     result.record_fail(
                         repr(input_val),
                         "ERROR" if py_is_error else "OK",
                         "ERROR" if tcl_is_error else "OK",
-                        f"Expected: valid"
+                        f"Expected: valid",
+                        c_out=c_status
                     )
             else:
-                # Both should fail
-                if py_is_error and tcl_is_error:
+                # All should fail
+                all_error = py_is_error and tcl_is_error
+                if has_c and not c_skip:
+                    all_error = all_error and c_is_error
+
+                if all_error:
                     result.record_pass()
                 else:
+                    c_status = "SKIP" if c_skip else ("ERROR" if c_is_error else "OK") if c_is_error is not None else None
                     result.record_fail(
                         repr(input_val),
                         "ERROR" if py_is_error else "OK",
                         "ERROR" if tcl_is_error else "OK",
-                        f"Expected: error ({expected})"
+                        f"Expected: error ({expected})",
+                        c_out=c_status
                     )
 
     result.end_time = time.time()
@@ -427,10 +518,12 @@ def test_helper_functions() -> TestResult:
     return result
 
 
-def test_edge_cases() -> TestResult:
+def test_edge_cases(include_c: bool = True) -> TestResult:
     """Test edge cases and boundary conditions."""
     result = TestResult("Edge Case Tests")
     result.start_time = time.time()
+
+    has_c = include_c and c_cli_available()
 
     edge_cases = [
         # Pre-1925 designations (A-prefix)
@@ -467,14 +560,25 @@ def test_edge_cases() -> TestResult:
         if not tcl_success:
             tcl_packed = f"ERROR: {tcl_packed}"
 
-        if py_packed == packed and tcl_packed == packed:
+        c_packed = None
+        if has_c:
+            c_success, c_packed = run_c_convert(unpacked)
+            if not c_success:
+                c_packed = f"ERROR: {c_packed}"
+
+        all_match = py_packed == packed and tcl_packed == packed
+        if has_c:
+            all_match = all_match and c_packed == packed
+
+        if all_match:
             result.record_pass()
         else:
             result.record_fail(
                 f"pack({unpacked})",
                 py_packed,
                 tcl_packed,
-                f"Expected: {packed}"
+                f"Expected: {packed}",
+                c_out=c_packed
             )
 
         # Test unpack direction
@@ -487,14 +591,25 @@ def test_edge_cases() -> TestResult:
         if not tcl_success:
             tcl_unpacked = f"ERROR: {tcl_unpacked}"
 
-        if py_unpacked == unpacked and tcl_unpacked == unpacked:
+        c_unpacked = None
+        if has_c:
+            c_success, c_unpacked = run_c_convert(packed)
+            if not c_success:
+                c_unpacked = f"ERROR: {c_unpacked}"
+
+        all_match = py_unpacked == unpacked and tcl_unpacked == unpacked
+        if has_c:
+            all_match = all_match and c_unpacked == unpacked
+
+        if all_match:
             result.record_pass()
         else:
             result.record_fail(
                 f"unpack({packed})",
                 py_unpacked,
                 tcl_unpacked,
-                f"Expected: {unpacked}"
+                f"Expected: {unpacked}",
+                c_out=c_unpacked
             )
 
     result.end_time = time.time()
@@ -627,6 +742,61 @@ def run_individual_library_tests() -> Dict:
 
     results['tcl'] = tcl_tests
 
+    # C tests (if CLI available)
+    if c_cli_available():
+        print("  Running C full test suite...")
+        c_tests = []
+
+        # C CSV test
+        c_test_csv = os.path.join(SCRIPT_DIR, '..', 'c', 'test_csv')
+        if os.path.exists(c_test_csv) and os.path.exists(csv_path):
+            result = subprocess.run([c_test_csv, csv_path], capture_output=True, text=True, timeout=300)
+            import re
+            passed_match = re.search(r'Passed:\s*(\d+)', result.stdout)
+            failed_match = re.search(r'Failed:\s*(\d+)', result.stdout)
+            if passed_match:
+                passed = int(passed_match.group(1))
+                failed = int(failed_match.group(1)) if failed_match else 0
+                c_tests.append(('CSV Conversions', passed, failed))
+
+        # C error test
+        c_test_errors = os.path.join(SCRIPT_DIR, '..', 'c', 'test_errors')
+        if os.path.exists(c_test_errors) and os.path.exists(error_csv):
+            result = subprocess.run([c_test_errors, error_csv], capture_output=True, text=True, timeout=60)
+            import re
+            passed_match = re.search(r'Passed:\s*(\d+)', result.stdout)
+            failed_match = re.search(r'Failed:\s*(\d+)', result.stdout)
+            if passed_match:
+                passed = int(passed_match.group(1))
+                failed = int(failed_match.group(1)) if failed_match else 0
+                c_tests.append(('Error Handling', passed, failed))
+
+        # C helper test
+        c_test_helpers = os.path.join(SCRIPT_DIR, '..', 'c', 'test_helpers')
+        if os.path.exists(c_test_helpers):
+            result = subprocess.run([c_test_helpers], capture_output=True, text=True, timeout=60)
+            import re
+            passed_match = re.search(r'Passed:\s*(\d+)', result.stdout)
+            failed_match = re.search(r'Failed:\s*(\d+)', result.stdout)
+            if passed_match:
+                passed = int(passed_match.group(1))
+                failed = int(failed_match.group(1)) if failed_match else 0
+                c_tests.append(('Helper Functions', passed, failed))
+
+        # C fragment test
+        c_test_fragments = os.path.join(SCRIPT_DIR, '..', 'c', 'test_fragments')
+        if os.path.exists(c_test_fragments):
+            result = subprocess.run([c_test_fragments], capture_output=True, text=True, timeout=60)
+            import re
+            passed_match = re.search(r'Passed:\s*(\d+)', result.stdout)
+            failed_match = re.search(r'Failed:\s*(\d+)', result.stdout)
+            if passed_match:
+                passed = int(passed_match.group(1))
+                failed = int(failed_match.group(1)) if failed_match else 0
+                c_tests.append(('Fragment Handling', passed, failed))
+
+        results['c'] = c_tests
+
     return results
 
 
@@ -635,6 +805,8 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
 
     py_ver = python_version
     tcl_ver = get_tcl_version()
+    c_ver = get_c_version()
+    has_c = c_cli_available()
 
     with open(output_path, 'w') as f:
         f.write("=" * 78 + "\n")
@@ -644,6 +816,8 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
         f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         f.write(f"Python Library Version: {py_ver}\n")
         f.write(f"TCL Library Version: {tcl_ver}\n")
+        if has_c:
+            f.write(f"C Library Version: {c_ver}\n")
         f.write(f"Python Version: {sys.version.split()[0]}\n\n")
 
         # Individual Library Tests
@@ -669,6 +843,16 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
                 tcl_total_passed += passed
                 tcl_total_failed += failed
             f.write(f"  {'TOTAL':<30} Passed: {tcl_total_passed:>10,}  Failed: {tcl_total_failed}\n\n")
+
+            if 'c' in lib_results:
+                f.write("C Library:\n")
+                c_total_passed = 0
+                c_total_failed = 0
+                for name, passed, failed in lib_results.get('c', []):
+                    f.write(f"  {name:<30} Passed: {passed:>10,}  Failed: {failed}\n")
+                    c_total_passed += passed
+                    c_total_failed += failed
+                f.write(f"  {'TOTAL':<30} Passed: {c_total_passed:>10,}  Failed: {c_total_failed}\n\n")
 
         # Summary
         f.write("-" * 78 + "\n")
@@ -718,6 +902,8 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
                         f.write(f"  [{i+1}] Input: {error['input']}\n")
                         f.write(f"      Python: {error['python']}\n")
                         f.write(f"      TCL:    {error['tcl']}\n")
+                        if 'c' in error and error['c'] is not None:
+                            f.write(f"      C:      {error['c']}\n")
                         if error['detail']:
                             f.write(f"      {error['detail']}\n")
                     if len(result.errors) > 20:
@@ -728,7 +914,8 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
         f.write("SPECIFICATION COMPLIANCE\n")
         f.write("-" * 78 + "\n\n")
 
-        f.write("Both libraries implement the MPC packed designation format as specified at:\n")
+        lib_count = "All three libraries" if has_c else "Both libraries"
+        f.write(f"{lib_count} implement the MPC packed designation format as specified at:\n")
         f.write("https://www.minorplanetcenter.net/iau/info/PackedDes.html\n\n")
 
         f.write("Supported designation types:\n")
@@ -751,12 +938,21 @@ def generate_report(results: List[TestResult], output_path: str, lib_results: Di
         f.write("CONCLUSION\n")
         f.write("-" * 78 + "\n\n")
 
-        if total_failed == 0:
-            f.write("The Python and TCL implementations are FULLY INTEROPERABLE.\n")
-            f.write("Both libraries produce identical results for all test cases.\n")
-            f.write("Either library can be used in production with confidence.\n")
+        if has_c:
+            impl_list = "Python, TCL, and C"
+            lib_word = "All three libraries"
+            any_word = "Any"
         else:
-            f.write("DISCREPANCIES FOUND between Python and TCL implementations.\n")
+            impl_list = "Python and TCL"
+            lib_word = "Both libraries"
+            any_word = "Either"
+
+        if total_failed == 0:
+            f.write(f"The {impl_list} implementations are FULLY INTEROPERABLE.\n")
+            f.write(f"{lib_word} produce identical results for all test cases.\n")
+            f.write(f"{any_word} library can be used in production with confidence.\n")
+        else:
+            f.write(f"DISCREPANCIES FOUND between {impl_list} implementations.\n")
             f.write("Review the failure details above before production deployment.\n")
 
         f.write("\n" + "=" * 78 + "\n")
@@ -773,8 +969,15 @@ def main():
         print("ERROR: Cannot access TCL library. Ensure tclsh is installed.")
         sys.exit(1)
 
+    # Check C availability
+    has_c = c_cli_available()
+
     print(f"Python Library Version: {python_version}")
     print(f"TCL Library Version: {tcl_ver}")
+    if has_c:
+        print(f"C Library Version: {get_c_version()}")
+    else:
+        print("C Library: Not available (run 'make' in c/ directory to build)")
     print()
 
     results = []
@@ -819,11 +1022,16 @@ def main():
     total_passed = sum(r.passed for r in results)
     total_failed = sum(r.failed for r in results)
 
+    if has_c:
+        impl_list = "Python, TCL, and C"
+    else:
+        impl_list = "Python and TCL"
+
     print()
     print("=" * 50)
     if total_failed == 0:
         print(f"ALL {total_passed} TESTS PASSED")
-        print("Python and TCL libraries are fully interoperable.")
+        print(f"{impl_list} libraries are fully interoperable.")
     else:
         print(f"FAILED: {total_failed} of {total_passed + total_failed} tests")
         print("See report for details.")

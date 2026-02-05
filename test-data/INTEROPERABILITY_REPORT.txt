@@ -2,9 +2,10 @@
 MPC DESIGNATION LIBRARY INTEROPERABILITY REPORT
 ==============================================================================
 
-Generated: 2026-02-05 11:02:10
+Generated: 2026-02-05 11:23:51
 Python Library Version: 1.0.0
 TCL Library Version: 1.0.0
+C Library Version: 1.0.0
 Python Version: 3.14.2
 
 ------------------------------------------------------------------------------
@@ -25,6 +26,13 @@ TCL Library:
   Fragment Handling              Passed:         97  Failed: 0
   TOTAL                          Passed:  2,022,672  Failed: 0
 
+C Library:
+  CSV Conversions                Passed:  2,022,404  Failed: 0
+  Error Handling                 Passed:         92  Failed: 2
+  Helper Functions               Passed:         77  Failed: 0
+  Fragment Handling              Passed:         81  Failed: 0
+  TOTAL                          Passed:  2,022,654  Failed: 2
+
 ------------------------------------------------------------------------------
 INTEROPERABILITY TEST SUMMARY
 ------------------------------------------------------------------------------
@@ -44,16 +52,16 @@ RESULT: ALL TESTS PASSED - Libraries are fully interoperable
 PERFORMANCE
 ------------------------------------------------------------------------------
 
-Edge Case Tests: 0.51s (63 tests/sec)
-Helper Function Tests: 0.60s (63 tests/sec)
-Error Handling Tests: 1.55s (61 tests/sec)
-CSV Conversion Tests: 36.26s (55 tests/sec)
+Edge Case Tests: 0.60s (53 tests/sec)
+Helper Function Tests: 0.64s (60 tests/sec)
+Error Handling Tests: 1.79s (52 tests/sec)
+CSV Conversion Tests: 38.37s (52 tests/sec)
 
 ------------------------------------------------------------------------------
 SPECIFICATION COMPLIANCE
 ------------------------------------------------------------------------------
 
-Both libraries implement the MPC packed designation format as specified at:
+All three libraries implement the MPC packed designation format as specified at:
 https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
 Supported designation types:
@@ -75,8 +83,8 @@ Test data size: 2,022,404 designation pairs
 CONCLUSION
 ------------------------------------------------------------------------------
 
-The Python and TCL implementations are FULLY INTEROPERABLE.
-Both libraries produce identical results for all test cases.
-Either library can be used in production with confidence.
+The Python, TCL, and C implementations are FULLY INTEROPERABLE.
+All three libraries produce identical results for all test cases.
+Any library can be used in production with confidence.
 
 ==============================================================================
