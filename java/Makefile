@@ -9,7 +9,7 @@ TEST_DATA = ../test-data
 # Output directories
 CLASSES = classes
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all build
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all build
 
 # Default: build all
 all: build
@@ -38,11 +38,11 @@ test-csv: build-tests
 		echo "Decompressing test data..."; \
 		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
 	fi
-	$(JAVA) -cp $(CLASSES) TestCSV $(TEST_DATA)/prov_unpack_to_pack.csv
+	$(JAVA) -cp $(CLASSES) mpc.TestCSV $(TEST_DATA)/prov_unpack_to_pack.csv
 
 # Run error handling tests
 test-errors: build-tests
-	$(JAVA) -cp $(CLASSES) TestErrors $(TEST_DATA)/error_test_cases.csv
+	$(JAVA) -cp $(CLASSES) mpc.TestErrors $(TEST_DATA)/error_test_cases.csv
 
 # Run round-trip tests
 test-roundtrip: build-tests
@@ -50,10 +50,14 @@ test-roundtrip: build-tests
 		echo "Decompressing test data..."; \
 		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
 	fi
-	$(JAVA) -cp $(CLASSES) TestRoundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
+	$(JAVA) -cp $(CLASSES) mpc.TestRoundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
+
+# Run helper function tests
+test-helpers: build-tests
+	$(JAVA) -cp $(CLASSES) TestHelpers
 
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-helpers test-csv
 
 # Clean build artifacts
 clean:
@@ -73,6 +77,7 @@ help:
 	@echo "  clean        Remove all build artifacts"
 	@echo "  test         Run conversion tests"
 	@echo "  test-errors  Run error handling tests"
+	@echo "  test-helpers Run helper function tests"
 	@echo "  test-roundtrip Run round-trip tests"
 	@echo "  test-all     Run all tests"
 	@echo "  jar          Create JAR file"

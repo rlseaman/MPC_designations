@@ -187,7 +187,7 @@ Updated test cases:
 - [x] TCL library (tcl/src/mpc_designation.tcl)
 - [x] Python library (python/src/mpc_designation/mpc_designation.py)
 - [x] Go library (go/mpc/mpc_designation.go)
-- [ ] Java
+- [x] Java (java/src/mpc/MPCDesignation.java)
 - [ ] Rust
 - [ ] JavaScript/TypeScript
 - [ ] Ruby

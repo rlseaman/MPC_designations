@@ -395,8 +395,34 @@ public class MPCDesignation {
             throw new MPCDesignationException("Invalid century code: " + century);
         }
 
+        // Asteroid provisionals: only I-L valid (1800-2199)
+        if (century != 'I' && century != 'J' && century != 'K' && century != 'L') {
+            throw new MPCDesignationException(
+                "Invalid century code for asteroid provisional: " + century + " (must be I-L for years 1800-2199)");
+        }
+
         String fullYear = CENTURY_CODES.get(century) + year;
         int orderNum = decodeCycleCount(orderEncoded);
+        int yearNum = Integer.parseInt(fullYear);
+
+        // For pre-1925 designations, use A-prefix format (MPC canonical)
+        // A-prefix: A=1 for 1xxx years, B=2 for 2xxx years (theoretical)
+        if (yearNum < 1925) {
+            char firstDigit = fullYear.charAt(0);
+            String restOfYear = fullYear.substring(1);
+            String prefix = "";
+            if (firstDigit == '1') {
+                prefix = "A";
+            } else if (firstDigit == '2') {
+                prefix = "B";
+            }
+            if (!prefix.isEmpty()) {
+                if (orderNum == 0) {
+                    return prefix + restOfYear + " " + halfMonth + secondLetter;
+                }
+                return prefix + restOfYear + " " + halfMonth + secondLetter + orderNum;
+            }
+        }
 
         if (orderNum == 0) {
             return fullYear + " " + halfMonth + secondLetter;
@@ -454,6 +480,14 @@ public class MPCDesignation {
 
         if (!isValidHalfMonth(halfMonth)) {
             throw new MPCDesignationException("Invalid half-month letter: " + halfMonth);
+        }
+
+        int yearInt = Integer.parseInt(year);
+
+        // Asteroid provisionals: only years 1800-2199 valid
+        if (yearInt < 1800 || yearInt > 2199) {
+            throw new MPCDesignationException(
+                "Year out of range for asteroid provisional: " + year + " (must be 1800-2199)");
         }
 
         int century = Integer.parseInt(year.substring(0, 2));
@@ -604,10 +638,16 @@ public class MPCDesignation {
     // Numbered comet designations
     // =========================================================================
 
+    /**
+     * Unpack a numbered comet designation.
+     * Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
+     */
     public static String unpackCometNumbered(String packed) throws MPCDesignationException {
         String p = packed.trim();
+        int length = p.length();
 
-        Pattern pattern = Pattern.compile("^(\\d{4})([PD])$");
+        // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
+        Pattern pattern = Pattern.compile("^(\\d{4})([PD])([a-z]{1,2})?$");
         Matcher matcher = pattern.matcher(p);
         if (!matcher.matches()) {
             throw new MPCDesignationException("Invalid packed numbered comet designation");
@@ -615,14 +655,24 @@ public class MPCDesignation {
 
         int number = Integer.parseInt(matcher.group(1));
         String cometType = matcher.group(2);
-        return number + cometType;
+        String fragment = matcher.group(3);
+
+        String result = number + cometType;
+        if (fragment != null && !fragment.isEmpty()) {
+            result += "-" + fragment.toUpperCase();
+        }
+        return result;
     }
 
+    /**
+     * Pack a numbered comet designation.
+     * Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
+     */
     public static String packCometNumbered(String unpacked) throws MPCDesignationException {
         String u = unpacked.trim();
 
-        // Match "1P" or "354P" or "1P/Halley" (with optional name after slash)
-        Pattern pattern = Pattern.compile("^(\\d+)([PD])(?:/[A-Za-z].*)?$");
+        // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
+        Pattern pattern = Pattern.compile("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
         Matcher matcher = pattern.matcher(u);
         if (!matcher.matches()) {
             throw new MPCDesignationException("Invalid unpacked numbered comet designation");
@@ -630,12 +680,17 @@ public class MPCDesignation {
 
         int number = Integer.parseInt(matcher.group(1));
         String cometType = matcher.group(2);
+        String fragment = matcher.group(3);
 
         if (number < 1 || number > 9999) {
             throw new MPCDesignationException("Comet number out of range (1-9999): " + number);
         }
 
-        return String.format("%04d%s", number, cometType);
+        String result = String.format("%04d%s", number, cometType);
+        if (fragment != null && !fragment.isEmpty()) {
+            result += fragment.toLowerCase();
+        }
+        return result;
     }
 
     // =========================================================================
@@ -1076,6 +1131,23 @@ public class MPCDesignation {
             }
         }
 
+        // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+        if (des.length() == 6 || des.length() == 7) {
+            if (Pattern.matches("^[0-9]{4}[PD][a-z]{1,2}$", des)) {
+                info.format = FormatType.PACKED;
+                info.type = "comet_numbered";
+                char cometType = des.charAt(4);
+                String typeDesc = COMET_TYPE_DESCRIPTIONS.getOrDefault(cometType, String.valueOf(cometType));
+                int fragLen = des.length() - 5;
+                if (fragLen == 1) {
+                    info.subtype = "comet numbered " + typeDesc + " with fragment";
+                } else {
+                    info.subtype = "comet numbered " + typeDesc + " with 2-letter fragment";
+                }
+                return info;
+            }
+        }
+
         // Check for packed provisional asteroid (7 chars)
         if (des.length() == 7) {
             // Extended format with underscore
@@ -1211,15 +1283,24 @@ public class MPCDesignation {
             return info;
         }
 
-        // Check for unpacked numbered periodic comet
-        if (Pattern.matches("^(\\d+)([PD])(?:/[A-Za-z].*)?$", des)) {
+        // Check for unpacked numbered periodic comet (with optional fragment)
+        if (Pattern.matches("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des)) {
             info.format = FormatType.UNPACKED;
             info.type = "comet_numbered";
-            Matcher m = Pattern.compile("^(\\d+)([PD])(?:/[A-Za-z].*)?$").matcher(des);
+            Matcher m = Pattern.compile("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$").matcher(des);
             if (m.matches()) {
                 char cometType = m.group(2).charAt(0);
                 String typeDesc = COMET_TYPE_DESCRIPTIONS.getOrDefault(cometType, String.valueOf(cometType));
-                info.subtype = "comet numbered " + typeDesc;
+                String fragment = m.group(3);
+                if (fragment != null && !fragment.isEmpty()) {
+                    if (fragment.length() == 1) {
+                        info.subtype = "comet numbered " + typeDesc + " with fragment";
+                    } else {
+                        info.subtype = "comet numbered " + typeDesc + " with 2-letter fragment";
+                    }
+                } else {
+                    info.subtype = "comet numbered " + typeDesc;
+                }
             }
             return info;
         }
@@ -1343,6 +1424,326 @@ public class MPCDesignation {
         try {
             detectFormat(designation);
             return true;
+        } catch (MPCDesignationException e) {
+            return false;
+        }
+    }
+
+    // =========================================================================
+    // Helper Functions for Format Conversion and Fragment Handling
+    // =========================================================================
+
+    /**
+     * Convert minimal packed format to 12-character MPC report format.
+     * The 12-character format is used in MPC observation records (columns 1-12).
+     * For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+     *
+     * Examples:
+     *   "0073Pa"   -> "0073P      a" (numbered comet with single fragment)
+     *   "0073Paa"  -> "0073P     aa" (numbered comet with double fragment)
+     *   "00001"    -> "       00001" (numbered asteroid)
+     *   "J95X00A"  -> "     J95X00A" (provisional asteroid)
+     *   "CJ95O010" -> "    CJ95O010" (provisional comet)
+     */
+    public static String toReportFormat(String minimal) throws MPCDesignationException {
+        minimal = minimal.trim();
+        int length = minimal.length();
+
+        Info info = detectFormat(minimal);
+
+        if (info.format != FormatType.PACKED) {
+            throw new MPCDesignationException("toReportFormat requires packed format input: " + minimal);
+        }
+
+        // Initialize 12-char output with spaces
+        char[] report = "            ".toCharArray();
+
+        switch (info.type) {
+            case "permanent":
+                // Right-align 5-char designation
+                for (int i = 0; i < length; i++) {
+                    report[12 - length + i] = minimal.charAt(i);
+                }
+                break;
+
+            case "provisional":
+            case "provisional_extended":
+            case "survey":
+                // Right-align 7-char designation
+                for (int i = 0; i < length; i++) {
+                    report[12 - length + i] = minimal.charAt(i);
+                }
+                break;
+
+            case "comet_numbered":
+                // Numbered comet: first 5 chars (####P), fragment in cols 11-12
+                if (length == 5) {
+                    // No fragment
+                    for (int i = 0; i < 5; i++) {
+                        report[i] = minimal.charAt(i);
+                    }
+                } else if (length == 6) {
+                    // Single-letter fragment
+                    for (int i = 0; i < 5; i++) {
+                        report[i] = minimal.charAt(i);
+                    }
+                    report[11] = minimal.charAt(5);
+                } else if (length == 7) {
+                    // Two-letter fragment
+                    for (int i = 0; i < 5; i++) {
+                        report[i] = minimal.charAt(i);
+                    }
+                    report[10] = minimal.charAt(5);
+                    report[11] = minimal.charAt(6);
+                }
+                break;
+
+            case "comet_provisional":
+            case "comet_full":
+            case "comet_ancient":
+            case "comet_bce":
+                // Right-align in 12-char field
+                for (int i = 0; i < length; i++) {
+                    report[12 - length + i] = minimal.charAt(i);
+                }
+                break;
+
+            case "satellite":
+                // Right-align 8-char designation
+                for (int i = 0; i < length; i++) {
+                    report[12 - length + i] = minimal.charAt(i);
+                }
+                break;
+
+            default:
+                throw new MPCDesignationException("Unsupported type for report format: " + info.type);
+        }
+
+        return new String(report);
+    }
+
+    /**
+     * Convert 12-character MPC report format to minimal packed format.
+     */
+    public static String fromReportFormat(String report) throws MPCDesignationException {
+        if (report.length() > 12) {
+            throw new MPCDesignationException("Report format too long: " + report);
+        }
+
+        // Pad to 12 chars if shorter
+        while (report.length() < 12) {
+            report = " " + report;
+        }
+
+        // Check for numbered comet with fragment (fragment in cols 11-12)
+        // Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+        String first5 = report.substring(0, 5);
+        String middle = report.substring(5, 10);
+        char frag1 = report.charAt(10);
+        char frag2 = report.charAt(11);
+
+        // Check if this is a numbered comet format
+        if (Pattern.matches("^[0-9]{4}[PD]$", first5) && middle.trim().isEmpty()) {
+            StringBuilder result = new StringBuilder(first5);
+            if (frag1 >= 'a' && frag1 <= 'z') {
+                result.append(frag1);
+            }
+            if (frag2 >= 'a' && frag2 <= 'z') {
+                result.append(frag2);
+            }
+            return result.toString();
+        }
+
+        // Standard case: just trim spaces
+        return report.trim();
+    }
+
+    /**
+     * Check if a designation has a comet fragment suffix.
+     * Works with both packed and unpacked formats.
+     */
+    public static boolean hasFragment(String desig) {
+        try {
+            Info info = detectFormat(desig);
+            String dtype = info.type;
+
+            // Only comets can have fragments
+            if (!dtype.equals("comet_numbered") && !dtype.equals("comet_provisional") && !dtype.equals("comet_full")) {
+                return false;
+            }
+
+            desig = desig.trim();
+            int length = desig.length();
+
+            if (info.format == FormatType.UNPACKED) {
+                // Look for "-X" or "-XX" at end
+                return Pattern.matches(".*-[A-Z]{1,2}$", desig);
+            } else {
+                // Packed format
+                if (dtype.equals("comet_numbered")) {
+                    // Check for lowercase after P/D (position 5+)
+                    if (length > 5) {
+                        char c = desig.charAt(5);
+                        return c >= 'a' && c <= 'z';
+                    }
+                } else if (dtype.equals("comet_provisional")) {
+                    // 7-char: last char lowercase and not '0'
+                    char lastChar = desig.charAt(length - 1);
+                    return lastChar >= 'a' && lastChar <= 'z' && lastChar != '0';
+                } else if (dtype.equals("comet_full")) {
+                    char lastChar = desig.charAt(length - 1);
+                    return lastChar >= 'a' && lastChar <= 'z' && lastChar != '0';
+                }
+            }
+        } catch (MPCDesignationException e) {
+            return false;
+        }
+        return false;
+    }
+
+    /**
+     * Extract the fragment suffix from a comet designation.
+     * Works with both packed and unpacked formats.
+     * Fragment is returned in uppercase (e.g., "A", "AA").
+     * Returns empty string if no fragment.
+     */
+    public static String getFragment(String desig) throws MPCDesignationException {
+        Info info = detectFormat(desig);
+        String dtype = info.type;
+
+        // Only comets can have fragments
+        if (!dtype.equals("comet_numbered") && !dtype.equals("comet_provisional") && !dtype.equals("comet_full")) {
+            return "";
+        }
+
+        desig = desig.trim();
+        int length = desig.length();
+
+        if (info.format == FormatType.UNPACKED) {
+            // Look for "-X" or "-XX" at end
+            Matcher m = Pattern.compile("-([A-Z]{1,2})$").matcher(desig);
+            if (m.find()) {
+                return m.group(1);
+            }
+        } else {
+            // Packed format
+            if (dtype.equals("comet_numbered")) {
+                // Fragment is lowercase after P/D
+                if (length == 6) {
+                    return String.valueOf(desig.charAt(5)).toUpperCase();
+                } else if (length == 7) {
+                    return desig.substring(5, 7).toUpperCase();
+                }
+            } else if (dtype.equals("comet_provisional")) {
+                // 7-char: position 6 if lowercase and not '0'
+                // 8-char: positions 6-7 if lowercase
+                if (length == 7) {
+                    char lastChar = desig.charAt(6);
+                    if (lastChar >= 'a' && lastChar <= 'z' && lastChar != '0') {
+                        return String.valueOf(lastChar).toUpperCase();
+                    }
+                } else if (length == 8) {
+                    String frag = desig.substring(6, 8);
+                    if (frag.charAt(0) >= 'a' && frag.charAt(0) <= 'z' &&
+                        frag.charAt(1) >= 'a' && frag.charAt(1) <= 'z') {
+                        return frag.toUpperCase();
+                    }
+                }
+            } else if (dtype.equals("comet_full")) {
+                // 8-char: position 7 if lowercase and not '0'
+                // 9-char: positions 7-8 if lowercase
+                if (length == 8) {
+                    char lastChar = desig.charAt(7);
+                    if (lastChar >= 'a' && lastChar <= 'z' && lastChar != '0') {
+                        return String.valueOf(lastChar).toUpperCase();
+                    }
+                } else if (length == 9) {
+                    String frag = desig.substring(7, 9);
+                    if (frag.charAt(0) >= 'a' && frag.charAt(0) <= 'z' &&
+                        frag.charAt(1) >= 'a' && frag.charAt(1) <= 'z') {
+                        return frag.toUpperCase();
+                    }
+                }
+            }
+        }
+
+        return "";
+    }
+
+    /**
+     * Get the parent comet designation (without fragment suffix).
+     * Works with both packed and unpacked formats.
+     * Returns the designation in the same format (packed or unpacked) as input.
+     */
+    public static String getParent(String desig) throws MPCDesignationException {
+        Info info = detectFormat(desig);
+        String dtype = info.type;
+
+        // Non-comets: return as-is
+        if (!dtype.equals("comet_numbered") && !dtype.equals("comet_provisional") && !dtype.equals("comet_full")) {
+            return desig.trim();
+        }
+
+        desig = desig.trim();
+        int length = desig.length();
+
+        if (info.format == FormatType.UNPACKED) {
+            // Remove "-X" or "-XX" suffix if present
+            return desig.replaceAll("-[A-Z]{1,2}$", "");
+        } else {
+            // Packed format
+            if (dtype.equals("comet_numbered")) {
+                // Remove lowercase fragment letters after P/D
+                if (length > 5) {
+                    char c = desig.charAt(5);
+                    if (c >= 'a' && c <= 'z') {
+                        return desig.substring(0, 5);
+                    }
+                }
+            } else if (dtype.equals("comet_provisional")) {
+                // 7-char: replace lowercase fragment with '0'
+                // 8-char: replace 2 lowercase with '0', truncate
+                if (length == 7) {
+                    char lastChar = desig.charAt(6);
+                    if (lastChar >= 'a' && lastChar <= 'z' && lastChar != '0') {
+                        return desig.substring(0, 6) + "0";
+                    }
+                } else if (length == 8) {
+                    char c = desig.charAt(6);
+                    if (c >= 'a' && c <= 'z') {
+                        return desig.substring(0, 6) + "0";
+                    }
+                }
+            } else if (dtype.equals("comet_full")) {
+                // 8-char: replace fragment with '0'
+                // 9-char: replace fragment with '0', truncate
+                if (length == 8) {
+                    char lastChar = desig.charAt(7);
+                    if (lastChar >= 'a' && lastChar <= 'z' && lastChar != '0') {
+                        return desig.substring(0, 7) + "0";
+                    }
+                } else if (length == 9) {
+                    char c = desig.charAt(7);
+                    if (c >= 'a' && c <= 'z') {
+                        return desig.substring(0, 7) + "0";
+                    }
+                }
+            }
+        }
+
+        return desig;
+    }
+
+    /**
+     * Check if two designations refer to the same object.
+     * This function normalizes both designations to packed format and compares them,
+     * handling different formats (packed/unpacked).
+     */
+    public static boolean designationsEqual(String desig1, String desig2) {
+        try {
+            String packed1 = pack(desig1);
+            String packed2 = pack(desig2);
+            return packed1.equals(packed2);
         } catch (MPCDesignationException e) {
             return false;
         }
