@@ -220,11 +220,10 @@ class MPCDesignationError extends Error {
 ```bash
 # Run all tests
 make test-all
-# or
-npm run test:all
 
 # Run specific test suites
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ cases)
 make test-roundtrip # Round-trip tests
 ```

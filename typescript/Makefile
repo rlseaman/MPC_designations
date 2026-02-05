@@ -5,7 +5,7 @@ NODE = node
 
 TEST_DATA = ../test-data
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all build install
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all build install
 
 # Default: build
 all: build
@@ -44,8 +44,12 @@ test-roundtrip: build
 	fi
 	$(NODE) dist/test/test_roundtrip.js $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers: build
+	$(NODE) dist/test/test_helpers.js
+
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Clean build artifacts
 clean:
@@ -62,6 +66,7 @@ help:
 	@echo "  clean          Remove all build artifacts"
 	@echo "  test           Run conversion tests"
 	@echo "  test-errors    Run error handling tests"
+	@echo "  test-helpers   Run helper function tests"
 	@echo "  test-roundtrip Run round-trip tests"
 	@echo "  test-all       Run all tests"
 	@echo "  run ARGS=...   Run CLI with arguments"
