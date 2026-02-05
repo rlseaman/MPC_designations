@@ -1623,6 +1623,354 @@ def unpack_satellite_designation(designation: str) -> str:
 
 
 # =============================================================================
+# Format conversion functions (minimal <-> 12-char MPC report format)
+# =============================================================================
+
+def to_report_format(minimal: str) -> str:
+    """
+    Convert minimal packed format to 12-character MPC report format.
+
+    The 12-character format is used in MPC observation records (columns 1-12).
+    For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+
+    Examples:
+        "0073Pa"   -> "0073P      a" (numbered comet with single fragment)
+        "0073Paa"  -> "0073P     aa" (numbered comet with double fragment)
+        "00001"    -> "       00001" (numbered asteroid)
+        "J95X00A"  -> "     J95X00A" (provisional asteroid)
+        "CJ95O010" -> "    CJ95O010" (provisional comet)
+
+    Args:
+        minimal: Minimal packed designation
+
+    Returns:
+        12-character MPC report format string
+
+    Raises:
+        MPCDesignationError: If input is not valid packed format
+    """
+    minimal = minimal.strip()
+    length = len(minimal)
+
+    # Detect format
+    info = detect_format(minimal)
+    fmt = info['format']
+    dtype = info['type']
+
+    if fmt != 'packed':
+        raise MPCDesignationError(f"to_report_format requires packed format input: {minimal}")
+
+    # Initialize 12-char output with spaces
+    report = [' '] * 12
+
+    if dtype == 'permanent':
+        # Right-align 5-char designation
+        for i, c in enumerate(minimal):
+            report[12 - length + i] = c
+
+    elif dtype in ('provisional', 'provisional_extended', 'survey'):
+        # Right-align 7-char designation
+        for i, c in enumerate(minimal):
+            report[12 - length + i] = c
+
+    elif dtype == 'comet_numbered':
+        # Numbered comet: first 5 chars (####P), fragment in cols 11-12
+        if length == 5:
+            # No fragment
+            for i in range(5):
+                report[i] = minimal[i]
+        elif length == 6:
+            # Single-letter fragment
+            for i in range(5):
+                report[i] = minimal[i]
+            report[11] = minimal[5]
+        elif length == 7:
+            # Two-letter fragment
+            for i in range(5):
+                report[i] = minimal[i]
+            report[10] = minimal[5]
+            report[11] = minimal[6]
+
+    elif dtype in ('comet_provisional', 'comet_full', 'comet_ancient', 'comet_bce'):
+        # Right-align in 12-char field
+        for i, c in enumerate(minimal):
+            report[12 - length + i] = c
+
+    elif dtype == 'satellite':
+        # Right-align 8-char designation
+        for i, c in enumerate(minimal):
+            report[12 - length + i] = c
+
+    else:
+        raise MPCDesignationError(f"Unsupported type for report format: {dtype}")
+
+    return ''.join(report)
+
+
+def from_report_format(report: str) -> str:
+    """
+    Convert 12-character MPC report format to minimal packed format.
+
+    Args:
+        report: 12-character report format designation
+
+    Returns:
+        Minimal packed designation
+
+    Raises:
+        MPCDesignationError: If input is not valid
+    """
+    length = len(report)
+    if length > 12:
+        raise MPCDesignationError(f"Report format too long: {report}")
+
+    # Pad to 12 chars if shorter
+    report = report.rjust(12)
+
+    # Check for numbered comet with fragment (fragment in cols 11-12)
+    # Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+    first5 = report[0:5]
+    middle = report[5:10]
+    last2 = report[10:12]
+
+    if re.match(r'^[0-9]{4}[PD]$', first5) and middle.strip() == '':
+        # Check for fragment in last 2 positions
+        frag1 = report[10]
+        frag2 = report[11]
+
+        result = first5
+        if frag1.islower():
+            result += frag1
+        if frag2.islower():
+            result += frag2
+        return result
+
+    # Standard case: just trim spaces
+    return report.strip()
+
+
+# =============================================================================
+# Fragment helper functions
+# =============================================================================
+
+def has_fragment(desig: str) -> bool:
+    """
+    Check if a designation has a comet fragment suffix.
+
+    Works with both packed and unpacked formats.
+
+    Args:
+        desig: Designation to check (packed or unpacked)
+
+    Returns:
+        True if has fragment, False if no fragment or not a comet
+    """
+    try:
+        info = detect_format(desig)
+    except MPCDesignationError:
+        return False
+
+    dtype = info['type']
+
+    # Only comets can have fragments
+    if dtype not in ('comet_numbered', 'comet_provisional', 'comet_full'):
+        return False
+
+    fmt = info['format']
+    desig = desig.strip()
+    length = len(desig)
+
+    if fmt == 'unpacked':
+        # Look for "-X" or "-XX" at end
+        if re.search(r'-[A-Z]{1,2}$', desig):
+            return True
+    else:
+        # Packed format
+        if dtype == 'comet_numbered':
+            # Check for lowercase after P/D (position 5+)
+            if length > 5 and desig[5].islower():
+                return True
+        elif dtype == 'comet_provisional':
+            # 7-char: last char lowercase and not '0'
+            # 8-char: last two chars lowercase
+            last_char = desig[-1]
+            if last_char.islower() and last_char != '0':
+                return True
+        elif dtype == 'comet_full':
+            # Check last char(s)
+            last_char = desig[-1]
+            if last_char.islower() and last_char != '0':
+                return True
+
+    return False
+
+
+def get_fragment(desig: str) -> str:
+    """
+    Extract the fragment suffix from a comet designation.
+
+    Works with both packed and unpacked formats.
+    Fragment is returned in uppercase (e.g., "A", "AA").
+
+    Args:
+        desig: Designation to extract fragment from
+
+    Returns:
+        Fragment in uppercase, or empty string if no fragment
+
+    Raises:
+        MPCDesignationError: If not a valid designation
+    """
+    info = detect_format(desig)
+    dtype = info['type']
+
+    # Only comets can have fragments
+    if dtype not in ('comet_numbered', 'comet_provisional', 'comet_full'):
+        return ""
+
+    fmt = info['format']
+    desig = desig.strip()
+    length = len(desig)
+
+    if fmt == 'unpacked':
+        # Look for "-X" or "-XX" at end
+        match = re.search(r'-([A-Z]{1,2})$', desig)
+        if match:
+            return match.group(1)
+    else:
+        # Packed format
+        if dtype == 'comet_numbered':
+            # Fragment is lowercase after P/D
+            if length == 6:
+                return desig[5].upper()
+            elif length == 7:
+                return desig[5:7].upper()
+        elif dtype == 'comet_provisional':
+            # 7-char: position 6 if lowercase and not '0'
+            # 8-char: positions 6-7 if lowercase
+            if length == 7:
+                last_char = desig[6]
+                if last_char.islower() and last_char != '0':
+                    return last_char.upper()
+            elif length == 8:
+                frag = desig[6:8]
+                if frag.islower():
+                    return frag.upper()
+        elif dtype == 'comet_full':
+            # 8-char: position 7 if lowercase and not '0'
+            # 9-char: positions 7-8 if lowercase
+            if length == 8:
+                last_char = desig[7]
+                if last_char.islower() and last_char != '0':
+                    return last_char.upper()
+            elif length == 9:
+                frag = desig[7:9]
+                if frag.islower():
+                    return frag.upper()
+
+    return ""
+
+
+def get_parent(desig: str) -> str:
+    """
+    Get the parent comet designation (without fragment suffix).
+
+    Works with both packed and unpacked formats.
+    Returns the designation in the same format (packed or unpacked) as input.
+
+    Examples:
+        "73P-A"   -> "73P"
+        "0073Pa"  -> "0073P"
+        "73P"     -> "73P" (no change)
+        "C/1995 O1-A" -> "C/1995 O1"
+
+    Args:
+        desig: Designation to get parent from
+
+    Returns:
+        Parent designation in same format as input
+
+    Raises:
+        MPCDesignationError: If not a valid designation
+    """
+    info = detect_format(desig)
+    dtype = info['type']
+
+    # Non-comets: return as-is
+    if dtype not in ('comet_numbered', 'comet_provisional', 'comet_full'):
+        return desig.strip()
+
+    fmt = info['format']
+    desig = desig.strip()
+    length = len(desig)
+
+    if fmt == 'unpacked':
+        # Remove "-X" or "-XX" suffix if present
+        return re.sub(r'-[A-Z]{1,2}$', '', desig)
+    else:
+        # Packed format
+        if dtype == 'comet_numbered':
+            # Remove lowercase fragment letters after P/D
+            if length > 5 and desig[5].islower():
+                return desig[0:5]
+        elif dtype == 'comet_provisional':
+            # 7-char: replace lowercase fragment with '0'
+            # 8-char: replace 2 lowercase with '0', truncate
+            if length == 7:
+                last_char = desig[6]
+                if last_char.islower() and last_char != '0':
+                    return desig[0:6] + '0'
+            elif length == 8:
+                frag = desig[6:8]
+                if frag.islower():
+                    return desig[0:6] + '0'
+        elif dtype == 'comet_full':
+            # 8-char: replace fragment with '0'
+            # 9-char: replace fragment with '0', truncate
+            if length == 8:
+                last_char = desig[7]
+                if last_char.islower() and last_char != '0':
+                    return desig[0:7] + '0'
+            elif length == 9:
+                frag = desig[7:9]
+                if frag.islower():
+                    return desig[0:7] + '0'
+
+        return desig
+
+
+# =============================================================================
+# Comparison functions
+# =============================================================================
+
+def designations_equal(desig1: str, desig2: str) -> bool:
+    """
+    Check if two designations refer to the same object.
+
+    This function normalizes both designations to packed format
+    and compares them, handling different formats (packed/unpacked).
+
+    Examples:
+        designations_equal("1995 XA", "J95X00A") -> True (same object)
+        designations_equal("73P", "0073P") -> True (same object)
+        designations_equal("73P-A", "73P-B") -> False (different fragments)
+
+    Args:
+        desig1: First designation
+        desig2: Second designation
+
+    Returns:
+        True if same object, False if different or invalid
+    """
+    try:
+        packed1 = pack(desig1)
+        packed2 = pack(desig2)
+        return packed1 == packed2
+    except MPCDesignationError:
+        return False
+
+
+# =============================================================================
 # Command-line interface
 # =============================================================================
 

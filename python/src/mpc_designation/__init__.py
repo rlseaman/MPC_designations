@@ -62,6 +62,14 @@ from .mpc_designation import (
     pack_satellite,
     unpack_satellite,
 
+    # Helper functions
+    to_report_format,
+    from_report_format,
+    has_fragment,
+    get_fragment,
+    get_parent,
+    designations_equal,
+
     # Exception class
     MPCDesignationError,
 )
@@ -102,6 +110,14 @@ __all__ = [
     'unpack_comet_full',
     'pack_satellite',
     'unpack_satellite',
+
+    # Helper functions
+    'to_report_format',
+    'from_report_format',
+    'has_fragment',
+    'get_fragment',
+    'get_parent',
+    'designations_equal',
 
     # Exception
     'MPCDesignationError',

@@ -131,6 +131,48 @@ Detect the format of a designation without converting.
 - **Parameters:** `designation` - The MPC designation to analyze
 - **Returns:** Dictionary with format information
 
+#### `to_report_format(minimal: str) -> str`
+
+Convert minimal packed format to 12-character MPC report format.
+
+- **Parameters:** `minimal` - Minimal packed designation (e.g., '0073Pa')
+- **Returns:** 12-character report format (e.g., '0073P      a')
+
+#### `from_report_format(report: str) -> str`
+
+Convert 12-character MPC report format to minimal packed format.
+
+- **Parameters:** `report` - 12-character report format
+- **Returns:** Minimal packed designation
+
+#### `has_fragment(desig: str) -> bool`
+
+Check if a designation has a comet fragment suffix.
+
+- **Parameters:** `desig` - Designation to check (packed or unpacked)
+- **Returns:** True if has fragment, False if not
+
+#### `get_fragment(desig: str) -> str`
+
+Extract the fragment suffix from a comet designation.
+
+- **Parameters:** `desig` - Designation (packed or unpacked)
+- **Returns:** Fragment in uppercase (e.g., 'A', 'AA'), or empty string
+
+#### `get_parent(desig: str) -> str`
+
+Get the parent comet designation without fragment suffix.
+
+- **Parameters:** `desig` - Designation (packed or unpacked)
+- **Returns:** Parent designation in same format as input
+
+#### `designations_equal(desig1: str, desig2: str) -> bool`
+
+Check if two designations refer to the same object.
+
+- **Parameters:** `desig1`, `desig2` - Designations to compare
+- **Returns:** True if same object, False if different
+
 ### Exceptions
 
 #### `MPCDesignationError`
@@ -173,6 +215,53 @@ convert_simple('PJ30J01aa')     # Returns 'P/1930 J1-AA'
 
 Fragment letters include all A-Z (including I, per MPC data).
 
+## Helper Functions
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+Convert between minimal packed format and the 12-character MPC observation report format:
+
+```python
+from mpc_designation import to_report_format, from_report_format
+
+# Minimal to 12-char report format
+report = to_report_format('0073Pa')   # '0073P      a'
+
+# 12-char report format to minimal
+minimal = from_report_format('0073P      a')  # '0073Pa'
+```
+
+### Fragment Extraction
+
+```python
+from mpc_designation import has_fragment, get_fragment, get_parent
+
+# Check if designation has a fragment
+if has_fragment('73P-A'):  # Returns True
+    # Extract fragment (uppercase)
+    frag = get_fragment('73P-A')   # 'A'
+    frag = get_fragment('73P-AA')  # 'AA'
+
+    # Get parent comet
+    parent = get_parent('73P-A')   # '73P'
+    parent = get_parent('0073Pa')  # '0073P'
+```
+
+### Designation Comparison
+
+Compare designations across different formats:
+
+```python
+from mpc_designation import designations_equal
+
+# Same object, different formats
+designations_equal('1995 XA', 'J95X00A')  # Returns True
+designations_equal('73P-A', '0073Pa')     # Returns True
+
+# Different objects
+designations_equal('73P-A', '73P-B')      # Returns False
+```
+
 ## Pre-1925 Designations
 
 For years before 1925, the library outputs A-prefix format per MPC convention:
@@ -206,6 +295,9 @@ python test/test_errors.py ../test-data/error_test_cases.csv
 
 # Run fragment handling tests
 python test/test_fragments.py
+
+# Run helper function tests
+python test/test_helpers.py
 
 # Run conversion tests (requires decompressing test data)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz
