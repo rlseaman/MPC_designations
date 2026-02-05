@@ -65,6 +65,33 @@ Rscript src/mpc_designation_cli.R --verbose '1995 XA'
 | `pack_satellite(unpacked)` | Pack satellite designation |
 | `unpack_satellite(packed)` | Unpack satellite designation |
 
+### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `to_report_format(minimal)` | Convert minimal packed to 12-char MPC report format |
+| `from_report_format(report)` | Convert 12-char report format to minimal packed |
+| `has_fragment(desig)` | Check if designation has a comet fragment suffix |
+| `get_fragment(desig)` | Extract fragment suffix (uppercase, e.g., "A", "AA") |
+| `get_parent(desig)` | Get parent comet without fragment suffix |
+| `designations_equal(d1, d2)` | Check if two designations refer to the same object |
+
+Helper function examples:
+
+```r
+# Format conversion
+to_report_format("0073Pa")            # "0073P      a"
+from_report_format("0073P      a")    # "0073Pa"
+
+# Fragment handling
+has_fragment("73P-A")                 # TRUE
+get_fragment("73P-A")                 # "A"
+get_parent("73P-A")                   # "73P"
+
+# Designation comparison
+designations_equal("73P-A", "0073Pa") # TRUE
+```
+
 ## Examples
 
 ```r
@@ -155,17 +182,20 @@ print(df)
 ## Testing
 
 ```bash
-# Quick validation tests
-make test-quick
-
-# Error handling tests
+# Error handling tests (94 cases)
 make test-errors
+
+# Helper function tests (77 cases)
+make test-helpers
 
 # Full CSV test suite (2M+ tests)
 make test-csv
 
-# All tests
-make test
+# Round-trip verification
+make test-roundtrip
+
+# Run all tests
+make test-all
 ```
 
 ## Supported Formats

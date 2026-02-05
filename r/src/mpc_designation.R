@@ -362,8 +362,27 @@ unpack_provisional <- function(packed) {
     mpc_error(sprintf("Invalid century code: %s", century))
   }
 
-  full_year <- sprintf("%d%s", CENTURY_CODES[[century]], year)
+  # Validate century code for asteroids: only I-L (1800-2199) are valid
+  if (!(century %in% c("I", "J", "K", "L"))) {
+    mpc_error(sprintf("Invalid century code for asteroid provisional: %s (must be I-L)", century))
+  }
+
+  full_year_int <- CENTURY_CODES[[century]] * 100 + as.integer(year)
   order_num <- decode_cycle_count(order_encoded)
+
+  # For years < 1925, output A-prefix format (MPC primary designation)
+  if (full_year_int < 1925) {
+    first_digit <- substr(as.character(full_year_int), 1, 1)
+    rest_year <- substr(as.character(full_year_int), 2, 4)
+    prefix <- if (first_digit == "1") "A" else "B"
+    if (order_num == 0) {
+      return(sprintf("%s%s %s%s", prefix, rest_year, half_month, second_letter))
+    } else {
+      return(sprintf("%s%s %s%s%d", prefix, rest_year, half_month, second_letter, order_num))
+    }
+  }
+
+  full_year <- sprintf("%d%s", CENTURY_CODES[[century]], year)
 
   if (order_num == 0) {
     sprintf("%s %s%s", full_year, half_month, second_letter)
@@ -563,42 +582,55 @@ pack_comet_provisional <- function(unpacked) {
 # =============================================================================
 
 #' Unpack a numbered comet designation
-#' @param packed Packed designation string
+#' @param packed Packed designation string (5-7 chars)
 #' @return Unpacked designation string
 #' @export
 unpack_comet_numbered <- function(packed) {
   p <- trimws(packed)
+  len <- nchar(p)
 
-  if (!grepl("^\\d{4}[PD]$", p)) {
+  # Match numbered comet with optional fragment: 0073P, 0073Pa, 0073Paa
+  if (len < 5 || len > 7 || !grepl("^\\d{4}[PD][a-z]{0,2}$", p)) {
     mpc_error("Invalid packed numbered comet designation")
   }
 
   number <- as.integer(substr(p, 1, 4))
   comet_type <- substr(p, 5, 5)
-  sprintf("%d%s", number, comet_type)
+  fragment <- if (len > 5) substr(p, 6, len) else ""
+
+  result <- sprintf("%d%s", number, comet_type)
+  if (nchar(fragment) > 0) {
+    result <- sprintf("%s-%s", result, toupper(fragment))
+  }
+  result
 }
 
 #' Pack a numbered comet designation
 #' @param unpacked Unpacked designation string
-#' @return Packed designation string
+#' @return Packed designation string (5-7 chars)
 #' @export
 pack_comet_numbered <- function(unpacked) {
   u <- trimws(unpacked)
 
-  # Match "1P" or "354P" or "1P/Halley"
-  if (!grepl("^\\d+[PD](/[A-Za-z].*)?$", u)) {
+  # Match "1P", "73P-A", "73P-AA", or "1P/Halley" (with optional fragment and name)
+  if (!grepl("^\\d+[PD](-[A-Z]{1,2})?(/[A-Za-z].*)?$", u)) {
     mpc_error("Invalid unpacked numbered comet designation")
   }
 
-  m <- regmatches(u, regexec("^(\\d+)([PD])", u))[[1]]
+  m <- regmatches(u, regexec("^(\\d+)([PD])(-([A-Z]{1,2}))?", u))[[1]]
   number <- as.integer(m[2])
   comet_type <- m[3]
+  fragment <- if (length(m) >= 5 && nchar(m[5]) > 0) m[5] else ""
 
   if (number < 1 || number > 9999) {
     mpc_error(sprintf("Comet number out of range (1-9999): %d", number))
   }
 
-  sprintf("%04d%s", number, comet_type)
+  result <- sprintf("%04d%s", number, comet_type)
+  if (nchar(fragment) > 0) {
+    result <- paste0(result, tolower(fragment))
+  }
+  result
 }
 
 # =============================================================================
@@ -998,13 +1030,29 @@ detect_format <- function(designation) {
       return(list(format = "packed", type = "permanent", subtype = subtype))
     }
 
-    # Check for packed numbered comet
+    # Check for packed numbered comet (no fragment)
     if (grepl("^[0-9]{4}[PD]$", des)) {
       comet_type <- substr(des, 5, 5)
       type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
       return(list(format = "packed", type = "comet_numbered",
                   subtype = sprintf("comet numbered %s", type_desc)))
     }
+  }
+
+  # Check for packed numbered comet with single-letter fragment (6 chars)
+  if (nchar(des) == 6 && grepl("^[0-9]{4}[PD][a-z]$", des)) {
+    comet_type <- substr(des, 5, 5)
+    type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
+    return(list(format = "packed", type = "comet_numbered",
+                subtype = sprintf("comet numbered %s with fragment", type_desc)))
+  }
+
+  # Check for packed numbered comet with two-letter fragment (7 chars)
+  if (nchar(des) == 7 && grepl("^[0-9]{4}[PD][a-z]{2}$", des)) {
+    comet_type <- substr(des, 5, 5)
+    type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
+    return(list(format = "packed", type = "comet_numbered",
+                subtype = sprintf("comet numbered %s with fragment", type_desc)))
   }
 
   # Check for packed provisional asteroid (7 chars)
@@ -1107,13 +1155,18 @@ detect_format <- function(designation) {
     return(list(format = "unpacked", type = "comet_full", subtype = subtype))
   }
 
-  # Check for unpacked numbered periodic comet
-  if (grepl("^\\d+[PD](/[A-Za-z].*)?$", des)) {
+  # Check for unpacked numbered periodic comet (with optional fragment)
+  if (grepl("^\\d+[PD](-[A-Z]{1,2})?(/[A-Za-z].*)?$", des)) {
     m <- regmatches(des, regexec("^\\d+([PD])", des))[[1]]
     comet_type <- m[2]
     type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
-    return(list(format = "unpacked", type = "comet_numbered",
-                subtype = sprintf("comet numbered %s", type_desc)))
+    has_frag <- grepl("-[A-Z]{1,2}", des)
+    subtype <- if (has_frag) {
+      sprintf("comet numbered %s with fragment", type_desc)
+    } else {
+      sprintf("comet numbered %s", type_desc)
+    }
+    return(list(format = "unpacked", type = "comet_numbered", subtype = subtype))
   }
 
   mpc_error(sprintf("Unable to detect designation format: %s", designation))
@@ -1222,4 +1275,331 @@ is_valid_designation <- function(designation) {
   }, error = function(e) {
     FALSE
   })
+}
+
+# =============================================================================
+# Helper functions for format conversion and fragment handling
+# =============================================================================
+
+#' Convert minimal packed format to 12-character MPC report format
+#'
+#' The 12-character format is used in MPC observation records (columns 1-12).
+#' For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+#'
+#' @param minimal Minimal packed designation
+#' @return 12-character MPC report format string
+#' @export
+#' @examples
+#' to_report_format("0073Pa")   # "0073P      a"
+#' to_report_format("00001")    # "       00001"
+#' to_report_format("J95X00A")  # "     J95X00A"
+to_report_format <- function(minimal) {
+  minimal <- trimws(minimal)
+  len <- nchar(minimal)
+
+  info <- detect_format(minimal)
+  if (info$format != "packed") {
+    mpc_error(sprintf("to_report_format requires packed format input: %s", minimal))
+  }
+
+  dtype <- info$type
+
+  # Initialize 12-char output with spaces
+  report <- rep(" ", 12)
+
+  if (dtype == "permanent") {
+    # Right-align 5-char designation
+    for (i in seq_len(len)) {
+      report[12 - len + i] <- substr(minimal, i, i)
+    }
+  } else if (dtype == "comet_numbered") {
+    # Check for fragment (length 6 or 7)
+    if (len > 5 && grepl("[a-z]", substr(minimal, 6, len))) {
+      # Has fragment - put base in columns 1-5, fragment in columns 11-12
+      for (i in 1:5) {
+        report[i] <- substr(minimal, i, i)
+      }
+      fragment <- substr(minimal, 6, len)
+      frag_len <- nchar(fragment)
+      for (i in seq_len(frag_len)) {
+        report[12 - frag_len + i] <- substr(fragment, i, i)
+      }
+    } else {
+      # No fragment - left-align with trailing spaces
+      for (i in seq_len(len)) {
+        report[i] <- substr(minimal, i, i)
+      }
+    }
+  } else if (dtype %in% c("provisional", "provisional_extended", "survey")) {
+    # Right-align 7-char designation
+    for (i in seq_len(len)) {
+      report[12 - len + i] <- substr(minimal, i, i)
+    }
+  } else if (dtype %in% c("comet_full", "comet_provisional", "comet_ancient", "comet_bce")) {
+    # Right-align 8 or 9 char designation
+    for (i in seq_len(len)) {
+      report[12 - len + i] <- substr(minimal, i, i)
+    }
+  } else if (dtype == "satellite") {
+    # Right-align 8-char designation
+    for (i in seq_len(len)) {
+      report[12 - len + i] <- substr(minimal, i, i)
+    }
+  } else {
+    mpc_error(sprintf("Unknown designation type: %s", dtype))
+  }
+
+  paste0(report, collapse = "")
+}
+
+#' Convert 12-character MPC report format to minimal packed format
+#'
+#' @param report 12-character report format designation
+#' @return Minimal packed designation
+#' @export
+#' @examples
+#' from_report_format("0073P      a")  # "0073Pa"
+#' from_report_format("       00001")  # "00001"
+from_report_format <- function(report) {
+  len <- nchar(report)
+  if (len > 12) {
+    mpc_error(sprintf("Report format too long: %s", report))
+  }
+
+  # Pad to 12 chars if shorter
+  while (nchar(report) < 12) {
+    report <- paste0(" ", report)
+  }
+
+  # Check for numbered comet with fragment (fragment in cols 11-12)
+  first5 <- substr(report, 1, 5)
+  middle <- substr(report, 6, 10)
+  last2 <- substr(report, 11, 12)
+
+  if (grepl("^[0-9]{4}[PD]$", first5) && trimws(middle) == "") {
+    frag1 <- substr(report, 11, 11)
+    frag2 <- substr(report, 12, 12)
+
+    result <- first5
+    if (grepl("[a-z]", frag1)) {
+      result <- paste0(result, frag1)
+    }
+    if (grepl("[a-z]", frag2)) {
+      result <- paste0(result, frag2)
+    }
+    return(result)
+  }
+
+  # Standard case: just trim spaces
+  trimws(report)
+}
+
+#' Check if a designation has a comet fragment suffix
+#'
+#' Works with both packed and unpacked formats.
+#'
+#' @param desig Designation to check (packed or unpacked)
+#' @return TRUE if has fragment, FALSE if no fragment or not a comet
+#' @export
+#' @examples
+#' has_fragment("73P-A")     # TRUE
+#' has_fragment("0073Pa")    # TRUE
+#' has_fragment("73P")       # FALSE
+#' has_fragment("1995 XA")   # FALSE
+has_fragment <- function(desig) {
+  info <- tryCatch(detect_format(desig), error = function(e) NULL)
+  if (is.null(info)) return(FALSE)
+
+  dtype <- info$type
+
+  # Only comets can have fragments
+  if (!(dtype %in% c("comet_numbered", "comet_provisional", "comet_full"))) {
+    return(FALSE)
+  }
+
+  fmt <- info$format
+  desig <- trimws(desig)
+  len <- nchar(desig)
+
+  if (fmt == "unpacked") {
+    # Look for "-X" or "-XX" at end
+    return(grepl("-[A-Z]{1,2}$", desig))
+  } else {
+    # Packed format
+    if (dtype == "comet_numbered") {
+      # Check for lowercase after P/D (position 6+)
+      if (len > 5 && grepl("[a-z]", substr(desig, 6, 6))) {
+        return(TRUE)
+      }
+    } else if (dtype == "comet_provisional") {
+      # 7-char: last char lowercase and not '0'
+      # 8-char: last two chars lowercase
+      last_char <- substr(desig, len, len)
+      if (grepl("[a-z]", last_char) && last_char != "0") {
+        return(TRUE)
+      }
+    } else if (dtype == "comet_full") {
+      # Check for lowercase at the end (not '0')
+      last_char <- substr(desig, len, len)
+      if (grepl("[a-z]", last_char) && last_char != "0") {
+        return(TRUE)
+      }
+    }
+  }
+
+  FALSE
+}
+
+#' Extract fragment suffix from comet designation
+#'
+#' Works with both packed and unpacked formats.
+#' Fragment is returned in uppercase (e.g., "A", "AA").
+#'
+#' @param desig Designation to extract fragment from
+#' @return Fragment in uppercase, or empty string if no fragment
+#' @export
+#' @examples
+#' get_fragment("73P-A")    # "A"
+#' get_fragment("0073Pa")   # "A"
+#' get_fragment("73P-AA")   # "AA"
+#' get_fragment("73P")      # ""
+get_fragment <- function(desig) {
+  info <- detect_format(desig)
+  dtype <- info$type
+
+  # Only comets can have fragments
+  if (!(dtype %in% c("comet_numbered", "comet_provisional", "comet_full"))) {
+    return("")
+  }
+
+  fmt <- info$format
+  desig <- trimws(desig)
+  len <- nchar(desig)
+
+  if (fmt == "unpacked") {
+    # Look for "-X" or "-XX" at end
+    m <- regmatches(desig, regexec("-([A-Z]{1,2})$", desig))[[1]]
+    if (length(m) >= 2) {
+      return(m[2])
+    }
+  } else {
+    # Packed format
+    if (dtype == "comet_numbered") {
+      # Fragment is lowercase after P/D
+      if (len == 6) {
+        return(toupper(substr(desig, 6, 6)))
+      } else if (len == 7) {
+        return(toupper(substr(desig, 6, 7)))
+      }
+    } else if (dtype == "comet_provisional") {
+      # 7-char: last char lowercase (not '0')
+      # 8-char: last two chars lowercase
+      last_char <- substr(desig, len, len)
+      if (len == 7 && grepl("[a-z]", last_char) && last_char != "0") {
+        return(toupper(last_char))
+      } else if (len == 8 && grepl("[a-z]", last_char)) {
+        return(toupper(substr(desig, 7, 8)))
+      }
+    } else if (dtype == "comet_full") {
+      # Similar logic for full comet
+      last_char <- substr(desig, len, len)
+      if (grepl("[a-z]", last_char) && last_char != "0") {
+        # Check if it's a 2-letter fragment
+        if (len >= 9 && grepl("[a-z]", substr(desig, len - 1, len - 1))) {
+          return(toupper(substr(desig, len - 1, len)))
+        }
+        return(toupper(last_char))
+      }
+    }
+  }
+
+  ""
+}
+
+#' Get parent comet designation without fragment suffix
+#'
+#' Works with both packed and unpacked formats.
+#' Returns the designation in the same format (packed or unpacked) as input.
+#'
+#' @param desig Designation to get parent from
+#' @return Parent designation in same format as input
+#' @export
+#' @examples
+#' get_parent("73P-A")    # "73P"
+#' get_parent("0073Pa")   # "0073P"
+#' get_parent("73P")      # "73P"
+get_parent <- function(desig) {
+  info <- detect_format(desig)
+  dtype <- info$type
+
+  # Non-comets: return as-is
+  if (!(dtype %in% c("comet_numbered", "comet_provisional", "comet_full"))) {
+    return(trimws(desig))
+  }
+
+  fmt <- info$format
+  desig <- trimws(desig)
+  len <- nchar(desig)
+
+  if (fmt == "unpacked") {
+    # Remove "-X" or "-XX" suffix if present
+    return(sub("-[A-Z]{1,2}$", "", desig))
+  } else {
+    # Packed format
+    if (dtype == "comet_numbered") {
+      # Remove lowercase fragment letters after P/D
+      if (len > 5 && grepl("[a-z]", substr(desig, 6, 6))) {
+        return(substr(desig, 1, 5))
+      }
+    } else if (dtype == "comet_provisional") {
+      # Remove fragment and add '0' if needed
+      if (len == 7) {
+        last_char <- substr(desig, 7, 7)
+        if (grepl("[a-z]", last_char) && last_char != "0") {
+          return(paste0(substr(desig, 1, 6), "0"))
+        }
+      } else if (len == 8) {
+        last_char <- substr(desig, 8, 8)
+        if (grepl("[a-z]", last_char)) {
+          return(paste0(substr(desig, 1, 6), "0"))
+        }
+      }
+    } else if (dtype == "comet_full") {
+      # Similar logic for full comet
+      last_char <- substr(desig, len, len)
+      if (grepl("[a-z]", last_char) && last_char != "0") {
+        # Check if 2-letter fragment
+        if (len >= 9 && grepl("[a-z]", substr(desig, len - 1, len - 1))) {
+          return(paste0(substr(desig, 1, len - 2), "0"))
+        }
+        return(paste0(substr(desig, 1, len - 1), "0"))
+      }
+    }
+  }
+
+  desig
+}
+
+#' Check if two designations refer to the same object
+#'
+#' This function normalizes both designations to packed format
+#' and compares them, handling different formats (packed/unpacked).
+#'
+#' @param desig1 First designation
+#' @param desig2 Second designation
+#' @return TRUE if same object, FALSE if different or invalid
+#' @export
+#' @examples
+#' designations_equal("1995 XA", "J95X00A")  # TRUE
+#' designations_equal("73P", "0073P")        # TRUE
+#' designations_equal("73P-A", "73P-B")      # FALSE
+designations_equal <- function(desig1, desig2) {
+  packed1 <- tryCatch(pack(desig1), error = function(e) NULL)
+  packed2 <- tryCatch(pack(desig2), error = function(e) NULL)
+
+  if (is.null(packed1) || is.null(packed2)) {
+    return(FALSE)
+  }
+
+  packed1 == packed2
 }
