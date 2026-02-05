@@ -189,7 +189,8 @@ Updated test cases:
 - [x] Go library (go/mpc/mpc_designation.go)
 - [x] Java (java/src/mpc/MPCDesignation.java)
 - [x] Rust (rust/src/lib.rs)
-- [ ] JavaScript/TypeScript
+- [x] JavaScript (js/src/mpc_designation.js)
+- [ ] TypeScript
 - [ ] Ruby
 - [ ] Perl
 - [ ] PHP

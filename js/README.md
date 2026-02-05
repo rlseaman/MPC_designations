@@ -148,6 +148,77 @@ Ensure a designation is in unpacked format.
 
 Check if a string is a valid MPC designation.
 
+### Helper Functions
+
+#### `toReportFormat(minimal: string): string`
+
+Convert minimal packed format to 12-character MPC report format.
+
+```javascript
+const { toReportFormat } = require('./src/mpc_designation');
+
+toReportFormat('0073Pa');   // '0073P      a'
+toReportFormat('00001');    // '       00001'
+```
+
+#### `fromReportFormat(report: string): string`
+
+Convert 12-character MPC report format to minimal packed format.
+
+```javascript
+const { fromReportFormat } = require('./src/mpc_designation');
+
+fromReportFormat('0073P      a');  // '0073Pa'
+fromReportFormat('       00001');  // '00001'
+```
+
+#### `hasFragment(desig: string): boolean`
+
+Check if a designation has a comet fragment suffix.
+
+```javascript
+const { hasFragment } = require('./src/mpc_designation');
+
+hasFragment('73P-A');   // true
+hasFragment('73P');     // false
+hasFragment('0073Pa');  // true (packed)
+```
+
+#### `getFragment(desig: string): string`
+
+Extract the fragment suffix from a comet designation (uppercase).
+
+```javascript
+const { getFragment } = require('./src/mpc_designation');
+
+getFragment('73P-A');    // 'A'
+getFragment('0073Paa');  // 'AA'
+getFragment('73P');      // ''
+```
+
+#### `getParent(desig: string): string`
+
+Get the parent comet designation without fragment suffix.
+
+```javascript
+const { getParent } = require('./src/mpc_designation');
+
+getParent('73P-A');    // '73P'
+getParent('0073Paa');  // '0073P'
+```
+
+#### `designationsEqual(desig1: string, desig2: string): boolean`
+
+Check if two designations refer to the same object.
+
+```javascript
+const { designationsEqual } = require('./src/mpc_designation');
+
+designationsEqual('1995 XA', 'J95X00A');  // true
+designationsEqual('73P-A', '0073Pa');     // true
+designationsEqual('73P-A', '73P-B');      // false
+```
+
 ### Exceptions
 
 #### `MPCDesignationError`
@@ -169,15 +240,19 @@ try {
 ## Testing
 
 ```bash
-# Run conversion tests
+# Run all tests
+make test-all
+
+# Run specific tests
+make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
+make test-csv       # Conversion tests (2M+ cases)
+make test-roundtrip # Round-trip tests
+
+# Or run directly with node
+node test/test_helpers.js
+node test/test_errors.js ../test-data/error_test_cases.csv
 node test/test_csv.js ../test-data/prov_unpack_to_pack.csv
-
-# Run round-trip tests
-node test/test_roundtrip.js ../test-data/prov_unpack_to_pack.csv
-
-# Using make
-make test
-make test-roundtrip
 ```
 
 ## Performance

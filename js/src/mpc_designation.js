@@ -403,12 +403,38 @@ function unpackProvisional(packed) {
     const orderEncoded = packed.substring(4, 6);
     const secondLetter = packed[6];
 
+    // Asteroid provisionals: only I-L valid (1800-2199)
+    if (century !== 'I' && century !== 'J' && century !== 'K' && century !== 'L') {
+        throw new MPCDesignationError(
+            `Invalid century code for asteroid provisional: ${century} (must be I-L for years 1800-2199)`
+        );
+    }
+
     if (!CENTURY_CODES[century]) {
         throw new MPCDesignationError(`Invalid century code: ${century}`);
     }
 
     const fullYear = `${CENTURY_CODES[century]}${year}`;
+    const yearNum = parseInt(fullYear, 10);
     const orderNum = decodeCycleCount(orderEncoded);
+
+    // For pre-1925 designations, use A-prefix format (MPC canonical)
+    if (yearNum < 1925) {
+        const firstDigit = fullYear[0];
+        const restOfYear = fullYear.substring(1);
+        let prefix = '';
+        if (firstDigit === '1') {
+            prefix = 'A';
+        } else if (firstDigit === '2') {
+            prefix = 'B';
+        }
+        if (prefix) {
+            if (orderNum === 0) {
+                return `${prefix}${restOfYear} ${halfMonth}${secondLetter}`;
+            }
+            return `${prefix}${restOfYear} ${halfMonth}${secondLetter}${orderNum}`;
+        }
+    }
 
     if (orderNum === 0) {
         return `${fullYear} ${halfMonth}${secondLetter}`;
@@ -469,6 +495,14 @@ function packProvisional(unpacked) {
 
     if (!isValidHalfMonth(halfMonth)) {
         throw new MPCDesignationError(`Invalid half-month letter: ${halfMonth}`);
+    }
+
+    // Asteroid provisionals: only years 1800-2199 valid
+    const yearInt = parseInt(year, 10);
+    if (yearInt < 1800 || yearInt > 2199) {
+        throw new MPCDesignationError(
+            `Year out of range for asteroid provisional: ${year} (must be 1800-2199)`
+        );
     }
 
     const century = year.substring(0, 2);
@@ -574,39 +608,54 @@ function packCometProvisional(unpacked) {
 
 /**
  * Unpack a numbered periodic comet designation.
+ * Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
  */
 function unpackCometNumbered(packed) {
     packed = packed.trim();
 
-    const match = packed.match(/^(\d{4})([PD])$/);
+    // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
+    const match = packed.match(/^(\d{4})([PD])([a-z]{1,2})?$/);
     if (!match) {
         throw new MPCDesignationError(`Invalid packed numbered comet designation: ${packed}`);
     }
 
     const number = parseInt(match[1], 10);
     const cometType = match[2];
-    return `${number}${cometType}`;
+    const fragment = match[3] || '';
+
+    let result = `${number}${cometType}`;
+    if (fragment) {
+        result += `-${fragment.toUpperCase()}`;
+    }
+    return result;
 }
 
 /**
  * Pack a numbered periodic comet designation.
+ * Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
  */
 function packCometNumbered(unpacked) {
     unpacked = unpacked.trim();
 
-    const match = unpacked.match(/^(\d+)([PD])(?:\/[A-Za-z].*)?$/);
+    // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
+    const match = unpacked.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
     if (!match) {
         throw new MPCDesignationError(`Invalid unpacked numbered comet designation: ${unpacked}`);
     }
 
     const number = parseInt(match[1], 10);
     const cometType = match[2];
+    const fragment = match[3] || '';
 
     if (number < 1 || number > 9999) {
         throw new MPCDesignationError(`Comet number out of range (1-9999): ${number}`);
     }
 
-    return number.toString().padStart(4, '0') + cometType;
+    let result = number.toString().padStart(4, '0') + cometType;
+    if (fragment) {
+        result += fragment.toLowerCase();
+    }
+    return result;
 }
 
 // =============================================================================
@@ -1061,6 +1110,21 @@ function detectFormat(designation) {
         }
     }
 
+    // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+    if (des.length === 6 || des.length === 7) {
+        if (/^[0-9]{4}[PD][a-z]{1,2}$/.test(des)) {
+            result.format = 'packed';
+            result.type = 'comet_numbered';
+            const fragLen = des.length - 5;
+            if (fragLen === 1) {
+                result.subtype = 'comet numbered with fragment';
+            } else {
+                result.subtype = 'comet numbered with 2-letter fragment';
+            }
+            return result;
+        }
+    }
+
     // Check for packed comet provisional (7 chars starting with century code)
     if (des.length === 7) {
         if (/^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/.test(des)) {
@@ -1131,12 +1195,21 @@ function detectFormat(designation) {
         return result;
     }
 
-    // Check for unpacked numbered periodic comet "1P" or "354P"
-    match = des.match(/^(\d+)([PD])(?:\/[A-Za-z].*)?$/);
+    // Check for unpacked numbered periodic comet "1P" or "354P" or "73P-A"
+    match = des.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
     if (match) {
         result.format = 'unpacked';
         result.type = 'comet_numbered';
-        result.subtype = 'comet numbered';
+        const fragment = match[3] || '';
+        if (fragment) {
+            if (fragment.length === 1) {
+                result.subtype = 'comet numbered with fragment';
+            } else {
+                result.subtype = 'comet numbered with 2-letter fragment';
+            }
+        } else {
+            result.subtype = 'comet numbered';
+        }
         return result;
     }
 
@@ -1246,6 +1319,326 @@ function isValidDesignation(designation) {
 }
 
 // =============================================================================
+// Helper Functions for Format Conversion and Fragment Handling
+// =============================================================================
+
+/**
+ * Convert minimal packed format to 12-character MPC report format.
+ * The 12-character format is used in MPC observation records (columns 1-12).
+ * For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+ *
+ * Examples:
+ *   "0073Pa"   -> "0073P      a" (numbered comet with single fragment)
+ *   "0073Paa"  -> "0073P     aa" (numbered comet with double fragment)
+ *   "00001"    -> "       00001" (numbered asteroid)
+ *   "J95X00A"  -> "     J95X00A" (provisional asteroid)
+ *   "CJ95O010" -> "    CJ95O010" (provisional comet)
+ */
+function toReportFormat(minimal) {
+    minimal = minimal.trim();
+    const length = minimal.length;
+
+    const info = detectFormat(minimal);
+
+    if (info.format !== 'packed') {
+        throw new MPCDesignationError(`toReportFormat requires packed format input: ${minimal}`);
+    }
+
+    // Initialize 12-char output with spaces
+    let report = '            '.split('');
+
+    switch (info.type) {
+        case 'permanent':
+            // Right-align 5-char designation
+            for (let i = 0; i < length; i++) {
+                report[12 - length + i] = minimal[i];
+            }
+            break;
+
+        case 'provisional':
+        case 'provisional_extended':
+        case 'survey':
+            // Right-align 7-char designation
+            for (let i = 0; i < length; i++) {
+                report[12 - length + i] = minimal[i];
+            }
+            break;
+
+        case 'comet_numbered':
+            // Numbered comet: first 5 chars (####P), fragment in cols 11-12
+            if (length === 5) {
+                // No fragment
+                for (let i = 0; i < 5; i++) {
+                    report[i] = minimal[i];
+                }
+            } else if (length === 6) {
+                // Single-letter fragment
+                for (let i = 0; i < 5; i++) {
+                    report[i] = minimal[i];
+                }
+                report[11] = minimal[5];
+            } else if (length === 7) {
+                // Two-letter fragment
+                for (let i = 0; i < 5; i++) {
+                    report[i] = minimal[i];
+                }
+                report[10] = minimal[5];
+                report[11] = minimal[6];
+            }
+            break;
+
+        case 'comet_provisional':
+        case 'comet_full':
+        case 'comet_ancient':
+        case 'comet_bce':
+            // Right-align in 12-char field
+            for (let i = 0; i < length; i++) {
+                report[12 - length + i] = minimal[i];
+            }
+            break;
+
+        case 'satellite':
+            // Right-align 8-char designation
+            for (let i = 0; i < length; i++) {
+                report[12 - length + i] = minimal[i];
+            }
+            break;
+
+        default:
+            throw new MPCDesignationError(`Unsupported type for report format: ${info.type}`);
+    }
+
+    return report.join('');
+}
+
+/**
+ * Convert 12-character MPC report format to minimal packed format.
+ */
+function fromReportFormat(report) {
+    if (report.length > 12) {
+        throw new MPCDesignationError(`Report format too long: ${report}`);
+    }
+
+    // Pad to 12 chars if shorter
+    while (report.length < 12) {
+        report = ' ' + report;
+    }
+
+    // Check for numbered comet with fragment (fragment in cols 11-12)
+    // Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+    const first5 = report.substring(0, 5);
+    const middle = report.substring(5, 10);
+    const frag1 = report[10];
+    const frag2 = report[11];
+
+    // Check if this is a numbered comet format
+    if (/^[0-9]{4}[PD]$/.test(first5) && middle.trim() === '') {
+        let result = first5;
+        if (frag1 >= 'a' && frag1 <= 'z') {
+            result += frag1;
+        }
+        if (frag2 >= 'a' && frag2 <= 'z') {
+            result += frag2;
+        }
+        return result;
+    }
+
+    // Standard case: just trim spaces
+    return report.trim();
+}
+
+/**
+ * Check if a designation has a comet fragment suffix.
+ * Works with both packed and unpacked formats.
+ */
+function hasFragment(desig) {
+    let info;
+    try {
+        info = detectFormat(desig);
+    } catch (e) {
+        return false;
+    }
+
+    const dtype = info.type;
+
+    // Only comets can have fragments
+    if (dtype !== 'comet_numbered' && dtype !== 'comet_provisional' && dtype !== 'comet_full') {
+        return false;
+    }
+
+    desig = desig.trim();
+    const length = desig.length;
+
+    if (info.format === 'unpacked') {
+        // Look for "-X" or "-XX" at end
+        return /-[A-Z]{1,2}$/.test(desig);
+    } else {
+        // Packed format
+        if (dtype === 'comet_numbered') {
+            // Check for lowercase after P/D (position 5+)
+            if (length > 5) {
+                const c = desig[5];
+                return c >= 'a' && c <= 'z';
+            }
+        } else if (dtype === 'comet_provisional') {
+            // 7-char: last char lowercase and not '0'
+            const lastChar = desig[length - 1];
+            return lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0';
+        } else if (dtype === 'comet_full') {
+            const lastChar = desig[length - 1];
+            return lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0';
+        }
+    }
+    return false;
+}
+
+/**
+ * Extract the fragment suffix from a comet designation.
+ * Works with both packed and unpacked formats.
+ * Fragment is returned in uppercase (e.g., "A", "AA").
+ * Returns empty string if no fragment.
+ */
+function getFragment(desig) {
+    const info = detectFormat(desig);
+    const dtype = info.type;
+
+    // Only comets can have fragments
+    if (dtype !== 'comet_numbered' && dtype !== 'comet_provisional' && dtype !== 'comet_full') {
+        return '';
+    }
+
+    desig = desig.trim();
+    const length = desig.length;
+
+    if (info.format === 'unpacked') {
+        // Look for "-X" or "-XX" at end
+        const match = desig.match(/-([A-Z]{1,2})$/);
+        if (match) {
+            return match[1];
+        }
+    } else {
+        // Packed format
+        if (dtype === 'comet_numbered') {
+            // Fragment is lowercase after P/D
+            if (length === 6) {
+                return desig[5].toUpperCase();
+            } else if (length === 7) {
+                return desig.substring(5, 7).toUpperCase();
+            }
+        } else if (dtype === 'comet_provisional') {
+            // 7-char: position 6 if lowercase and not '0'
+            // 8-char: positions 6-7 if lowercase
+            if (length === 7) {
+                const lastChar = desig[6];
+                if (lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0') {
+                    return lastChar.toUpperCase();
+                }
+            } else if (length === 8) {
+                const frag = desig.substring(6, 8);
+                if (frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z') {
+                    return frag.toUpperCase();
+                }
+            }
+        } else if (dtype === 'comet_full') {
+            // 8-char: position 7 if lowercase and not '0'
+            // 9-char: positions 7-8 if lowercase
+            if (length === 8) {
+                const lastChar = desig[7];
+                if (lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0') {
+                    return lastChar.toUpperCase();
+                }
+            } else if (length === 9) {
+                const frag = desig.substring(7, 9);
+                if (frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z') {
+                    return frag.toUpperCase();
+                }
+            }
+        }
+    }
+
+    return '';
+}
+
+/**
+ * Get the parent comet designation (without fragment suffix).
+ * Works with both packed and unpacked formats.
+ * Returns the designation in the same format (packed or unpacked) as input.
+ */
+function getParent(desig) {
+    const info = detectFormat(desig);
+    const dtype = info.type;
+
+    // Non-comets: return as-is
+    if (dtype !== 'comet_numbered' && dtype !== 'comet_provisional' && dtype !== 'comet_full') {
+        return desig.trim();
+    }
+
+    desig = desig.trim();
+    const length = desig.length;
+
+    if (info.format === 'unpacked') {
+        // Remove "-X" or "-XX" suffix if present
+        return desig.replace(/-[A-Z]{1,2}$/, '');
+    } else {
+        // Packed format
+        if (dtype === 'comet_numbered') {
+            // Remove lowercase fragment letters after P/D
+            if (length > 5) {
+                const c = desig[5];
+                if (c >= 'a' && c <= 'z') {
+                    return desig.substring(0, 5);
+                }
+            }
+        } else if (dtype === 'comet_provisional') {
+            // 7-char: replace lowercase fragment with '0'
+            // 8-char: replace 2 lowercase with '0', truncate
+            if (length === 7) {
+                const lastChar = desig[6];
+                if (lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0') {
+                    return desig.substring(0, 6) + '0';
+                }
+            } else if (length === 8) {
+                const c = desig[6];
+                if (c >= 'a' && c <= 'z') {
+                    return desig.substring(0, 6) + '0';
+                }
+            }
+        } else if (dtype === 'comet_full') {
+            // 8-char: replace fragment with '0'
+            // 9-char: replace fragment with '0', truncate
+            if (length === 8) {
+                const lastChar = desig[7];
+                if (lastChar >= 'a' && lastChar <= 'z' && lastChar !== '0') {
+                    return desig.substring(0, 7) + '0';
+                }
+            } else if (length === 9) {
+                const c = desig[7];
+                if (c >= 'a' && c <= 'z') {
+                    return desig.substring(0, 7) + '0';
+                }
+            }
+        }
+    }
+
+    return desig;
+}
+
+/**
+ * Check if two designations refer to the same object.
+ * This function normalizes both designations to packed format and compares them,
+ * handling different formats (packed/unpacked).
+ */
+function designationsEqual(desig1, desig2) {
+    try {
+        const packed1 = pack(desig1);
+        const packed2 = pack(desig2);
+        return packed1 === packed2;
+    } catch (e) {
+        return false;
+    }
+}
+
+// =============================================================================
 // Module exports
 // =============================================================================
 
@@ -1269,5 +1662,12 @@ module.exports = {
     unpackCometFull,
     packSatellite,
     unpackSatellite,
+    // Helper functions
+    toReportFormat,
+    fromReportFormat,
+    hasFragment,
+    getFragment,
+    getParent,
+    designationsEqual,
     MAX_ASTEROID_NUMBER
 };

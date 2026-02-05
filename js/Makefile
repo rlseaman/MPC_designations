@@ -3,7 +3,7 @@
 NODE = node
 TEST_DATA = ../test-data
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all
 
 # Default: nothing to build (interpreted language)
 all:
@@ -31,8 +31,12 @@ test-roundtrip:
 	fi
 	$(NODE) test/test_roundtrip.js $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers:
+	$(NODE) test/test_helpers.js
+
 # Run all tests
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Clean (nothing to clean for JS)
 clean:
