@@ -314,8 +314,26 @@ object MPCDesignation {
             throw MPCDesignationException("Invalid century code: $century")
         }
 
+        // Validate century code for asteroids: only I-L (1800-2199) are valid
+        if (century !in listOf('I', 'J', 'K', 'L')) {
+            throw MPCDesignationException("Invalid century code for asteroid: $century (must be I-L)")
+        }
+
         val fullYear = "${centuryCodes[century]}$year"
+        val yearInt = fullYear.toInt()
         val orderNum = decodeCycleCount(orderEncoded)
+
+        // Pre-1925 designations use A-prefix format
+        if (yearInt < 1925) {
+            val firstDigit = fullYear[0]
+            val yearSuffix = fullYear.substring(1)
+            val prefix = if (firstDigit == '1') 'A' else 'B'
+            return if (orderNum == 0) {
+                "$prefix$yearSuffix $halfMonth$secondLetter"
+            } else {
+                "$prefix$yearSuffix $halfMonth$secondLetter$orderNum"
+            }
+        }
 
         return if (orderNum == 0) {
             "$fullYear $halfMonth$secondLetter"
@@ -516,31 +534,44 @@ object MPCDesignation {
     fun unpackCometNumbered(packed: String): String {
         val p = packed.trim()
 
-        val pattern = Regex("""^(\d{4})([PD])$""")
+        // Match numbered comet with optional fragment: "0073P", "0073Pa", "0073Paa"
+        val pattern = Regex("""^(\d{4})([PD])([a-z]{1,2})?$""")
         val match = pattern.matchEntire(p)
             ?: throw MPCDesignationException("Invalid packed numbered comet designation")
 
         val number = match.groupValues[1].toInt()
         val cometType = match.groupValues[2]
-        return "$number$cometType"
+        val fragment = match.groupValues[3].takeIf { it.isNotEmpty() }
+
+        return if (fragment != null) {
+            "$number$cometType-${fragment.uppercase()}"
+        } else {
+            "$number$cometType"
+        }
     }
 
     fun packCometNumbered(unpacked: String): String {
         val u = unpacked.trim()
 
-        // Match "1P" or "354P" or "1P/Halley" (with optional name after slash)
-        val pattern = Regex("""^(\d+)([PD])(?:/[A-Za-z].*)?$""")
+        // Match "1P", "73P-A", "73P-AA", "1P/Halley" (with optional fragment and/or name)
+        val pattern = Regex("""^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
         val match = pattern.matchEntire(u)
             ?: throw MPCDesignationException("Invalid unpacked numbered comet designation")
 
         val number = match.groupValues[1].toInt()
         val cometType = match.groupValues[2]
+        val fragment = match.groupValues[3].takeIf { it.isNotEmpty() }
 
         if (number < 1 || number > 9999) {
             throw MPCDesignationException("Comet number out of range (1-9999): $number")
         }
 
-        return "${number.toString().padStart(4, '0')}$cometType"
+        val base = "${number.toString().padStart(4, '0')}$cometType"
+        return if (fragment != null) {
+            "$base${fragment.lowercase()}"
+        } else {
+            base
+        }
     }
 
     // =========================================================================
@@ -932,6 +963,16 @@ object MPCDesignation {
             }
         }
 
+        // Check for packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
+        if (des.length == 6 || des.length == 7) {
+            val fragPattern = Regex("""^(\d{4})([PD])([a-z]{1,2})$""")
+            fragPattern.matchEntire(des)?.let { match ->
+                val cometType = match.groupValues[2][0]
+                val typeDesc = cometTypeDescriptions[cometType] ?: cometType.toString()
+                return Info(FormatType.PACKED, "comet_numbered", "comet numbered $typeDesc with fragment")
+            }
+        }
+
         // Check for packed provisional asteroid (7 chars)
         if (des.length == 7) {
             // Extended format with underscore
@@ -1035,12 +1076,18 @@ object MPCDesignation {
             return Info(FormatType.UNPACKED, "comet_full", subtype)
         }
 
-        // Check for unpacked numbered periodic comet
-        val numberedCometPattern = Regex("""^(\d+)([PD])(?:/[A-Za-z].*)?$""")
+        // Check for unpacked numbered periodic comet with optional fragment
+        val numberedCometPattern = Regex("""^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
         numberedCometPattern.matchEntire(des)?.let { match ->
             val cometType = match.groupValues[2][0]
             val typeDesc = cometTypeDescriptions[cometType] ?: cometType.toString()
-            return Info(FormatType.UNPACKED, "comet_numbered", "comet numbered $typeDesc")
+            val fragment = match.groupValues[3]
+            val subtype = if (fragment.isNotEmpty()) {
+                "comet numbered $typeDesc with fragment"
+            } else {
+                "comet numbered $typeDesc"
+            }
+            return Info(FormatType.UNPACKED, "comet_numbered", subtype)
         }
 
         throw MPCDesignationException("Unable to detect designation format: $designation")
@@ -1130,6 +1177,167 @@ object MPCDesignation {
         return try {
             detectFormat(designation)
             true
+        } catch (e: MPCDesignationException) {
+            false
+        }
+    }
+
+    // =========================================================================
+    // Helper functions for format conversion and fragment handling
+    // =========================================================================
+
+    /**
+     * Convert minimal packed format to 12-character MPC observation report format.
+     * The 12-char format is used in MPC observation records (columns 1-12).
+     */
+    fun toReportFormat(minimal: String): String {
+        val m = minimal.trim()
+        val len = m.length
+
+        // Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
+        val numberedCometPattern = Regex("""^(\d{4}[PD])([a-z]{1,2})?$""")
+        numberedCometPattern.matchEntire(m)?.let { match ->
+            val base = match.groupValues[1]  // "0073P"
+            val fragment = match.groupValues[2].takeIf { it.isNotEmpty() }
+            return if (fragment != null) {
+                // Put fragment in columns 11-12, comet designation left-aligned
+                val padding = 12 - base.length - fragment.length
+                "$base${" ".repeat(padding)}$fragment"
+            } else {
+                // Numbered comet without fragment, left-aligned with trailing spaces
+                base.padEnd(12)
+            }
+        }
+
+        // All other formats: right-align in 12 characters
+        return m.padStart(12)
+    }
+
+    /**
+     * Convert 12-character MPC report format to minimal packed format.
+     */
+    fun fromReportFormat(report: String): String {
+        if (report.length != 12) {
+            throw MPCDesignationException("Report format must be exactly 12 characters")
+        }
+
+        // Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
+        val cometPattern = Regex("""^(\d{4}[PD])(\s*)([a-z]{0,2})$""")
+        cometPattern.matchEntire(report)?.let { match ->
+            val base = match.groupValues[1]  // "0073P"
+            val fragment = match.groupValues[3].takeIf { it.isNotEmpty() }
+            return if (fragment != null) {
+                "$base$fragment"
+            } else {
+                base
+            }
+        }
+
+        // All other formats: just trim whitespace
+        return report.trim()
+    }
+
+    /**
+     * Check if designation has a comet fragment suffix.
+     * Works with both packed and unpacked formats.
+     */
+    fun hasFragment(designation: String): Boolean {
+        val d = designation.trim()
+
+        // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+        if (Regex("""^\d+[PD]-[A-Z]{1,2}(?:/.*)?$""").containsMatchIn(d)) {
+            return true
+        }
+
+        // Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+        if (Regex("""^[PCDXAI]/\d+ [A-Z]\d+-[A-Z]{1,2}$""").containsMatchIn(d)) {
+            return true
+        }
+
+        // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+        if (Regex("""^\d{4}[PD][a-z]{1,2}$""").matches(d)) {
+            return true
+        }
+
+        // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa" (8-9 chars)
+        if (Regex("""^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]{1,2}$""").matches(d)) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Extract fragment suffix from comet designation.
+     * Returns uppercase fragment (e.g., "A", "AA"), empty string if no fragment.
+     * Works with both packed and unpacked formats.
+     */
+    fun getFragment(designation: String): String {
+        val d = designation.trim()
+
+        // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+        Regex("""^\d+[PD]-([A-Z]{1,2})(?:/.*)?$""").find(d)?.let {
+            return it.groupValues[1]
+        }
+
+        // Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+        Regex("""^[PCDXAI]/\d+ [A-Z]\d+-([A-Z]{1,2})$""").find(d)?.let {
+            return it.groupValues[1]
+        }
+
+        // Packed numbered comet with fragment: "0073Pa", "0073Paa"
+        Regex("""^\d{4}[PD]([a-z]{1,2})$""").find(d)?.let {
+            return it.groupValues[1].uppercase()
+        }
+
+        // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa"
+        Regex("""^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z]{1,2})$""").find(d)?.let {
+            return it.groupValues[1].uppercase()
+        }
+
+        return ""
+    }
+
+    /**
+     * Get parent comet designation without fragment suffix.
+     * Returns in same format (packed or unpacked) as input.
+     */
+    fun getParent(designation: String): String {
+        val d = designation.trim()
+
+        // Unpacked numbered comet with fragment: "73P-A" -> "73P"
+        Regex("""^(\d+[PD])-[A-Z]{1,2}((?:/.*)?)$""").find(d)?.let {
+            return it.groupValues[1] + it.groupValues[2]
+        }
+
+        // Unpacked provisional comet with fragment: "D/1993 F2-A" -> "D/1993 F2"
+        Regex("""^([PCDXAI]/\d+ [A-Z]\d+)-[A-Z]{1,2}$""").find(d)?.let {
+            return it.groupValues[1]
+        }
+
+        // Packed numbered comet with fragment: "0073Pa" -> "0073P"
+        Regex("""^(\d{4}[PD])[a-z]{1,2}$""").find(d)?.let {
+            return it.groupValues[1]
+        }
+
+        // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+        Regex("""^([A-L]\d{2}[A-Z]\d{2})[a-z]{1,2}$""").find(d)?.let {
+            return it.groupValues[1] + "0"
+        }
+
+        // No fragment found, return as-is
+        return d
+    }
+
+    /**
+     * Check if two designations refer to the same object.
+     * Normalizes both to packed format before comparing.
+     */
+    fun designationsEqual(d1: String, d2: String): Boolean {
+        return try {
+            val packed1 = pack(d1)
+            val packed2 = pack(d2)
+            packed1 == packed2
         } catch (e: MPCDesignationException) {
             false
         }

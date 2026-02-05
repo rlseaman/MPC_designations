@@ -13,7 +13,7 @@ TEST_DATA = ../test-data
 BUILD = build
 CLASSES = $(BUILD)/classes
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all build build-tests
+.PHONY: all clean test test-csv test-errors test-helpers test-roundtrip test-all build build-tests
 
 # Default: build all
 all: build
@@ -44,11 +44,11 @@ test-csv: build build-tests
 		echo "Decompressing test data..."; \
 		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
 	fi
-	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) TestCsvKt $(TEST_DATA)/prov_unpack_to_pack.csv
+	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) mpc.TestCsvKt $(TEST_DATA)/prov_unpack_to_pack.csv
 
 # Run error handling tests
 test-errors: build build-tests
-	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) TestErrorsKt $(TEST_DATA)/error_test_cases.csv
+	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) mpc.TestErrorsKt $(TEST_DATA)/error_test_cases.csv
 
 # Run round-trip tests
 test-roundtrip: build build-tests
@@ -56,10 +56,14 @@ test-roundtrip: build build-tests
 		echo "Decompressing test data..."; \
 		gunzip -k $(TEST_DATA)/prov_unpack_to_pack.csv.gz; \
 	fi
-	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) TestRoundtripKt $(TEST_DATA)/prov_unpack_to_pack.csv
+	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) mpc.TestRoundtripKt $(TEST_DATA)/prov_unpack_to_pack.csv
+
+# Run helper function tests
+test-helpers: build build-tests
+	$(KOTLIN) -cp $(BUILD)/mpc_designation.jar:$(CLASSES) mpc.TestHelpersKt
 
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Clean build artifacts
 clean:
@@ -74,7 +78,9 @@ help:
 	@echo "  build          Compile all Kotlin sources"
 	@echo "  clean          Remove all build artifacts"
 	@echo "  test           Run conversion tests"
-	@echo "  test-errors    Run error handling tests"
+	@echo "  test-errors    Run error handling tests (94 cases)"
+	@echo "  test-helpers   Run helper function tests (77 cases)"
+	@echo "  test-csv       Run CSV conversion tests (2M+ entries)"
 	@echo "  test-roundtrip Run round-trip tests"
 	@echo "  test-all       Run all tests"
 	@echo "  run ARGS=...   Run CLI with arguments"

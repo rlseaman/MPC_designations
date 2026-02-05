@@ -84,6 +84,29 @@ Main converter object with all conversion functions.
 | `detectFormat(designation: String): Info` | Detect format without converting |
 | `isValidDesignation(designation: String?): Boolean` | Check if valid |
 
+#### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `toReportFormat(s: String): String` | Convert minimal packed to 12-char MPC report format |
+| `fromReportFormat(s: String): String` | Convert 12-char report format to minimal packed |
+| `hasFragment(s: String): Boolean` | Check if designation has a comet fragment suffix |
+| `getFragment(s: String): String` | Extract fragment suffix (uppercase, e.g., "A", "AA") |
+| `getParent(s: String): String` | Get parent comet without fragment |
+| `designationsEqual(d1: String, d2: String): Boolean` | Check if same object (compares packed forms) |
+
+```kotlin
+// Helper function examples
+val report = MPCDesignation.toReportFormat("0073Pa")  // "0073P      a"
+val minimal = MPCDesignation.fromReportFormat("0073P      a")  // "0073Pa"
+
+val hasFrag = MPCDesignation.hasFragment("73P-A")  // true
+val frag = MPCDesignation.getFragment("73P-A")  // "A"
+val parent = MPCDesignation.getParent("73P-A")  // "73P"
+
+val same = MPCDesignation.designationsEqual("73P-A", "0073Pa")  // true
+```
+
 #### Data Classes
 
 ```kotlin
@@ -115,6 +138,7 @@ make test-all
 
 # Run specific test suites
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ cases)
 make test-roundtrip # Round-trip tests
 ```
@@ -159,8 +183,10 @@ MPCDesignation.convertSimple("S/2019 S 22") // "SK19S220"
 | Type | Unpacked | Packed |
 |------|----------|--------|
 | Numbered | 1P | 0001P |
+| Numbered (fragment) | 73P-A | 0073Pa |
+| Numbered (2-letter fragment) | 73P-AA | 0073Paa |
 | Provisional | C/1995 O1 | CJ95O010 |
-| Fragment | D/1993 F2-B | DJ93F02b |
+| Provisional (fragment) | D/1993 F2-B | DJ93F02b |
 
 ### Natural Satellites
 
