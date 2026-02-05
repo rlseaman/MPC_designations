@@ -4,7 +4,7 @@ JULIA = julia
 
 TEST_DATA = ../test-data
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all run
+.PHONY: all clean test test-csv test-errors test-helpers test-roundtrip test-all run
 
 # Default: nothing to build for Julia
 all:
@@ -36,8 +36,12 @@ test-roundtrip:
 	fi
 	$(JULIA) test/test_roundtrip.jl $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers:
+	$(JULIA) test/test_helpers.jl
+
 # Run all tests
-test-all: test-errors test-csv
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Clean (nothing to clean for Julia)
 clean:
@@ -48,12 +52,14 @@ help:
 	@echo "MPC Designation Converter (Julia) - Build System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all          No build step required (Julia is interpreted)"
-	@echo "  test         Run conversion tests"
-	@echo "  test-errors  Run error handling tests"
+	@echo "  all           No build step required (Julia is interpreted)"
+	@echo "  test          Run conversion tests"
+	@echo "  test-errors   Run error handling tests (94 cases)"
+	@echo "  test-helpers  Run helper function tests (77 cases)"
+	@echo "  test-csv      Run CSV conversion tests (2M+ entries)"
 	@echo "  test-roundtrip Run round-trip tests"
-	@echo "  test-all     Run all tests"
-	@echo "  run ARGS=... Run CLI with arguments"
+	@echo "  test-all      Run all tests"
+	@echo "  run ARGS=...  Run CLI with arguments"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make run ARGS='1995 XA'"

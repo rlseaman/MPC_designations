@@ -214,7 +214,7 @@ Updated test cases:
 - [ ] Forth
 - [x] Fortran (fortran/src/mpc_designation.f90)
 - [ ] Haskell
-- [ ] Julia
+- [x] Julia (julia/src/MPCDesignation.jl)
 - [ ] Kotlin
 - [x] Nim (nim/src/mpc_designation.nim)
 - [ ] Octave/MATLAB
@@ -271,18 +271,17 @@ Packed 8-char: ^[A-L]\d{2}[A-Z]\d{2}[a-z]{2}$
 The following languages still need helper functions and test_helpers with 77 test cases:
 
 **Remaining (in approximate performance order)**:
-1. Julia - JIT compiled, designed for numerical computing
-2. Kotlin - JVM with JIT
-3. C# - .NET JIT
-4. Haskell - compiled functional
-5. Forth - stack-based
-6. R - interpreted
-7. Octave/MATLAB - interpreted
-8. Bash - shell scripting
+1. Kotlin - JVM with JIT
+2. C# - .NET JIT
+3. Haskell - compiled functional
+4. Forth - stack-based
+5. R - interpreted
+6. Octave/MATLAB - interpreted
+7. Bash - shell scripting
 
 **Completed** (helper functions + test_helpers + README documentation):
 - C, Go, Java, JavaScript, Perl, PHP, Python, Ruby, Rust, TCL, TypeScript
-- AWK, C++, Fortran, Nim, SPP/IRAF, Swift
+- AWK, C++, Fortran, Julia, Nim, SPP/IRAF, Swift
 
 **README Documentation Status**: All 16 completed language implementations have been reviewed and updated with:
 - Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)

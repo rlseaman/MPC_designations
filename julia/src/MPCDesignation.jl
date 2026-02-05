@@ -329,10 +329,24 @@ function unpack_provisional(packed::AbstractString)
     order_encoded = p[5:6]
     second_letter = p[7]
 
+    # Validate century code for asteroids: must be I-L (1800-2199)
+    !(century in ['I', 'J', 'K', 'L']) && throw(MPCDesignationError("Invalid century code for asteroid: $century (must be I-L)"))
+
     !haskey(CENTURY_CODES, century) && throw(MPCDesignationError("Invalid century code: $century"))
 
     full_year = "$(CENTURY_CODES[century])$year"
+    year_int = parse(Int, full_year)
     order_num = decode_cycle_count(order_encoded)
+
+    # Pre-1925: output A-prefix format (A for 1xxx, B for 2xxx)
+    if year_int < 1925
+        prefix = full_year[1] == '1' ? 'A' : 'B'
+        year_suffix = full_year[2:end]  # e.g., "908" from "1908"
+        if order_num == 0
+            return "$prefix$year_suffix $half_month$second_letter"
+        end
+        return "$prefix$year_suffix $half_month$second_letter$order_num"
+    end
 
     if order_num == 0
         return "$full_year $half_month$second_letter"
@@ -529,11 +543,18 @@ Unpack a numbered periodic comet designation.
 function unpack_comet_numbered(packed::AbstractString)
     p = strip(packed)
 
-    m = match(r"^(\d{4})([PD])$", p)
+    m = match(r"^(\d{4})([PD])([a-z]{1,2})?$", p)
     m === nothing && throw(MPCDesignationError("Invalid packed numbered comet designation"))
 
     number = parse(Int, m.captures[1])
     comet_type = m.captures[2]
+
+    # Check for fragment
+    if m.captures[3] !== nothing
+        fragment = uppercase(m.captures[3])
+        return "$number$comet_type-$fragment"
+    end
+
     return "$number$comet_type"
 end
 
@@ -545,14 +566,20 @@ Pack a numbered periodic comet designation.
 function pack_comet_numbered(unpacked::AbstractString)
     u = strip(unpacked)
 
-    # Match "1P" or "354P" or "1P/Halley"
-    m = match(r"^(\d+)([PD])(?:/[A-Za-z].*)?$", u)
+    # Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
+    m = match(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", u)
     m === nothing && throw(MPCDesignationError("Invalid unpacked numbered comet designation"))
 
     number = parse(Int, m.captures[1])
     comet_type = m.captures[2]
 
     (number < 1 || number > 9999) && throw(MPCDesignationError("Comet number out of range (1-9999): $number"))
+
+    # Check for fragment
+    if m.captures[3] !== nothing
+        fragment = lowercase(m.captures[3])
+        return lpad(number, 4, '0') * comet_type * fragment
+    end
 
     return lpad(number, 4, '0') * comet_type
 end
@@ -920,6 +947,15 @@ function detect_format(designation::AbstractString)
         end
     end
 
+    # Check for packed numbered comet with fragment (6-7 chars)
+    if length(des) == 6 || length(des) == 7
+        if match(r"^[0-9]{4}[PD][a-z]{1,2}$", des) !== nothing
+            comet_type = des[5]
+            type_desc = get(COMET_TYPE_DESCRIPTIONS, comet_type, string(comet_type))
+            return FormatInfo(:packed, "comet_numbered", "comet numbered $type_desc with fragment")
+        end
+    end
+
     # Check for packed provisional asteroid (7 chars)
     if length(des) == 7
         if des[1] == '_'
@@ -1010,12 +1046,14 @@ function detect_format(designation::AbstractString)
         return FormatInfo(:unpacked, "comet_full", subtype)
     end
 
-    # Check for unpacked numbered periodic comet
-    if match(r"^(\d+)([PD])(?:/[A-Za-z].*)?$", des) !== nothing
-        m = match(r"^(\d+)([PD])(?:/[A-Za-z].*)?$", des)
+    # Check for unpacked numbered periodic comet (with optional fragment)
+    if match(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des) !== nothing
+        m = match(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des)
         comet_type = m.captures[2][1]
         type_desc = get(COMET_TYPE_DESCRIPTIONS, comet_type, string(comet_type))
-        return FormatInfo(:unpacked, "comet_numbered", "comet numbered $type_desc")
+        has_frag = m.captures[3] !== nothing
+        subtype = has_frag ? "comet numbered $type_desc with fragment" : "comet numbered $type_desc"
+        return FormatInfo(:unpacked, "comet_numbered", subtype)
     end
 
     throw(MPCDesignationError("Unable to detect designation format: $designation"))
@@ -1119,6 +1157,169 @@ function is_valid_designation(designation::AbstractString)
     try
         detect_format(designation)
         return true
+    catch
+        return false
+    end
+end
+
+# =============================================================================
+# Helper functions
+# =============================================================================
+
+export to_report_format, from_report_format, has_fragment, get_fragment, get_parent, designations_equal
+
+"""
+    to_report_format(minimal::AbstractString) -> String
+
+Convert minimal packed format to 12-character MPC observation report format.
+"""
+function to_report_format(minimal::AbstractString)
+    m = strip(minimal)
+    len = length(m)
+
+    # Check if it's a numbered comet (5-7 chars with P or D at position 5)
+    if 5 <= len <= 7 && all(c -> '0' <= c <= '9', m[1:4]) && m[5] in ['P', 'D']
+        prefix = m[1:5]  # e.g., "0073P"
+        if len == 5
+            return prefix * "       "  # 7 spaces
+        elseif len == 6
+            return prefix * "      " * string(m[6])  # 6 spaces + 1 char
+        else  # len == 7
+            return prefix * "     " * m[6:7]  # 5 spaces + 2 chars
+        end
+    end
+
+    # All other designations: right-align in 12 characters
+    len > 12 && throw(MPCDesignationError("Designation too long for report format: $minimal"))
+    return lpad(m, 12)
+end
+
+"""
+    from_report_format(report::AbstractString) -> String
+
+Convert 12-character MPC report format to minimal packed format.
+"""
+function from_report_format(report::AbstractString)
+    length(report) != 12 && throw(MPCDesignationError("Report format must be 12 characters: $report"))
+
+    # Check if it's a numbered comet (first 4 chars are digits, 5th is P or D)
+    if all(c -> '0' <= c <= '9', report[1:4]) && report[5] in ['P', 'D']
+        prefix = report[1:5]
+        suffix = strip(report[6:12])
+        return isempty(suffix) ? prefix : prefix * suffix
+    end
+
+    # All other formats: just trim
+    return strip(report)
+end
+
+"""
+    has_fragment(designation::AbstractString) -> Bool
+
+Check if a designation has a comet fragment suffix.
+"""
+function has_fragment(designation::AbstractString)
+    d = strip(designation)
+
+    # Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    match(r"^(\d+)([PD])-([A-Z]{1,2})(?:/.*)?$", d) !== nothing && return true
+
+    # Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    match(r"^(\d{4})([PD])([a-z]{1,2})$", d) !== nothing && return true
+
+    # Unpacked provisional comet with fragment: "D/1993 F2-A"
+    match(r"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$", d) !== nothing && return true
+
+    # Packed provisional comet with fragment: "DJ93F02a" (8 chars, ends with lowercase)
+    if length(d) == 8 && d[1] in COMET_TYPES && islowercase(d[8]) && d[8] != '0'
+        return true
+    end
+
+    # Packed provisional comet with 2-letter fragment: "DJ93F02aa"
+    if length(d) == 9 && d[1] in COMET_TYPES && islowercase(d[8]) && islowercase(d[9])
+        return true
+    end
+
+    return false
+end
+
+"""
+    get_fragment(designation::AbstractString) -> String
+
+Extract fragment suffix from a comet designation (returns uppercase).
+"""
+function get_fragment(designation::AbstractString)
+    d = strip(designation)
+
+    # Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    m = match(r"^(\d+)([PD])-([A-Z]{1,2})(?:/.*)?$", d)
+    m !== nothing && return m.captures[3]
+
+    # Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    m = match(r"^(\d{4})([PD])([a-z]{1,2})$", d)
+    m !== nothing && return uppercase(m.captures[3])
+
+    # Unpacked provisional comet with fragment: "D/1993 F2-A"
+    m = match(r"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$", d)
+    m !== nothing && return m.captures[4]
+
+    # Packed provisional comet with fragment: "DJ93F02a" (8 chars)
+    if length(d) == 8 && d[1] in COMET_TYPES && islowercase(d[8]) && d[8] != '0'
+        return uppercase(string(d[8]))
+    end
+
+    # Packed provisional comet with 2-letter fragment: "DJ93F02aa"
+    if length(d) == 9 && d[1] in COMET_TYPES && islowercase(d[8]) && islowercase(d[9])
+        return uppercase(d[8:9])
+    end
+
+    return ""
+end
+
+"""
+    get_parent(designation::AbstractString) -> String
+
+Get parent comet designation without fragment suffix.
+"""
+function get_parent(designation::AbstractString)
+    d = strip(designation)
+
+    # Unpacked numbered comet with fragment: "73P-A" -> "73P"
+    m = match(r"^(\d+)([PD])-([A-Z]{1,2})(?:/.*)?$", d)
+    m !== nothing && return m.captures[1] * m.captures[2]
+
+    # Packed numbered comet with fragment: "0073Pa" -> "0073P"
+    m = match(r"^(\d{4})([PD])([a-z]{1,2})$", d)
+    m !== nothing && return m.captures[1] * m.captures[2]
+
+    # Unpacked provisional comet with fragment: "D/1993 F2-A" -> "D/1993 F2"
+    m = match(r"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$", d)
+    m !== nothing && return m.captures[1] * m.captures[2] * "/" * m.captures[3]
+
+    # Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+    if length(d) == 8 && d[1] in COMET_TYPES && islowercase(d[8]) && d[8] != '0'
+        return d[1:7] * "0"
+    end
+
+    # Packed provisional comet with 2-letter fragment: "DJ93F02aa" -> "DJ93F020"
+    if length(d) == 9 && d[1] in COMET_TYPES && islowercase(d[8]) && islowercase(d[9])
+        return d[1:7] * "0"
+    end
+
+    # No fragment, return as-is
+    return d
+end
+
+"""
+    designations_equal(d1::AbstractString, d2::AbstractString) -> Bool
+
+Check if two designations refer to the same object (compares packed forms).
+"""
+function designations_equal(d1::AbstractString, d2::AbstractString)
+    try
+        packed1 = pack(d1)
+        packed2 = pack(d2)
+        return packed1 == packed2
     catch
         return false
     end

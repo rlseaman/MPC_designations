@@ -62,8 +62,9 @@ packed = pack_permanent(100001)      # Returns "A0001"
 make test-all
 
 # Run specific tests
-make test-errors     # Error handling tests
-make test-csv        # Conversion tests (2M+ cases)
+make test-errors     # Error handling tests (94 cases)
+make test-helpers    # Helper function tests (77 cases)
+make test-csv        # Conversion tests (2M+ entries)
 make test-roundtrip  # Round-trip tests
 ```
 
@@ -107,6 +108,29 @@ julia/
 | `unpack_comet_full(s)` | Unpack full comet designation |
 | `pack_satellite(s)` | Pack satellite designation |
 | `unpack_satellite(s)` | Unpack satellite designation |
+
+### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `to_report_format(s)` | Convert minimal packed to 12-char MPC report format |
+| `from_report_format(s)` | Convert 12-char report format to minimal packed |
+| `has_fragment(s)` | Check if designation has a comet fragment suffix |
+| `get_fragment(s)` | Extract fragment suffix (uppercase, e.g., "A", "AA") |
+| `get_parent(s)` | Get parent comet without fragment |
+| `designations_equal(d1, d2)` | Check if same object (compares packed forms) |
+
+```julia
+# Helper function examples
+report = to_report_format("0073Pa")  # "0073P      a"
+minimal = from_report_format("0073P      a")  # "0073Pa"
+
+has_frag = has_fragment("73P-A")  # true
+frag = get_fragment("73P-A")  # "A"
+parent = get_parent("73P-A")  # "73P"
+
+same = designations_equal("73P-A", "0073Pa")  # true
+```
 
 ### Types
 
