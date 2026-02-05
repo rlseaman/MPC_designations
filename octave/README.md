@@ -71,6 +71,33 @@ octave --no-gui src/mpc_designation_cli.m --verbose '1995 XA'
 | `mpc_pack_satellite(unpacked)` | Pack satellite designation |
 | `mpc_unpack_satellite(packed)` | Unpack satellite designation |
 
+### Helper Functions
+
+| Function | Description |
+|----------|-------------|
+| `mpc_to_report_format(minimal)` | Convert minimal packed to 12-char MPC report format |
+| `mpc_from_report_format(report)` | Convert 12-char report format to minimal packed |
+| `mpc_has_fragment(desig)` | Check if designation has a comet fragment suffix |
+| `mpc_get_fragment(desig)` | Extract fragment suffix (uppercase, e.g., 'A', 'AA') |
+| `mpc_get_parent(desig)` | Get parent comet without fragment suffix |
+| `mpc_designations_equal(d1, d2)` | Check if two designations refer to the same object |
+
+Helper function examples:
+
+```matlab
+% Format conversion
+mpc_to_report_format('0073Pa')            % '0073P      a'
+mpc_from_report_format('0073P      a')    % '0073Pa'
+
+% Fragment handling
+mpc_has_fragment('73P-A')                 % true
+mpc_get_fragment('73P-A')                 % 'A'
+mpc_get_parent('73P-A')                   % '73P'
+
+% Designation comparison
+mpc_designations_equal('73P-A', '0073Pa') % true
+```
+
 ## Examples
 
 ```matlab
@@ -127,17 +154,20 @@ end
 ## Testing
 
 ```bash
-# Quick validation tests
-make test-quick
-
-# Error handling tests
+# Error handling tests (94 cases)
 make test-errors
+
+# Helper function tests (77 cases)
+make test-helpers
 
 # Full CSV test suite (2M+ tests)
 make test-csv
 
-# All tests
-make test
+# Round-trip verification
+make test-roundtrip
+
+# Run all tests
+make test-all
 ```
 
 ## Supported Formats

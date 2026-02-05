@@ -217,7 +217,7 @@ Updated test cases:
 - [x] Julia (julia/src/MPCDesignation.jl)
 - [x] Kotlin (kotlin/src/mpc/MPCDesignation.kt)
 - [x] Nim (nim/src/mpc_designation.nim)
-- [ ] Octave/MATLAB
+- [x] Octave/MATLAB (octave/src/mpc_designation.m)
 - [x] R (r/src/mpc_designation.R)
 - [x] SPP/IRAF (spp/src/mpc_designation.x)
 - [x] Swift (swift/src/MPCDesignation.swift)
@@ -272,14 +272,13 @@ The following languages still need helper functions and test_helpers with 77 tes
 
 **Remaining (in approximate performance order)**:
 1. Forth - stack-based
-2. Octave/MATLAB - interpreted
-3. Bash - shell scripting
+2. Bash - shell scripting
 
 **Completed** (helper functions + test_helpers + README documentation):
-- C, C#, Go, Haskell, Java, JavaScript, Kotlin, Perl, PHP, Python, R, Ruby, Rust, TCL, TypeScript
+- C, C#, Go, Haskell, Java, JavaScript, Kotlin, Octave/MATLAB, Perl, PHP, Python, R, Ruby, Rust, TCL, TypeScript
 - AWK, C++, Fortran, Julia, Nim, SPP/IRAF, Swift
 
-**README Documentation Status**: All 21 completed language implementations have been reviewed and updated with:
+**README Documentation Status**: All 22 completed language implementations have been reviewed and updated with:
 - Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)
 - Full API documentation including all 6 helper functions
 - Makefile targets verified to match documented test commands
