@@ -283,10 +283,12 @@ cd spp/build
 cp ../src/mpc_designation.x .
 cp ../test/test_mpc.x .
 cp ../test/test_errors.x .
+cp ../test/test_helpers.x .
 cp ../test/test_csv.x .
 
 xc test_mpc.x mpc_designation.x -o test_mpc.e
 xc test_errors.x mpc_designation.x -o test_errors.e
+xc test_helpers.x mpc_designation.x -o test_helpers.e
 xc test_csv.x mpc_designation.x -o test_csv.e
 ```
 
@@ -297,9 +299,14 @@ Unit tests (32 tests):
 ./test_mpc.e test_mpc
 ```
 
-Error handling tests (94 tests, tests paths are hardcoded relative to build/):
+Error handling tests (94 tests, paths are hardcoded relative to build/):
 ```bash
 ./test_errors.e test_errors
+```
+
+Helper function tests (77 tests):
+```bash
+./test_helpers.e test_helpers
 ```
 
 CSV benchmark (2M+ conversions, path hardcoded relative to build/):
