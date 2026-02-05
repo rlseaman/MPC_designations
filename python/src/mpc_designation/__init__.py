@@ -27,8 +27,6 @@ Usage:
     results = convert_batch(designations, workers=4)
 """
 
-import os as _os
-
 from .mpc_designation import (
     # Core conversion functions
     convert,
@@ -127,20 +125,14 @@ __all__ = [
     'MPCDesignationError',
 ]
 
-# Read version from root VERSION file
+# Version: use importlib.metadata for installed packages, fallback for development
 def _get_version():
-    """Read version from VERSION file at repository root."""
-    # Try multiple locations to find VERSION file
-    paths = [
-        _os.path.join(_os.path.dirname(__file__), '..', '..', '..', '..', 'VERSION'),  # Installed
-        _os.path.join(_os.path.dirname(__file__), '..', '..', '..', 'VERSION'),  # Development
-    ]
-    for path in paths:
-        try:
-            with open(path, 'r') as f:
-                return f.read().strip()
-        except FileNotFoundError:
-            continue
-    return '1.0.0'  # Fallback
+    """Get package version from installed metadata or fallback."""
+    try:
+        from importlib.metadata import version
+        return version("mpc-designation")
+    except Exception:
+        # Fallback for development or if package not installed
+        return "1.0.0"
 
 __version__ = _get_version()

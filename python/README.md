@@ -13,6 +13,12 @@ result = convert_simple('J95X00A')  # Returns '1995 XA'
 
 ## Installation
 
+### From PyPi
+
+```bash
+pip install mpc-designation
+```
+
 ### From Source
 
 ```bash
@@ -100,6 +106,28 @@ for des in designations:
     except MPCDesignationError as e:
         print(f"{des}: Error - {e}")
 ```
+
+### Parallel Batch Processing (Large Datasets)
+
+For processing millions of designations, use the parallel batch functions:
+
+```python
+from mpc_designation.batch import convert_batch, pack_batch, unpack_batch
+
+# Convert millions of designations in parallel
+results = convert_batch(designations, workers=4)
+
+# Pack all to compact format
+packed = pack_batch(designations, workers=4)
+
+# Unpack all to human-readable format
+unpacked = unpack_batch(packed_designations, workers=4)
+
+# Handle errors gracefully (returns None for invalid designations)
+results = pack_batch(designations, workers=4, ignore_errors=True)
+```
+
+Performance on 2M designations (8 workers): ~800K pack/sec, ~1.5M unpack/sec.
 
 ## API Reference
 
