@@ -1,0 +1,26 @@
+MPC Designation Conversion Benchmark
+======================================================================
+
+Python version: 3.14.2 (main, Dec  5 2025, 16:49:16) [Clang 17.0.0 (clang-1700.4.4.1)]
+CPU count: 10
+Test data: 2,022,404 designations
+
+Scalar (single-threaded) results:
+  pack (unpacked->packed)                 :    195,931/sec (5.10 us/call)
+  unpack (packed->unpacked)               :    416,077/sec (2.40 us/call)
+
+Parallel (multi-process) results:
+  pack_batch (parallel, 2w)               :    233,543/sec (4.28 us/call)
+  unpack_batch (parallel, 2w)             :    473,752/sec (2.11 us/call)
+  pack_batch (parallel, 4w)               :    454,514/sec (2.20 us/call)
+  unpack_batch (parallel, 4w)             :    908,939/sec (1.10 us/call)
+  pack_batch (parallel, 8w)               :    823,574/sec (1.21 us/call)
+  unpack_batch (parallel, 8w)             :  1,577,516/sec (0.63 us/call)
+
+Speedup summary:
+  pack_batch (parallel, 2w)               : 1.19x vs scalar
+  unpack_batch (parallel, 2w)             : 2.42x vs scalar
+  pack_batch (parallel, 4w)               : 2.32x vs scalar
+  unpack_batch (parallel, 4w)             : 4.64x vs scalar
+  pack_batch (parallel, 8w)               : 4.20x vs scalar
+  unpack_batch (parallel, 8w)             : 8.05x vs scalar

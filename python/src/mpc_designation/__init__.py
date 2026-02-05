@@ -21,6 +21,10 @@ Usage:
     # Category-specific (for known input types)
     packed = pack_asteroid('1995 XA')
     packed = pack_comet('C/1995 O1')
+
+    # Batch processing (parallel, for large datasets)
+    from mpc_designation.batch import convert_batch, pack_batch, unpack_batch
+    results = convert_batch(designations, workers=4)
 """
 
 import os as _os
