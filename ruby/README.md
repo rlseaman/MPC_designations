@@ -213,14 +213,14 @@ Raised for invalid designations. Inherits from `StandardError`.
 ## Testing
 
 ```bash
-# Run conversion tests
-make test
-
-# Run round-trip tests
-make test-roundtrip
-
 # Run all tests
 make test-all
+
+# Run specific tests
+make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
+make test-csv       # Conversion tests (2M+ cases)
+make test-roundtrip # Roundtrip verification
 ```
 
 ## Performance

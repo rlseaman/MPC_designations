@@ -4,7 +4,7 @@ RUBY = ruby
 
 TEST_DATA = ../test-data
 
-.PHONY: all test test-csv test-errors test-roundtrip test-all
+.PHONY: all test test-csv test-errors test-helpers test-roundtrip test-all
 
 # Default: run tests
 all: test
@@ -23,6 +23,10 @@ test-csv:
 test-errors:
 	$(RUBY) test/test_errors.rb $(TEST_DATA)/error_test_cases.csv
 
+# Run helper function tests
+test-helpers:
+	$(RUBY) test/test_helpers.rb
+
 # Run bidirectional and round-trip tests
 test-roundtrip:
 	@if [ ! -f $(TEST_DATA)/prov_unpack_to_pack.csv ]; then \
@@ -32,7 +36,7 @@ test-roundtrip:
 	$(RUBY) test/test_roundtrip.rb $(TEST_DATA)/prov_unpack_to_pack.csv
 
 # Run all tests
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-helpers test-csv test-roundtrip
 
 # Clean (nothing to clean for Ruby)
 clean:

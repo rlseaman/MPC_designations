@@ -158,14 +158,18 @@ designations_equal('73P-A', '73P-B');      # 0 (false)
 ## Testing
 
 ```bash
-# Run CSV conversion tests
-perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv
-
-# Run error handling tests
+# Run error handling tests (94 cases)
 perl test/test_errors.pl ../test-data/error_test_cases.csv
 
-# Run helper function tests
+# Run helper function tests (77 cases)
 perl test/test_helpers.pl
+
+# Run CSV conversion tests (2M+ cases, requires decompressing test data first)
+gunzip -k ../test-data/prov_unpack_to_pack.csv.gz
+perl test/test_csv.pl ../test-data/prov_unpack_to_pack.csv
+
+# Run roundtrip tests
+perl test/test_roundtrip.pl ../test-data/prov_unpack_to_pack.csv
 ```
 
 ## License

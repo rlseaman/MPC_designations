@@ -206,10 +206,11 @@ MPCDesignation::designationsEqual('73P-A', '73P-B');      // false
 
 ```bash
 # Run all tests
-make test
+make test-all
 
 # Run specific tests
 make test-errors    # Error handling tests (94 cases)
+make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ entries)
 make test-roundtrip # Roundtrip verification
 
@@ -229,6 +230,7 @@ php/
 └── test/
     ├── test_csv.php       # CSV conversion tests
     ├── test_errors.php    # Error handling tests
+    ├── test_helpers.php   # Helper function tests
     └── test_roundtrip.php # Roundtrip tests
 ```
 

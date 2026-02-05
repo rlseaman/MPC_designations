@@ -1,6 +1,6 @@
 # PHP MPC Designation Converter Makefile
 
-.PHONY: test test-csv test-errors test-roundtrip test-all clean help
+.PHONY: test test-csv test-errors test-helpers test-roundtrip test-all clean help
 
 # Test data paths
 TEST_DATA_DIR := ../test-data
@@ -16,7 +16,7 @@ test: test-errors test-csv
 	@echo ""
 	@echo "=== All PHP Tests Complete ==="
 
-test-all: test-errors test-csv test-roundtrip
+test-all: test-errors test-helpers test-csv test-roundtrip
 	@echo ""
 	@echo "=== All PHP Tests Complete ==="
 
@@ -29,6 +29,11 @@ test-csv: $(CSV_FILE)
 test-errors:
 	@echo "--- PHP Error Tests ---"
 	php test/test_errors.php $(ERROR_FILE)
+
+# Run helper function tests
+test-helpers:
+	@echo "--- PHP Helper Tests ---"
+	php test/test_helpers.php
 
 # Run roundtrip tests
 test-roundtrip: $(CSV_FILE)
@@ -48,5 +53,6 @@ help:
 	@echo "  test-all      Run all tests including roundtrip"
 	@echo "  test-csv      Run CSV conversion tests (2M+ entries)"
 	@echo "  test-errors   Run error handling tests"
+	@echo "  test-helpers  Run helper function tests"
 	@echo "  test-roundtrip Run roundtrip tests"
 	@echo "  help          Show this help"
