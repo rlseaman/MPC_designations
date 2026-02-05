@@ -290,18 +290,21 @@ convert_simple('1700 AA')    # Error - year before 1800 for asteroids
 ## Testing
 
 ```bash
-# Run error handling tests
+# Run error handling tests (94 test cases)
 python test/test_errors.py ../test-data/error_test_cases.csv
 
 # Run fragment handling tests
 python test/test_fragments.py
 
-# Run helper function tests
+# Run helper function tests (77 test cases)
 python test/test_helpers.py
 
-# Run conversion tests (requires decompressing test data)
+# Run conversion tests (requires decompressing test data first)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz
 python test/test_csv.py ../test-data/prov_unpack_to_pack.csv
+
+# Run roundtrip tests (verifies pack(unpack(x)) == x and unpack(pack(x)) == x)
+python test/test_roundtrip.py ../test-data/prov_unpack_to_pack.csv
 ```
 
 ## Examples

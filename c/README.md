@@ -162,6 +162,9 @@ int mpc_convert_simple(const char *input, char *output, size_t output_size);
 // Conversion with format information
 int mpc_convert(const char *input, char *output, size_t output_size, mpc_info_t *info);
 
+// Format detection (without conversion)
+int mpc_detect_format(const char *input, mpc_info_t *info);
+
 // Format conversion (minimal <-> 12-char MPC report format)
 int mpc_to_report_format(const char *minimal, char *report, size_t outlen);
 int mpc_from_report_format(const char *report, char *minimal, size_t outlen);
@@ -216,14 +219,17 @@ make clean
 # Conversion tests (2M+ test cases)
 make test
 
-# Error handling tests
+# Error handling tests (94 test cases)
 make test-errors
 
 # Fragment handling tests
 make test-fragments
 
-# Helper function tests
+# Helper function tests (77 test cases)
 make test-helpers
+
+# Roundtrip tests (verifies pack(unpack(x)) == x and unpack(pack(x)) == x)
+make test-roundtrip
 
 # All tests
 make test-all

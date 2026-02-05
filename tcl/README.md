@@ -240,18 +240,21 @@ if {[catch {set result [MPCDesignation::convertSimple $input]} err]} {
 ## Testing
 
 ```bash
-# Run error handling tests
+# Run error handling tests (94 test cases)
 tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
 
 # Run fragment handling tests
 tclsh test/test_fragments.tcl
 
-# Run helper function tests
+# Run helper function tests (77 test cases)
 tclsh test/test_helpers.tcl
 
-# Run conversion tests (requires decompressing test data)
+# Run conversion tests (requires decompressing test data first)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz
 tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv
+
+# Run roundtrip tests (verifies pack(unpack(x)) == x and unpack(pack(x)) == x)
+tclsh test/test_roundtrip.tcl ../test-data/prov_unpack_to_pack.csv
 ```
 
 ## Examples
