@@ -373,12 +373,37 @@ func UnpackProvisional(packed string) (string, error) {
 		return "", fmt.Errorf("%w: invalid century code: %c", ErrInvalidFormat, century)
 	}
 
+	// Asteroid provisionals: only I-L valid (1800-2199)
+	if century != 'I' && century != 'J' && century != 'K' && century != 'L' {
+		return "", fmt.Errorf("%w: invalid century code for asteroid provisional: %c (must be I-L for years 1800-2199)", ErrInvalidFormat, century)
+	}
+
 	orderNum, err := decodeCycleCount(orderEncoded)
 	if err != nil {
 		return "", err
 	}
 
 	fullYear := fmt.Sprintf("%d%s", centuryVal, year)
+	yearNum, _ := strconv.Atoi(fullYear)
+
+	// For pre-1925 designations, use A-prefix format (MPC canonical)
+	// A-prefix: A=1 for 1xxx years, B=2 for 2xxx years (theoretical)
+	if yearNum < 1925 {
+		firstDigit := fullYear[0]
+		restOfYear := fullYear[1:]
+		var prefix string
+		if firstDigit == '1' {
+			prefix = "A"
+		} else if firstDigit == '2' {
+			prefix = "B"
+		}
+		if prefix != "" {
+			if orderNum == 0 {
+				return fmt.Sprintf("%s%s %c%c", prefix, restOfYear, halfMonth, secondLetter), nil
+			}
+			return fmt.Sprintf("%s%s %c%c%d", prefix, restOfYear, halfMonth, secondLetter, orderNum), nil
+		}
+	}
 
 	if orderNum == 0 {
 		return fmt.Sprintf("%s %c%c", fullYear, halfMonth, secondLetter), nil
@@ -452,6 +477,11 @@ func PackProvisional(unpacked string) (string, error) {
 	yearInt, err := strconv.Atoi(year)
 	if err != nil {
 		return "", fmt.Errorf("%w: invalid year", ErrInvalidFormat)
+	}
+
+	// Asteroid provisionals: only years 1800-2199 valid
+	if yearInt < 1800 || yearInt > 2199 {
+		return "", fmt.Errorf("%w: year out of range for asteroid provisional: %s (must be 1800-2199)", ErrOutOfRange, year)
 	}
 
 	century := yearInt / 100
@@ -644,9 +674,12 @@ func PackCometProvisional(unpacked string) (string, error) {
 }
 
 // UnpackCometNumbered unpacks a numbered periodic comet designation
+// Supports fragments: 0073Pa -> 73P-A, 0073Paa -> 73P-AA
 func UnpackCometNumbered(packed string) (string, error) {
 	p := strings.TrimSpace(packed)
-	if len(p) != 5 {
+	length := len(p)
+
+	if length < 5 || length > 7 {
 		return "", fmt.Errorf("%w: invalid packed numbered comet designation", ErrInvalidFormat)
 	}
 
@@ -660,10 +693,25 @@ func UnpackCometNumbered(packed string) (string, error) {
 		return "", fmt.Errorf("%w: invalid packed numbered comet designation", ErrInvalidFormat)
 	}
 
-	return fmt.Sprintf("%d%c", num, cometType), nil
+	result := fmt.Sprintf("%d%c", num, cometType)
+
+	// Check for fragment (lowercase letters after comet type)
+	if length > 5 {
+		fragment := p[5:]
+		// Validate fragment: must be 1-2 lowercase letters
+		for i := 0; i < len(fragment); i++ {
+			if fragment[i] < 'a' || fragment[i] > 'z' {
+				return "", fmt.Errorf("%w: invalid fragment in packed comet designation", ErrInvalidFormat)
+			}
+		}
+		result += "-" + strings.ToUpper(fragment)
+	}
+
+	return result, nil
 }
 
 // PackCometNumbered packs a numbered periodic comet designation
+// Supports fragments: 73P-A -> 0073Pa, 73P-AA -> 0073Paa
 func PackCometNumbered(unpacked string) (string, error) {
 	u := strings.TrimSpace(unpacked)
 
@@ -694,7 +742,31 @@ func PackCometNumbered(unpacked string) (string, error) {
 		return "", fmt.Errorf("%w: comet number out of range (1-9999): %d", ErrOutOfRange, num)
 	}
 
-	return fmt.Sprintf("%04d%c", num, cometType), nil
+	result := fmt.Sprintf("%04d%c", num, cometType)
+
+	// Check for fragment suffix: "-A" or "-AA"
+	rest := u[numEnd+1:]
+	if strings.HasPrefix(rest, "-") {
+		fragment := rest[1:]
+		// Check for /name suffix and strip it
+		slashIdx := strings.Index(fragment, "/")
+		if slashIdx >= 0 {
+			fragment = fragment[0:slashIdx]
+		}
+
+		// Validate fragment: must be 1-2 uppercase letters
+		if len(fragment) < 1 || len(fragment) > 2 {
+			return "", fmt.Errorf("%w: invalid fragment length (1-2 letters)", ErrInvalidFormat)
+		}
+		for i := 0; i < len(fragment); i++ {
+			if fragment[i] < 'A' || fragment[i] > 'Z' {
+				return "", fmt.Errorf("%w: invalid fragment (must be uppercase letters)", ErrInvalidFormat)
+			}
+		}
+		result += strings.ToLower(fragment)
+	}
+
+	return result, nil
 }
 
 // UnpackSatellite unpacks a natural satellite provisional designation
@@ -1218,6 +1290,23 @@ func DetectFormat(designation string) (Info, error) {
 		}
 	}
 
+	// Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
+	if len(des) == 6 || len(des) == 7 {
+		if isPackedCometNumbered(des) {
+			info.Format = FormatPacked
+			info.Type = "comet_numbered"
+			cometType := des[4]
+			typeDesc := cometTypeDescriptions[cometType]
+			fragLen := len(des) - 5
+			if fragLen == 1 {
+				info.Subtype = fmt.Sprintf("comet numbered %s with fragment", typeDesc)
+			} else {
+				info.Subtype = fmt.Sprintf("comet numbered %s with 2-letter fragment", typeDesc)
+			}
+			return info, nil
+		}
+	}
+
 	// Check for packed provisional asteroid (7 chars)
 	if len(des) == 7 {
 		// Extended format with underscore
@@ -1586,7 +1675,8 @@ func isPackedSurveyT(s string) bool {
 }
 
 func isPackedCometNumbered(s string) bool {
-	if len(s) != 5 {
+	length := len(s)
+	if length < 5 || length > 7 {
 		return false
 	}
 	for i := 0; i < 4; i++ {
@@ -1594,7 +1684,16 @@ func isPackedCometNumbered(s string) bool {
 			return false
 		}
 	}
-	return s[4] == 'P' || s[4] == 'D'
+	if s[4] != 'P' && s[4] != 'D' {
+		return false
+	}
+	// Check for optional fragment (lowercase letters)
+	for i := 5; i < length; i++ {
+		if s[i] < 'a' || s[i] > 'z' {
+			return false
+		}
+	}
+	return true
 }
 
 func isPackedCometProv(s string) bool {
@@ -1735,7 +1834,7 @@ func parseUnpackedCometFull(s string) (cometType byte, year int, ok bool) {
 }
 
 func isUnpackedCometNumbered(s string) bool {
-	// Pattern: number followed by P or D, optionally followed by /name
+	// Pattern: number followed by P or D, optionally followed by -fragment and/or /name
 	numEnd := 0
 	for i := 0; i < len(s); i++ {
 		if s[i] < '0' || s[i] > '9' {
@@ -1753,9 +1852,31 @@ func isUnpackedCometNumbered(s string) bool {
 		return false
 	}
 
-	// Rest should be empty or start with /
-	if numEnd+1 < len(s) && s[numEnd+1] != '/' {
-		return false
+	// Rest should be empty, start with -, or start with /
+	if numEnd+1 < len(s) {
+		nextChar := s[numEnd+1]
+		if nextChar != '/' && nextChar != '-' {
+			return false
+		}
+		// If it starts with -, validate fragment
+		if nextChar == '-' {
+			rest := s[numEnd+2:]
+			// Fragment should be 1-2 uppercase letters, optionally followed by /name
+			fragEnd := 0
+			for i := 0; i < len(rest); i++ {
+				if rest[i] == '/' {
+					fragEnd = i
+					break
+				}
+				if rest[i] < 'A' || rest[i] > 'Z' {
+					return false
+				}
+				fragEnd = i + 1
+			}
+			if fragEnd < 1 || fragEnd > 2 {
+				return false
+			}
+		}
 	}
 
 	return true
@@ -1877,4 +1998,369 @@ func Unpack(designation string) (string, error) {
 		return "", err
 	}
 	return result.Output, nil
+}
+
+// =============================================================================
+// Helper Functions for Format Conversion and Fragment Handling
+// =============================================================================
+
+// ToReportFormat converts minimal packed format to 12-character MPC report format.
+// The 12-character format is used in MPC observation records (columns 1-12).
+// For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+//
+// Examples:
+//
+//	"0073Pa"   -> "0073P      a" (numbered comet with single fragment)
+//	"0073Paa"  -> "0073P     aa" (numbered comet with double fragment)
+//	"00001"    -> "       00001" (numbered asteroid)
+//	"J95X00A"  -> "     J95X00A" (provisional asteroid)
+//	"CJ95O010" -> "    CJ95O010" (provisional comet)
+func ToReportFormat(minimal string) (string, error) {
+	minimal = strings.TrimSpace(minimal)
+	length := len(minimal)
+
+	info, err := DetectFormat(minimal)
+	if err != nil {
+		return "", err
+	}
+
+	if info.Format != FormatPacked {
+		return "", fmt.Errorf("%w: ToReportFormat requires packed format input", ErrInvalidFormat)
+	}
+
+	// Initialize 12-char output with spaces
+	report := []byte("            ")
+
+	switch info.Type {
+	case "permanent":
+		// Right-align 5-char designation
+		for i := 0; i < length; i++ {
+			report[12-length+i] = minimal[i]
+		}
+
+	case "provisional", "provisional_extended", "survey":
+		// Right-align 7-char designation
+		for i := 0; i < length; i++ {
+			report[12-length+i] = minimal[i]
+		}
+
+	case "comet_numbered":
+		// Numbered comet: first 5 chars (####P), fragment in cols 11-12
+		if length == 5 {
+			// No fragment
+			for i := 0; i < 5; i++ {
+				report[i] = minimal[i]
+			}
+		} else if length == 6 {
+			// Single-letter fragment
+			for i := 0; i < 5; i++ {
+				report[i] = minimal[i]
+			}
+			report[11] = minimal[5]
+		} else if length == 7 {
+			// Two-letter fragment
+			for i := 0; i < 5; i++ {
+				report[i] = minimal[i]
+			}
+			report[10] = minimal[5]
+			report[11] = minimal[6]
+		}
+
+	case "comet_provisional", "comet_full", "comet_ancient", "comet_bce":
+		// Right-align in 12-char field
+		for i := 0; i < length; i++ {
+			report[12-length+i] = minimal[i]
+		}
+
+	case "satellite":
+		// Right-align 8-char designation
+		for i := 0; i < length; i++ {
+			report[12-length+i] = minimal[i]
+		}
+
+	default:
+		return "", fmt.Errorf("%w: unsupported type for report format: %s", ErrInvalidFormat, info.Type)
+	}
+
+	return string(report), nil
+}
+
+// FromReportFormat converts 12-character MPC report format to minimal packed format.
+func FromReportFormat(report string) (string, error) {
+	length := len(report)
+	if length > 12 {
+		return "", fmt.Errorf("%w: report format too long", ErrInvalidFormat)
+	}
+
+	// Pad to 12 chars if shorter
+	for len(report) < 12 {
+		report = " " + report
+	}
+
+	// Check for numbered comet with fragment (fragment in cols 11-12)
+	// Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+	first5 := report[0:5]
+	middle := report[5:10]
+	frag1 := report[10]
+	frag2 := report[11]
+
+	// Check if this is a numbered comet format
+	if len(first5) == 5 &&
+		first5[0] >= '0' && first5[0] <= '9' &&
+		first5[1] >= '0' && first5[1] <= '9' &&
+		first5[2] >= '0' && first5[2] <= '9' &&
+		first5[3] >= '0' && first5[3] <= '9' &&
+		(first5[4] == 'P' || first5[4] == 'D') &&
+		strings.TrimSpace(middle) == "" {
+
+		result := first5
+		if frag1 >= 'a' && frag1 <= 'z' {
+			result += string(frag1)
+		}
+		if frag2 >= 'a' && frag2 <= 'z' {
+			result += string(frag2)
+		}
+		return result, nil
+	}
+
+	// Standard case: just trim spaces
+	return strings.TrimSpace(report), nil
+}
+
+// HasFragment checks if a designation has a comet fragment suffix.
+// Works with both packed and unpacked formats.
+func HasFragment(desig string) bool {
+	info, err := DetectFormat(desig)
+	if err != nil {
+		return false
+	}
+
+	dtype := info.Type
+
+	// Only comets can have fragments
+	if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+		return false
+	}
+
+	desig = strings.TrimSpace(desig)
+	length := len(desig)
+
+	if info.Format == FormatUnpacked {
+		// Look for "-X" or "-XX" at end
+		if length >= 3 {
+			dashIdx := strings.LastIndex(desig, "-")
+			if dashIdx >= 0 && dashIdx < length-1 {
+				frag := desig[dashIdx+1:]
+				if len(frag) >= 1 && len(frag) <= 2 {
+					allUpper := true
+					for i := 0; i < len(frag); i++ {
+						if frag[i] < 'A' || frag[i] > 'Z' {
+							allUpper = false
+							break
+						}
+					}
+					return allUpper
+				}
+			}
+		}
+	} else {
+		// Packed format
+		if dtype == "comet_numbered" {
+			// Check for lowercase after P/D (position 5+)
+			if length > 5 && desig[5] >= 'a' && desig[5] <= 'z' {
+				return true
+			}
+		} else if dtype == "comet_provisional" {
+			// 7-char: last char lowercase and not '0'
+			// 8-char: last two chars lowercase
+			lastChar := desig[length-1]
+			if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+				return true
+			}
+		} else if dtype == "comet_full" {
+			// Check last char(s)
+			lastChar := desig[length-1]
+			if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// GetFragment extracts the fragment suffix from a comet designation.
+// Works with both packed and unpacked formats.
+// Fragment is returned in uppercase (e.g., "A", "AA").
+// Returns empty string if no fragment.
+func GetFragment(desig string) (string, error) {
+	info, err := DetectFormat(desig)
+	if err != nil {
+		return "", err
+	}
+
+	dtype := info.Type
+
+	// Only comets can have fragments
+	if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+		return "", nil
+	}
+
+	desig = strings.TrimSpace(desig)
+	length := len(desig)
+
+	if info.Format == FormatUnpacked {
+		// Look for "-X" or "-XX" at end
+		dashIdx := strings.LastIndex(desig, "-")
+		if dashIdx >= 0 && dashIdx < length-1 {
+			frag := desig[dashIdx+1:]
+			if len(frag) >= 1 && len(frag) <= 2 {
+				allUpper := true
+				for i := 0; i < len(frag); i++ {
+					if frag[i] < 'A' || frag[i] > 'Z' {
+						allUpper = false
+						break
+					}
+				}
+				if allUpper {
+					return frag, nil
+				}
+			}
+		}
+	} else {
+		// Packed format
+		if dtype == "comet_numbered" {
+			// Fragment is lowercase after P/D
+			if length == 6 {
+				return strings.ToUpper(string(desig[5])), nil
+			} else if length == 7 {
+				return strings.ToUpper(desig[5:7]), nil
+			}
+		} else if dtype == "comet_provisional" {
+			// 7-char: position 6 if lowercase and not '0'
+			// 8-char: positions 6-7 if lowercase
+			if length == 7 {
+				lastChar := desig[6]
+				if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+					return strings.ToUpper(string(lastChar)), nil
+				}
+			} else if length == 8 {
+				frag := desig[6:8]
+				if frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z' {
+					return strings.ToUpper(frag), nil
+				}
+			}
+		} else if dtype == "comet_full" {
+			// 8-char: position 7 if lowercase and not '0'
+			// 9-char: positions 7-8 if lowercase
+			if length == 8 {
+				lastChar := desig[7]
+				if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+					return strings.ToUpper(string(lastChar)), nil
+				}
+			} else if length == 9 {
+				frag := desig[7:9]
+				if frag[0] >= 'a' && frag[0] <= 'z' && frag[1] >= 'a' && frag[1] <= 'z' {
+					return strings.ToUpper(frag), nil
+				}
+			}
+		}
+	}
+
+	return "", nil
+}
+
+// GetParent returns the parent comet designation (without fragment suffix).
+// Works with both packed and unpacked formats.
+// Returns the designation in the same format (packed or unpacked) as input.
+func GetParent(desig string) (string, error) {
+	info, err := DetectFormat(desig)
+	if err != nil {
+		return "", err
+	}
+
+	dtype := info.Type
+
+	// Non-comets: return as-is
+	if dtype != "comet_numbered" && dtype != "comet_provisional" && dtype != "comet_full" {
+		return strings.TrimSpace(desig), nil
+	}
+
+	desig = strings.TrimSpace(desig)
+	length := len(desig)
+
+	if info.Format == FormatUnpacked {
+		// Remove "-X" or "-XX" suffix if present
+		dashIdx := strings.LastIndex(desig, "-")
+		if dashIdx >= 0 && dashIdx < length-1 {
+			frag := desig[dashIdx+1:]
+			if len(frag) >= 1 && len(frag) <= 2 {
+				allUpper := true
+				for i := 0; i < len(frag); i++ {
+					if frag[i] < 'A' || frag[i] > 'Z' {
+						allUpper = false
+						break
+					}
+				}
+				if allUpper {
+					return desig[0:dashIdx], nil
+				}
+			}
+		}
+	} else {
+		// Packed format
+		if dtype == "comet_numbered" {
+			// Remove lowercase fragment letters after P/D
+			if length > 5 && desig[5] >= 'a' && desig[5] <= 'z' {
+				return desig[0:5], nil
+			}
+		} else if dtype == "comet_provisional" {
+			// 7-char: replace lowercase fragment with '0'
+			// 8-char: replace 2 lowercase with '0', truncate
+			if length == 7 {
+				lastChar := desig[6]
+				if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+					return desig[0:6] + "0", nil
+				}
+			} else if length == 8 {
+				frag := desig[6:8]
+				if frag[0] >= 'a' && frag[0] <= 'z' {
+					return desig[0:6] + "0", nil
+				}
+			}
+		} else if dtype == "comet_full" {
+			// 8-char: replace fragment with '0'
+			// 9-char: replace fragment with '0', truncate
+			if length == 8 {
+				lastChar := desig[7]
+				if lastChar >= 'a' && lastChar <= 'z' && lastChar != '0' {
+					return desig[0:7] + "0", nil
+				}
+			} else if length == 9 {
+				frag := desig[7:9]
+				if frag[0] >= 'a' && frag[0] <= 'z' {
+					return desig[0:7] + "0", nil
+				}
+			}
+		}
+	}
+
+	return desig, nil
+}
+
+// DesignationsEqual checks if two designations refer to the same object.
+// This function normalizes both designations to packed format and compares them,
+// handling different formats (packed/unpacked).
+func DesignationsEqual(desig1, desig2 string) bool {
+	packed1, err := Pack(desig1)
+	if err != nil {
+		return false
+	}
+
+	packed2, err := Pack(desig2)
+	if err != nil {
+		return false
+	}
+
+	return packed1 == packed2
 }

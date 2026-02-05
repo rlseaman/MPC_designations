@@ -5,10 +5,10 @@ GOFLAGS = -ldflags="-s -w"
 
 TEST_DATA = ../test-data
 
-.PHONY: all clean test test-csv test-errors test-roundtrip test-all build
+.PHONY: all clean test test-csv test-errors test-roundtrip test-helpers test-all build
 
 # Default: build all
-all: mpc_designation test_csv test_errors test_roundtrip
+all: mpc_designation test_csv test_errors test_roundtrip test_helpers
 
 # Build the CLI
 mpc_designation:
@@ -23,6 +23,9 @@ test_errors:
 
 test_roundtrip:
 	$(GO) build $(GOFLAGS) -o $@ ./test/test_roundtrip
+
+test_helpers:
+	$(GO) build $(GOFLAGS) -o $@ ./test/test_helpers
 
 # Run conversion tests
 test: test_csv
@@ -44,12 +47,16 @@ test-roundtrip: test_roundtrip
 	fi
 	./test_roundtrip $(TEST_DATA)/prov_unpack_to_pack.csv
 
+# Run helper function tests
+test-helpers: test_helpers
+	./test_helpers
+
 # Run all tests
-test-all: test-errors test
+test-all: test-errors test-helpers test
 
 # Clean build artifacts
 clean:
-	rm -f mpc_designation test_csv test_errors test_roundtrip
+	rm -f mpc_designation test_csv test_errors test_roundtrip test_helpers
 
 # Cross-compile for multiple platforms
 build-all: build-linux build-windows build-darwin

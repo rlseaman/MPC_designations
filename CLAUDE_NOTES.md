@@ -126,9 +126,79 @@ Updated test cases:
   to `T-1 3138` (invalid survey format)
 - `min_year`: Changed from `1000 AA` to `1800 AA` (minimum valid asteroid year)
 
+### 7. Helper Functions for Format Conversion and Fragment Handling
+
+**What**: Added six helper functions to enable interoperability with other MPC tools (like Bill Gray's
+"lunar" library) and simplify working with comet fragments.
+
+**Functions**:
+
+1. **to_report_format(minimal)** / **ToReportFormat(minimal)**
+   - Converts minimal packed format to 12-character MPC observation report format
+   - The 12-char format is used in MPC observation records (columns 1-12)
+   - For numbered comets with fragments, fragment letter(s) go in columns 11-12
+   - Examples:
+     - `"0073Pa"` → `"0073P      a"` (numbered comet with single fragment)
+     - `"0073Paa"` → `"0073P     aa"` (numbered comet with double fragment)
+     - `"00001"` → `"       00001"` (numbered asteroid, right-aligned)
+     - `"J95X00A"` → `"     J95X00A"` (provisional asteroid)
+     - `"CJ95O010"` → `"    CJ95O010"` (provisional comet)
+
+2. **from_report_format(report)** / **FromReportFormat(report)**
+   - Converts 12-character MPC report format to minimal packed format
+   - Handles numbered comets with fragments in columns 11-12
+   - Examples:
+     - `"0073P      a"` → `"0073Pa"`
+     - `"0073P     aa"` → `"0073Paa"`
+     - `"       00001"` → `"00001"`
+
+3. **has_fragment(desig)** / **HasFragment(desig)**
+   - Returns true if designation has a comet fragment suffix
+   - Works with both packed and unpacked formats
+   - Examples:
+     - `"73P-A"` → true, `"73P"` → false
+     - `"0073Pa"` → true, `"0073P"` → false
+
+4. **get_fragment(desig)** / **GetFragment(desig)**
+   - Extracts fragment suffix from comet designation
+   - Returns uppercase (e.g., "A", "AA"), empty string if no fragment
+   - Works with both packed and unpacked formats
+   - Examples:
+     - `"73P-A"` → `"A"`, `"73P-AA"` → `"AA"`
+     - `"0073Pa"` → `"A"`, `"0073Paa"` → `"AA"`
+
+5. **get_parent(desig)** / **GetParent(desig)**
+   - Returns parent comet designation without fragment suffix
+   - Returns in same format (packed or unpacked) as input
+   - Examples:
+     - `"73P-A"` → `"73P"`, `"73P-AA"` → `"73P"`
+     - `"0073Pa"` → `"0073P"`, `"0073Paa"` → `"0073P"`
+
+6. **designations_equal(d1, d2)** / **DesignationsEqual(d1, d2)**
+   - Returns true if two designations refer to the same object
+   - Normalizes both to packed format before comparing
+   - Examples:
+     - `"1995 XA"`, `"J95X00A"` → true (same object)
+     - `"73P-A"`, `"0073Pa"` → true (same object)
+     - `"73P-A"`, `"73P-B"` → false (different fragments)
+
+**Implementation Status**:
+- [x] C library (c/src/mpc_designation.c)
+- [x] TCL library (tcl/src/mpc_designation.tcl)
+- [x] Python library (python/src/mpc_designation/mpc_designation.py)
+- [x] Go library (go/mpc/mpc_designation.go)
+- [ ] Java
+- [ ] Rust
+- [ ] JavaScript/TypeScript
+- [ ] Ruby
+- [ ] Perl
+- [ ] PHP
+
+**Test file**: Each library should have a `test_helpers` test with 77 test cases covering all functions.
+
 ## Implementation Checklist for Other Languages
 
-When updating Python, C, Go, Java, Rust, JavaScript, etc.:
+When updating Java, Rust, JavaScript, Ruby, Perl, PHP, etc.:
 
 - [ ] Add numbered comet fragment support (pack/unpack)
 - [ ] Add two-letter fragment support for provisional comets
@@ -140,6 +210,8 @@ When updating Python, C, Go, Java, Rust, JavaScript, etc.:
 - [ ] Update regex patterns to match new formats
 - [ ] Add/update fragment test cases
 - [ ] Validate against updated prov_unpack_to_pack.csv (2,022,404 entries)
+- [ ] Add helper functions (to_report_format, from_report_format, has_fragment, get_fragment, get_parent, designations_equal)
+- [ ] Add test_helpers test with 77 test cases
 
 ## Key Regex Patterns (Reference)
 
