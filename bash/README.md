@@ -4,7 +4,7 @@ A pure Bash implementation for converting between packed and unpacked Minor Plan
 
 ## Requirements
 
-- Bash 3.2+ (macOS default) or any POSIX-compatible shell
+- Bash 3.2+ (macOS default)
 
 ## Usage
 
@@ -29,6 +29,10 @@ A pure Bash implementation for converting between packed and unpacked Minor Plan
 ./src/mpc_designation.sh 1P           # -> 0001P
 ./src/mpc_designation.sh 'C/1995 O1'  # -> CJ95O010
 
+# Comets with fragments
+./src/mpc_designation.sh '73P-A'      # -> 0073Pa
+./src/mpc_designation.sh 0073Paa      # -> 73P-AA
+
 # Natural satellites
 ./src/mpc_designation.sh 'S/2019 S 22' # -> SK19S220
 ```
@@ -50,9 +54,12 @@ echo "$result"  # J95X00A
 | Permanent asteroid (100K-620K) | A0001-z9999 | 100001-619999 |
 | Permanent asteroid (620K+) | ~0000+ | 620000+ |
 | Provisional asteroid | J95X00A | 1995 XA |
+| Pre-1925 provisional | J08C00J | A908 CJ |
 | Survey | PLS2040 | 2040 P-L |
 | Numbered comet | 0001P | 1P |
+| Numbered comet with fragment | 0073Pa, 0073Paa | 73P-A, 73P-AA |
 | Provisional comet | CJ95O010 | C/1995 O1 |
+| Provisional comet with fragment | DJ93F02b | D/1993 F2-B |
 | Natural satellite | SK19S220 | S/2019 S 22 |
 
 ## API
@@ -74,17 +81,61 @@ unpack_provisional "J95X00A" # -> 1995 XA
 pack_survey "2040 P-L"       # -> PLS2040
 unpack_survey "PLS2040"      # -> 2040 P-L
 pack_numbered_comet "1P"     # -> 0001P
+pack_numbered_comet "73P-A"  # -> 0073Pa
 unpack_numbered_comet "0001P" # -> 1P
+unpack_numbered_comet "0073Pa" # -> 73P-A
 pack_provisional_comet "C/1995 O1" # -> CJ95O010
 unpack_provisional_comet "CJ95O010" # -> C/1995 O1
 pack_satellite "S/2019 S 22" # -> SK19S220
 unpack_satellite "SK19S220"  # -> S/2019 S 22
 ```
 
+### Helper Functions
+
+```bash
+# Convert minimal packed format to 12-character MPC report format
+to_report_format "0073Pa"      # -> "0073P      a"
+to_report_format "00001"       # -> "       00001"
+
+# Convert 12-character report format to minimal packed format
+from_report_format "0073P      a"  # -> "0073Pa"
+from_report_format "       00001"  # -> "00001"
+
+# Check if designation has a comet fragment suffix
+has_fragment "73P-A"    # returns 0 (true)
+has_fragment "73P"      # returns 1 (false)
+
+# Extract fragment suffix (uppercase, e.g., "A", "AA")
+get_fragment "73P-A"    # -> "A"
+get_fragment "0073Paa"  # -> "AA"
+
+# Get parent comet designation without fragment suffix
+get_parent "73P-A"      # -> "73P"
+get_parent "0073Pa"     # -> "0073P"
+
+# Check if two designations refer to the same object
+designations_equal "73P" "0073P"     # returns 0 (true)
+designations_equal "73P-A" "0073Pa"  # returns 0 (true)
+designations_equal "73P" "74P"       # returns 1 (false)
+```
+
 ## Testing
 
 ```bash
-make test
+# Run error handling tests (36 cases)
+make test-errors
+
+# Run helper function tests (77 cases)
+make test-helpers
+
+# Run full CSV test suite (2M+ tests)
+make test-csv
+
+# Run round-trip tests
+make test-roundtrip
+
+# Run all tests
+make test-all
 ```
 
 ## Limitations
@@ -96,4 +147,11 @@ make test
 ## Files
 
 - `src/mpc_designation.sh` - Main library and CLI
-- `test/test_errors.sh` - Test suite (36 test cases)
+- `test/test_errors.sh` - Error handling tests (36 cases)
+- `test/test_helpers.sh` - Helper function tests (77 cases)
+- `test/test_csv.sh` - CSV test suite
+- `test/test_roundtrip.sh` - Round-trip tests
+
+## License
+
+CC0 1.0 Universal - Public Domain Dedication

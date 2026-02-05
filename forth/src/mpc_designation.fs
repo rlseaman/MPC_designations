@@ -307,7 +307,7 @@ variable prov-cycle
 variable prov-outlen
 
 : unpack-prov ( addr len -- addr' len' )
-  \ Format: CyyHooL -> yyyy HL[n]
+  \ Format: CyyHooL -> yyyy HL[n] or A908 CJ for pre-1925
   \ Calculate year
   over c@ century>num 100 *
   2 pick 1+ c@ [char] 0 - 10 * +
@@ -315,23 +315,52 @@ variable prov-outlen
   prov-year !
   \ Get cycle count
   over 4 + decode-cycle prov-cycle !
-  \ Build output string in out-buf
-  \ Year (4 digits)
-  prov-year @ s>d <# # # # # #> out-buf swap move
-  \ Space
-  bl out-buf 4 + c!
-  \ Half-month letter
-  over 3 + c@ out-buf 5 + c!
-  \ Second letter
-  over 6 + c@ out-buf 6 + c!
-  \ Cycle count (if non-zero)
-  prov-cycle @ dup 0= if
-    drop 7 prov-outlen !
+  \ Check for pre-1925 A-prefix format
+  prov-year @ 1925 < if
+    \ A-prefix format: A908 CJ instead of 1908 CJ
+    prov-year @ 1000 / case
+      1 of [char] A endof
+      2 of [char] B endof
+      0 swap
+    endcase
+    out-buf c!
+    \ 3-digit year remainder (e.g., 908 for 1908)
+    prov-year @ 1000 mod
+    s>d <# # # # #> drop 3 out-buf 1+ swap move
+    \ Space
+    bl out-buf 4 + c!
+    \ Half-month letter
+    over 3 + c@ out-buf 5 + c!
+    \ Second letter
+    over 6 + c@ out-buf 6 + c!
+    \ Cycle count (if non-zero)
+    prov-cycle @ dup 0= if
+      drop 7 prov-outlen !
+    else
+      s>d <# #s #>
+      dup prov-outlen !
+      out-buf 7 + swap move
+      prov-outlen @ 7 + prov-outlen !
+    then
   else
-    s>d <# #s #>                  \ addr len of cycle string
-    dup prov-outlen !             \ save cycle string length
-    out-buf 7 + swap move         \ copy cycle to out-buf+7
-    prov-outlen @ 7 + prov-outlen !
+    \ Standard format
+    \ Year (4 digits)
+    prov-year @ s>d <# # # # # #> out-buf swap move
+    \ Space
+    bl out-buf 4 + c!
+    \ Half-month letter
+    over 3 + c@ out-buf 5 + c!
+    \ Second letter
+    over 6 + c@ out-buf 6 + c!
+    \ Cycle count (if non-zero)
+    prov-cycle @ dup 0= if
+      drop 7 prov-outlen !
+    else
+      s>d <# #s #>                  \ addr len of cycle string
+      dup prov-outlen !             \ save cycle string length
+      out-buf 7 + swap move         \ copy cycle to out-buf+7
+      prov-outlen @ 7 + prov-outlen !
+    then
   then
   out-buf prov-outlen @
   2swap 2drop ;
@@ -444,20 +473,53 @@ variable ext-outlen
 \ ============================================================================
 
 : is-comet-numbered-packed? ( addr len -- f )
-  dup 5 <> if 2drop false exit then
-  drop
-  dup 4 + c@ dup [char] P = swap [char] D = or 0= if drop false exit then
-  4 all-digit? ;
+  \ Check for 5-7 char format: 0001P, 0073Pa, 0073Paa
+  dup 5 < over 7 > or if 2drop false exit then
+  over 4 + c@ dup [char] P = swap [char] D = or 0= if 2drop false exit then
+  over 4 all-digit? 0= if 2drop false exit then
+  \ Check fragment suffix if present (must be lowercase)
+  dup 5 > if
+    over 5 + c@ is-lower 0= if 2drop false exit then
+    dup 7 = if
+      over 6 + c@ is-lower 0= if 2drop false exit then
+    then
+  then
+  2drop true ;
+
+variable comet-dash-pos
+variable comet-check-addr
+variable comet-check-len
 
 : is-comet-numbered-unpacked? ( addr len -- f )
   dup 2 < if 2drop false exit then
-  2dup + 1- c@ dup [char] P = swap [char] D = or 0= if 2drop false exit then
-  1- all-digit? ;
+  comet-check-len ! comet-check-addr !
+  \ Find dash position if any
+  0 comet-dash-pos !
+  comet-check-addr @ comet-check-len @ bounds ?do
+    i c@ [char] - = if i comet-dash-pos ! leave then
+  loop
+  comet-dash-pos @ if
+    \ Has dash - check format: digits + P/D + dash + letters
+    comet-dash-pos @ comet-check-addr @ -  \ dash offset from addr
+    dup 2 < if drop false exit then        \ need at least 2 chars before dash (e.g. "1P")
+    \ Check char before dash is P or D
+    comet-dash-pos @ 1- c@ dup [char] P = swap [char] D = or 0= if
+      drop false exit then
+    \ Check all chars before P/D are digits
+    comet-check-addr @ swap 1- all-digit?
+  else
+    \ No dash - simple format: digits + P/D
+    comet-check-addr @ comet-check-len @ + 1- c@
+    dup [char] P = swap [char] D = or 0= if false exit then
+    \ Check all chars before type letter are digits
+    comet-check-addr @ comet-check-len @ 1- all-digit?
+  then ;
 
 variable comet-num-len
+variable comet-frag-len
 
 : unpack-comet-numbered ( addr len -- addr' len' )
-  \ Format: 0001P -> 1P
+  \ Format: 0001P -> 1P, 0073Pa -> 73P-A, 0073Paa -> 73P-AA
   over 4 str>num                   \ addr len number
   s>d <# #s #>                     \ addr len num-str-addr num-str-len
   dup comet-num-len !              \ save length
@@ -465,17 +527,66 @@ variable comet-num-len
   \ Stack: addr len
   over 4 + c@                      \ get type letter (P or D)
   out-buf comet-num-len @ + c!     \ append to out-buf
+  comet-num-len @ 1+ comet-num-len ! \ update length
+  \ Check for fragment (6 or 7 chars)
+  dup 5 > if
+    [char] - out-buf comet-num-len @ + c!
+    comet-num-len @ 1+ comet-num-len !
+    \ Convert fragment to uppercase
+    over 5 + c@ [char] a - [char] A +
+    out-buf comet-num-len @ + c!
+    comet-num-len @ 1+ comet-num-len !
+    dup 7 = if
+      over 6 + c@ [char] a - [char] A +
+      out-buf comet-num-len @ + c!
+      comet-num-len @ 1+ comet-num-len !
+    then
+  then
   2drop
-  out-buf comet-num-len @ 1+ ;
+  out-buf comet-num-len @ ;
+
+variable pcn-dash-addr
+variable pcn-type-char
+variable pcn-number
 
 : pack-comet-numbered ( addr len -- addr' len' )
-  \ Format: 1P -> 0001P
-  2dup + 1- c@                     \ addr len type-char
-  -rot                             \ type-char addr len
-  1- str>num                       \ type-char number
-  s>d <# # # # # #> out-buf swap move
-  out-buf 4 + c!                   \ store type letter
-  out-buf 5 ;
+  \ Format: 1P -> 0001P, 73P-A -> 0073Pa, 73P-AA -> 0073Paa
+  \ Find dash for fragment
+  0 pcn-dash-addr !
+  0 comet-frag-len !
+  2dup bounds ?do
+    i c@ [char] - = if i pcn-dash-addr ! leave then
+  loop
+  pcn-dash-addr @ if
+    \ Has fragment
+    \ Fragment length = total len - dash offset - 1
+    2dup + pcn-dash-addr @ - 1- comet-frag-len !
+    \ Get type char (char before dash)
+    pcn-dash-addr @ 1- c@ pcn-type-char !
+    \ Get number (from start to type char)
+    over pcn-dash-addr @ over - 1- str>num pcn-number !
+    \ Build packed format
+    pcn-number @ s>d <# # # # # #> out-buf swap move
+    pcn-type-char @ out-buf 4 + c!
+    \ Add fragment (convert to lowercase)
+    comet-frag-len @ 1 = if
+      pcn-dash-addr @ 1+ c@ [char] A - [char] a + out-buf 5 + c!
+      2drop
+      out-buf 6
+    else
+      pcn-dash-addr @ 1+ c@ [char] A - [char] a + out-buf 5 + c!
+      pcn-dash-addr @ 2 + c@ [char] A - [char] a + out-buf 6 + c!
+      2drop
+      out-buf 7
+    then
+  else
+    \ No fragment - simple format
+    2dup + 1- c@ pcn-type-char !   \ get type char
+    over swap 1- str>num pcn-number ! \ parse number
+    pcn-number @ s>d <# # # # # #> out-buf swap move
+    pcn-type-char @ out-buf 4 + c!
+    out-buf 5
+  then ;
 
 \ ============================================================================
 \ Comet provisional designations (1995 O1, 1995 O1-B)
@@ -786,6 +897,388 @@ variable sat-num-len
 
   \ Unknown format - return as-is
   out-buf over move out-buf swap ;
+
+\ ============================================================================
+\ Helper functions for format conversion and fragment handling
+\ ============================================================================
+
+create report-buf 12 allot
+variable report-len
+
+variable trf-addr
+variable trf-len
+
+: to-report-format ( addr len -- addr' len' )
+  \ Convert minimal packed format to 12-character MPC report format
+  \ Numbered comets go at start, everything else right-aligned
+  trf-len ! trf-addr !
+  report-buf 12 bl fill
+  trf-len @ 5 >= trf-len @ 7 <= and if
+    trf-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+      trf-addr @ 4 all-digit? if
+        \ Numbered comet: 0001P -> "0001P       "
+        \ Or with fragment: 0073Pa -> "0073P      a"
+        trf-addr @ report-buf 5 move        \ copy first 5 chars (number+type)
+        trf-len @ 6 = if
+          trf-addr @ 5 + c@ report-buf 11 + c!    \ single letter at pos 11
+        then
+        trf-len @ 7 = if
+          trf-addr @ 5 + c@ report-buf 10 + c!    \ first letter at pos 10
+          trf-addr @ 6 + c@ report-buf 11 + c!    \ second letter at pos 11
+        then
+        report-buf 12 exit
+      then
+    then
+  then
+  \ Everything else: right-align to 12 chars
+  trf-addr @ 12 trf-len @ - report-buf + trf-len @ move
+  report-buf 12 ;
+
+variable frf-addr
+variable frf-len
+variable frf-start
+
+: from-report-format ( addr len -- addr' len' )
+  \ Convert 12-character report format to minimal packed format
+  \ Format for numbered comets: "0073P       " or "0073P      a" or "0073P     aa"
+  \ Fragment letters are in positions 10-11 (0-indexed)
+  frf-len ! frf-addr !
+  frf-len @ 12 <> if frf-addr @ frf-len @ exit then  \ return as-is if not 12 chars
+  \ Check for numbered comet format
+  frf-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+    frf-addr @ 4 all-digit? if
+      \ Numbered comet - check for fragment in columns 10-11 (positions 10, 11)
+      frf-addr @ report-buf 5 move           \ copy first 5 chars
+      5 report-len !
+      \ Check position 11 first (single letter fragment goes there)
+      frf-addr @ 11 + c@ bl <> if
+        \ Check if position 10 is also non-space (two-letter fragment)
+        frf-addr @ 10 + c@ bl <> if
+          \ Two-letter fragment at positions 10-11
+          frf-addr @ 10 + c@ report-buf 5 + c!
+          frf-addr @ 11 + c@ report-buf 6 + c!
+          7 report-len !
+        else
+          \ Single-letter fragment at position 11
+          frf-addr @ 11 + c@ report-buf 5 + c!
+          6 report-len !
+        then
+      then
+      report-buf report-len @ exit
+    then
+  then
+  \ Other formats: strip leading spaces
+  frf-addr @ frf-start !
+  frf-addr @ frf-len @ bounds ?do
+    i c@ bl <> if i frf-start ! leave then
+  loop
+  frf-start @ frf-addr @ <> if
+    \ Found non-space: copy from there to end
+    frf-addr @ frf-len @ + frf-start @ -    \ length of remaining string
+    frf-start @ report-buf 2 pick move
+    report-buf swap
+  else
+    \ All spaces or starts with non-space
+    frf-addr @ report-buf frf-len @ move
+    report-buf frf-len @
+  then ;
+
+variable has-frag-result
+
+: has-fragment ( addr len -- f )
+  \ Check if designation has a comet fragment suffix
+  false has-frag-result !
+  \ Unpacked numbered comet with fragment: nP-X or nP-XX
+  2dup
+  0 2 pick 2 pick bounds ?do
+    i c@ [char] - = if drop i leave then
+  loop
+  dup if
+    dup 1- c@ dup [char] P = swap [char] D = or if
+      true has-frag-result !
+    then
+  then
+  drop 2drop
+  \ Packed numbered comet with fragment: 0073Pa (6) or 0073Paa (7)
+  has-frag-result @ 0= if
+    2dup
+    dup 6 >= over 7 <= and if
+      over 4 + c@ dup [char] P = swap [char] D = or if
+        over 4 all-digit? if
+          over 5 + c@ is-lower if
+            true has-frag-result !
+          then
+        then
+      then
+    then
+    2drop
+  then
+  \ Packed provisional comet with fragment: DJ93F02a (8 with lowercase last)
+  has-frag-result @ 0= if
+    2dup
+    dup 8 = if
+      over c@ is-comet-type? if
+        over 7 + c@ dup is-lower swap [char] 0 <> and if
+          true has-frag-result !
+        then
+      then
+    then
+    2drop
+  then
+  \ Packed provisional comet with 2-letter fragment: PJ30J01aa (9)
+  has-frag-result @ 0= if
+    2dup
+    dup 9 = if
+      over c@ is-comet-type? if
+        over 7 + c@ is-lower if
+          over 8 + c@ is-lower if
+            true has-frag-result !
+          then
+        then
+      then
+    then
+    2drop
+  then
+  \ Unpacked provisional comet with fragment: C/1995 O1-A
+  has-frag-result @ 0= if
+    2dup
+    dup 11 >= if
+      over 1+ c@ [char] / = if
+        2dup + 2 - c@ [char] - = if
+          true has-frag-result !
+        else 2dup + 3 - c@ [char] - = if
+          true has-frag-result !
+        then then
+      then
+    then
+    2drop
+  then
+  2drop
+  has-frag-result @ ;
+
+create frag-buf 2 allot
+variable frag-len
+
+: get-fragment ( addr len -- addr' len' )
+  \ Extract fragment suffix (uppercase)
+  0 frag-len !
+  \ Unpacked numbered comet: nP-X or nP-XX
+  2dup
+  0 2 pick 2 pick bounds ?do
+    i c@ [char] - = if drop i leave then
+  loop
+  dup if
+    dup 1- c@ dup [char] P = swap [char] D = or if
+      1+                                    \ addr after dash
+      2 pick 2 pick + over -                \ fragment length
+      dup frag-len !
+      frag-buf swap move
+      2drop 2drop
+      frag-buf frag-len @ exit
+    then
+  then
+  drop 2drop
+  \ Packed numbered comet: 0073Pa or 0073Paa
+  2dup
+  dup 6 >= over 7 <= and if
+    over 4 + c@ dup [char] P = swap [char] D = or if
+      over 4 all-digit? if
+        over 5 + c@ is-lower if
+          over 5 + c@ [char] a - [char] A + frag-buf c!
+          1 frag-len !
+          dup 7 = if
+            over 6 + c@ [char] a - [char] A + frag-buf 1+ c!
+            2 frag-len !
+          then
+          2drop 2drop
+          frag-buf frag-len @ exit
+        then
+      then
+    then
+  then
+  2drop
+  \ Packed provisional comet: DJ93F02a or PJ30J01aa
+  2dup
+  dup 8 = if
+    over c@ is-comet-type? if
+      over 7 + c@ dup is-lower swap [char] 0 <> and if
+        over 7 + c@ [char] a - [char] A + frag-buf c!
+        1 frag-len !
+        2drop 2drop
+        frag-buf frag-len @ exit
+      then
+    then
+  then
+  dup 9 = if
+    over c@ is-comet-type? if
+      over 7 + c@ is-lower if
+        over 7 + c@ [char] a - [char] A + frag-buf c!
+        over 8 + c@ [char] a - [char] A + frag-buf 1+ c!
+        2 frag-len !
+        2drop 2drop
+        frag-buf frag-len @ exit
+      then
+    then
+  then
+  2drop
+  \ Unpacked provisional comet: C/1995 O1-A or C/1995 O1-AA
+  2dup
+  dup 11 >= if
+    over 1+ c@ [char] / = if
+      2dup + 2 - c@ [char] - = if
+        2dup + 1- c@ frag-buf c!
+        1 frag-len !
+        2drop 2drop
+        frag-buf frag-len @ exit
+      then
+      2dup + 3 - c@ [char] - = if
+        2dup + 2 - c@ frag-buf c!
+        2dup + 1- c@ frag-buf 1+ c!
+        2 frag-len !
+        2drop 2drop
+        frag-buf frag-len @ exit
+      then
+    then
+  then
+  2drop
+  2drop
+  frag-buf 0 ;
+
+create parent-buf MAX-LEN allot
+variable parent-len
+variable gp-addr
+variable gp-len
+variable gp-dash
+
+: get-parent ( addr len -- addr' len' )
+  \ Get parent comet without fragment suffix
+  gp-len ! gp-addr !
+
+  \ Unpacked numbered comet: 73P-A -> 73P
+  0 gp-dash !
+  gp-addr @ gp-len @ bounds ?do
+    i c@ [char] - = if i gp-dash ! leave then
+  loop
+  gp-dash @ if
+    gp-dash @ 1- c@ dup [char] P = swap [char] D = or if
+      gp-dash @ gp-addr @ - parent-len !
+      gp-addr @ parent-buf parent-len @ move
+      parent-buf parent-len @ exit
+    then
+  then
+
+  \ Packed numbered comet: 0073Pa -> 0073P
+  gp-len @ 6 >= gp-len @ 7 <= and if
+    gp-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+      gp-addr @ 4 all-digit? if
+        gp-addr @ 5 + c@ is-lower if
+          gp-addr @ parent-buf 5 move
+          parent-buf 5 exit
+        then
+      then
+    then
+  then
+
+  \ Packed provisional comet with fragment: DJ93F02a -> DJ93F020
+  gp-len @ 8 = if
+    gp-addr @ c@ is-comet-type? if
+      gp-addr @ 7 + c@ dup is-lower swap [char] 0 <> and if
+        gp-addr @ parent-buf 7 move
+        [char] 0 parent-buf 7 + c!
+        parent-buf 8 exit
+      then
+    then
+  then
+  gp-len @ 9 = if
+    gp-addr @ c@ is-comet-type? if
+      gp-addr @ 7 + c@ is-lower if
+        gp-addr @ parent-buf 7 move
+        [char] 0 parent-buf 7 + c!
+        parent-buf 8 exit
+      then
+    then
+  then
+
+  \ Unpacked provisional comet: D/1993 F2-B -> D/1993 F2
+  gp-len @ 11 >= if
+    gp-addr @ 1+ c@ [char] / = if
+      \ Find dash from position 6 onwards
+      0 gp-dash !
+      gp-addr @ gp-len @ + gp-addr @ 6 + ?do
+        i c@ [char] - = if i gp-dash ! then
+      loop
+      gp-dash @ if
+        gp-dash @ gp-addr @ - parent-len !
+        gp-addr @ parent-buf parent-len @ move
+        parent-buf parent-len @ exit
+      then
+    then
+  then
+
+  \ No fragment - return as-is
+  gp-addr @ parent-buf gp-len @ move
+  parent-buf gp-len @ ;
+
+create pack1-buf MAX-LEN allot
+create pack2-buf MAX-LEN allot
+create input1-buf MAX-LEN allot
+create input2-buf MAX-LEN allot
+variable pack1-len
+variable pack2-len
+variable de-len1
+variable de-len2
+variable pd-buf
+variable pd-len
+
+: is-packed? ( addr len -- f )
+  \ Check if designation is in packed format
+  2dup packed-perm? if 2drop true exit then
+  2dup is-extended-packed? if 2drop true exit then
+  2dup is-survey-packed? if 2drop true exit then
+  2dup is-comet-numbered-packed? if 2drop true exit then
+  2dup is-satellite-packed? if 2drop true exit then
+  2dup is-comet-full-packed? if 2drop true exit then
+  2dup packed-prov? if 2drop true exit then
+  2drop false ;
+
+variable pd-addr
+variable pd-result-addr
+variable pd-result-len
+
+: pack-to-buf ( addr len buf -- len' )
+  \ Pack a designation, store in buf, return length
+  pd-buf !
+  pd-len !
+  pd-addr !
+  \ Check if already packed
+  pd-addr @ pd-len @ is-packed? if
+    \ Already packed - just copy: move(src, dest, count)
+    pd-addr @ pd-buf @ pd-len @ move
+    pd-len @
+  else
+    \ Not packed - convert then copy result
+    pd-addr @ pd-len @ convert-simple     \ -> result-addr result-len
+    pd-result-len !
+    pd-result-addr !
+    \ move(src, dest, count)
+    pd-result-addr @ pd-buf @ pd-result-len @ move
+    pd-result-len @
+  then ;
+
+: designations-equal ( addr1 len1 addr2 len2 -- f )
+  \ Check if two designations refer to the same object
+  \ Pack both to normalized format and compare
+  \ First copy inputs to local buffers to preserve them
+  de-len2 !
+  input2-buf de-len2 @ move               \ copy addr2 to input2-buf
+  de-len1 !
+  input1-buf de-len1 @ move               \ copy addr1 to input1-buf
+  \ Pack first designation
+  input1-buf de-len1 @ pack1-buf pack-to-buf pack1-len !
+  \ Pack second designation
+  input2-buf de-len2 @ pack2-buf pack-to-buf pack2-len !
+  \ Compare
+  pack1-buf pack1-len @ pack2-buf pack2-len @ s= ;
 
 \ ============================================================================
 \ CLI support

@@ -208,10 +208,10 @@ Updated test cases:
 - [x] TCL library (tcl/src/mpc_designation.tcl)
 - [x] TypeScript (typescript/src/mpc_designation.ts)
 - [x] AWK (awk/src/mpc_designation.awk)
-- [ ] Bash
+- [x] Bash (bash/src/mpc_designation.sh)
 - [x] C++ (cpp/src/mpc_designation.cpp)
 - [x] C# (csharp/src/MpcDesignation.cs)
-- [ ] Forth
+- [x] Forth (forth/src/mpc_designation.fs)
 - [x] Fortran (fortran/src/mpc_designation.f90)
 - [x] Haskell (haskell/src/MPCDesignation.hs)
 - [x] Julia (julia/src/MPCDesignation.jl)
@@ -266,19 +266,21 @@ Packed 8-char: ^[A-L]\d{2}[A-Z]\d{2}[a-z]{2}$
 
 4. **Permanent satellites**: J013S format confirmed (planet + 3-digit decimal + S).
 
-## Next Steps (as of 2026-02-04)
+## Next Steps (as of 2026-02-05)
 
-The following languages still need helper functions and test_helpers with 77 test cases:
+**ALL LANGUAGES COMPLETE!**
 
-**Remaining (in approximate performance order)**:
-1. Forth - stack-based
-2. Bash - shell scripting
+All 25 language implementations now have:
+- 6 helper functions: `to_report_format`, `from_report_format`, `has_fragment`, `get_fragment`, `get_parent`, `designations_equal`
+- test_helpers with 77 test cases
+- README documentation with full API and test instructions
+- Makefile targets for all test suites
 
-**Completed** (helper functions + test_helpers + README documentation):
+**Completed languages**:
 - C, C#, Go, Haskell, Java, JavaScript, Kotlin, Octave/MATLAB, Perl, PHP, Python, R, Ruby, Rust, TCL, TypeScript
-- AWK, C++, Fortran, Julia, Nim, SPP/IRAF, Swift
+- AWK, Bash, C++, Forth, Fortran, Julia, Nim, SPP/IRAF, Swift
 
-**README Documentation Status**: All 22 completed language implementations have been reviewed and updated with:
+**README Documentation Status**: All 25 language implementations have been reviewed and updated with:
 - Complete test instructions (test-errors, test-helpers, test-csv, test-roundtrip, test-all)
 - Full API documentation including all 6 helper functions
 - Makefile targets verified to match documented test commands

@@ -29,7 +29,7 @@ base62_char() {
     echo "${BASE62:$val:1}"
 }
 
-# Convert century character to number
+# Convert century character to number (asteroids: I-L = 1800-2199)
 century_to_num() {
     case "$1" in
         I) echo 18 ;;
@@ -37,6 +37,44 @@ century_to_num() {
         K) echo 20 ;;
         L) echo 21 ;;
         *) echo -1 ;;
+    esac
+}
+
+# Convert century character to number for comets (A-L = 1000-2199)
+comet_century_to_num() {
+    case "$1" in
+        A) echo 10 ;;
+        B) echo 11 ;;
+        C) echo 12 ;;
+        D) echo 13 ;;
+        E) echo 14 ;;
+        F) echo 15 ;;
+        G) echo 16 ;;
+        H) echo 17 ;;
+        I) echo 18 ;;
+        J) echo 19 ;;
+        K) echo 20 ;;
+        L) echo 21 ;;
+        *) echo -1 ;;
+    esac
+}
+
+# Convert century number to character for comets
+num_to_comet_century() {
+    case "$1" in
+        10) echo "A" ;;
+        11) echo "B" ;;
+        12) echo "C" ;;
+        13) echo "D" ;;
+        14) echo "E" ;;
+        15) echo "F" ;;
+        16) echo "G" ;;
+        17) echo "H" ;;
+        18) echo "I" ;;
+        19) echo "J" ;;
+        20) echo "K" ;;
+        21) echo "L" ;;
+        *) echo "" ;;
     esac
 }
 
@@ -190,21 +228,42 @@ decode_cycle() {
     echo $((v1 * 10 + v2))
 }
 
-# Pack provisional designation: "1995 XA" -> "J95X00A"
+# Pack provisional designation: "1995 XA" -> "J95X00A", "A908 CJ" -> "J08C00J"
 pack_provisional() {
     local desig="$1"
 
     # Parse: year half second [cycle]
     local year half second cycle
-    # Extract year (first 4 chars)
-    year="${desig:0:4}"
-    # Skip space, get half-month letter
-    half="${desig:5:1}"
-    # Get second letter
-    second="${desig:6:1}"
-    # Get optional cycle number (rest of string after position 7)
-    cycle="${desig:7}"
-    cycle="${cycle:-0}"
+
+    # Check for A-prefix format (A908 CJ -> 1908 CJ)
+    local first="${desig:0:1}"
+    if [ "$first" = "A" ] || [ "$first" = "B" ]; then
+        local rest="${desig:1:3}"
+        local first_digit
+        if [ "$first" = "A" ]; then
+            first_digit=1
+        else
+            first_digit=2
+        fi
+        year="${first_digit}${rest}"
+        # Skip space, get half-month letter
+        half="${desig:5:1}"
+        # Get second letter
+        second="${desig:6:1}"
+        # Get optional cycle number
+        cycle="${desig:7}"
+        cycle="${cycle:-0}"
+    else
+        # Extract year (first 4 chars)
+        year="${desig:0:4}"
+        # Skip space, get half-month letter
+        half="${desig:5:1}"
+        # Get second letter
+        second="${desig:6:1}"
+        # Get optional cycle number (rest of string after position 7)
+        cycle="${desig:7}"
+        cycle="${cycle:-0}"
+    fi
 
     # Century code
     local century=$((year / 100))
@@ -227,7 +286,7 @@ pack_provisional() {
     echo "${century_char}${yy_str}${half}${cycle_encoded}${second}"
 }
 
-# Unpack provisional: "J95X00A" -> "1995 XA"
+# Unpack provisional: "J95X00A" -> "1995 XA", "J08C00J" -> "A908 CJ" (pre-1925)
 unpack_provisional() {
     local packed="$1"
 
@@ -253,10 +312,27 @@ unpack_provisional() {
     local cycle
     cycle=$(decode_cycle "$cycle_encoded")
 
-    if [ "$cycle" -eq 0 ]; then
-        echo "$year $half$second"
+    # Pre-1925 designations use A-prefix format
+    if [ "$year" -lt 1925 ]; then
+        local first_digit=$((year / 1000))
+        local rest=$((year % 1000))
+        local prefix
+        if [ "$first_digit" -eq 1 ]; then
+            prefix="A"
+        elif [ "$first_digit" -eq 2 ]; then
+            prefix="B"
+        fi
+        if [ "$cycle" -eq 0 ]; then
+            printf "%s%03d %s%s\n" "$prefix" "$rest" "$half" "$second"
+        else
+            printf "%s%03d %s%s%d\n" "$prefix" "$rest" "$half" "$second" "$cycle"
+        fi
     else
-        echo "$year $half$second$cycle"
+        if [ "$cycle" -eq 0 ]; then
+            echo "$year $half$second"
+        else
+            echo "$year $half$second$cycle"
+        fi
     fi
 }
 
@@ -304,35 +380,75 @@ unpack_survey() {
 # Comet encoding/decoding
 #==============================================================================
 
-# Pack numbered comet: "1P" -> "0001P"
+# Pack numbered comet: "1P" -> "0001P", "73P-A" -> "0073Pa", "73P-AA" -> "0073Paa"
 pack_numbered_comet() {
     local desig="$1"
+    local fragment=""
+    local base_desig="$desig"
+
+    # Check for fragment suffix: 73P-A or 73P-AA
+    if [[ "$desig" =~ ^([0-9]+)([PD])-([A-Z]{1,2})(/.*)?$ ]]; then
+        local num="${BASH_REMATCH[1]}"
+        local type="${BASH_REMATCH[2]}"
+        fragment="${BASH_REMATCH[3]}"
+        # Convert fragment to lowercase
+        fragment=$(echo "$fragment" | tr 'A-Z' 'a-z')
+        printf "%04d%s%s\n" "$num" "$type" "$fragment"
+        return
+    fi
+
+    # Check for base comet with optional name suffix: 73P or 73P/Schwassmann-Wachmann
+    if [[ "$desig" =~ ^([0-9]+)([PDCXA])(/.*)?$ ]]; then
+        local num="${BASH_REMATCH[1]}"
+        local type="${BASH_REMATCH[2]}"
+        printf "%04d%s\n" "$num" "$type"
+        return
+    fi
+
+    # Fallback
     local len="${#desig}"
     local type="${desig: -1}"
     local num="${desig:0:$((len-1))}"
     printf "%04d%s\n" "$num" "$type"
 }
 
-# Unpack numbered comet: "0001P" -> "1P"
+# Unpack numbered comet: "0001P" -> "1P", "0073Pa" -> "73P-A", "0073Paa" -> "73P-AA"
 unpack_numbered_comet() {
     local packed="$1"
+    local len="${#packed}"
     local num="${packed:0:4}"
     local type="${packed:4:1}"
     local num_val
     num_val=$(strip_leading_zeros "$num")
-    echo "${num_val}${type}"
+
+    # Check for fragment suffix (6 or 7 chars)
+    if [ "$len" -eq 6 ]; then
+        # Single-letter fragment
+        local fragment="${packed:5:1}"
+        fragment=$(echo "$fragment" | tr 'a-z' 'A-Z')
+        echo "${num_val}${type}-${fragment}"
+    elif [ "$len" -eq 7 ]; then
+        # Two-letter fragment
+        local fragment="${packed:5:2}"
+        fragment=$(echo "$fragment" | tr 'a-z' 'A-Z')
+        echo "${num_val}${type}-${fragment}"
+    else
+        echo "${num_val}${type}"
+    fi
 }
 
-# Pack provisional comet: "C/1995 O1" -> "CJ95O010"
+# Pack provisional comet: "C/1995 O1" -> "CJ95O010", "P/1930 J1-AA" -> "PJ30J01aa"
 pack_provisional_comet() {
     local desig="$1"
 
-    # Handle fragment suffix
+    # Handle fragment suffix (single or double letter, upper or lower case)
     local fragment=""
     local base_desig="$desig"
-    if [[ "$desig" =~ -([a-z])$ ]]; then
-        fragment="${desig: -1}"
-        base_desig="${desig:0:$((${#desig}-2))}"
+    if [[ "$desig" =~ -([A-Za-z]{1,2})$ ]]; then
+        fragment="${BASH_REMATCH[1]}"
+        base_desig="${desig:0:$((${#desig}-${#fragment}-1))}"
+        # Convert fragment to lowercase
+        fragment=$(echo "$fragment" | tr 'A-Z' 'a-z')
     fi
 
     local type="${base_desig:0:1}"
@@ -343,25 +459,38 @@ pack_provisional_comet() {
 
     local century=$((year / 100))
     local century_char
-    century_char=$(num_to_century "$century")
+    century_char=$(num_to_comet_century "$century")
     local yy=$((year % 100))
 
-    printf "%s%s%02d%s%02d%s\n" "$type" "$century_char" "$yy" "$half" "$order" "${fragment:-0}"
+    if [ -n "$fragment" ]; then
+        printf "%s%s%02d%s%02d%s\n" "$type" "$century_char" "$yy" "$half" "$order" "$fragment"
+    else
+        printf "%s%s%02d%s%02d0\n" "$type" "$century_char" "$yy" "$half" "$order"
+    fi
 }
 
-# Unpack provisional comet: "CJ95O010" -> "C/1995 O1"
+# Unpack provisional comet: "CJ95O010" -> "C/1995 O1", "PJ30J01aa" -> "P/1930 J1-AA"
 unpack_provisional_comet() {
     local packed="$1"
+    local len="${#packed}"
 
     local type="${packed:0:1}"
     local century_char="${packed:1:1}"
     local yy="${packed:2:2}"
     local half="${packed:4:1}"
     local order="${packed:5:2}"
-    local fragment="${packed:7:1}"
+
+    # Handle fragment (single or double letter)
+    local fragment=""
+    if [ "$len" -eq 9 ]; then
+        # Two-letter fragment
+        fragment="${packed:7:2}"
+    elif [ "$len" -eq 8 ]; then
+        fragment="${packed:7:1}"
+    fi
 
     local century
-    century=$(century_to_num "$century_char")
+    century=$(comet_century_to_num "$century_char")
     local yy_val
     yy_val=$(strip_leading_zeros "$yy")
     local year=$((century * 100 + yy_val))
@@ -374,6 +503,8 @@ unpack_provisional_comet() {
     fi
 
     if [ "$fragment" != "0" ] && [ -n "$fragment" ]; then
+        # Convert fragment to uppercase
+        fragment=$(echo "$fragment" | tr 'a-z' 'A-Z')
         result="${result}-${fragment}"
     fi
 
@@ -429,21 +560,43 @@ detect_format() {
     local len="${#desig}"
     local first="${desig:0:1}"
 
+    # Packed numbered comet: 0001P (5 chars), 0073Pa (6 chars), 0073Paa (7 chars)
+    # Must be exactly 4 digits + P/D + optional lowercase fragment
+    if [ "$len" -ge 5 ] && [ "$len" -le 7 ]; then
+        local c5="${desig:4:1}"
+        case "$c5" in
+            [PD])
+                if is_numeric "${desig:0:4}"; then
+                    if [ "$len" -eq 5 ]; then
+                        echo "packed_numbered_comet"
+                        return
+                    elif [ "$len" -eq 6 ] || [ "$len" -eq 7 ]; then
+                        local rest="${desig:5}"
+                        case "$rest" in
+                            [a-z]|[a-z][a-z])
+                                echo "packed_numbered_comet"
+                                return
+                                ;;
+                        esac
+                    fi
+                fi
+                ;;
+        esac
+    fi
+
+    # Unpacked numbered comet (with or without fragment)
+    # Match: 73P, 73P-A, 73P-AA, 73P/Name, 73P-A/Name
+    # Unpacked should NOT have leading zeros (e.g., 73P not 073P)
+    if [[ "$desig" =~ ^([1-9][0-9]*)([PD])(-[A-Z]{1,2})?(/.*)?$ ]]; then
+        echo "unpacked_numbered_comet"
+        return
+    fi
+
     # Packed permanent asteroid (5 chars, no slash or space)
     if [ "$len" -eq 5 ]; then
         case "$desig" in
             *[/\ ]*) ;;
             *)
-                # Check if it's a numbered comet (ends in PDCXA)
-                local last="${desig:4:1}"
-                case "$last" in
-                    [PDCXA])
-                        if is_numeric "${desig:0:4}"; then
-                            echo "packed_numbered_comet"
-                            return
-                        fi
-                        ;;
-                esac
                 echo "packed_permanent"
                 return
                 ;;
@@ -470,19 +623,21 @@ detect_format() {
         esac
     fi
 
-    # Packed provisional comet or satellite (8 chars)
-    if [ "$len" -eq 8 ]; then
+    # Packed provisional comet (8-9 chars) or satellite (8 chars)
+    if [ "$len" -eq 8 ] || [ "$len" -eq 9 ]; then
         local second="${desig:1:1}"
         case "$first" in
             [PDCXA])
                 case "$second" in
-                    [IJKL]) echo "packed_provisional_comet"; return ;;
+                    [A-L]) echo "packed_provisional_comet"; return ;;
                 esac
                 ;;
             S)
-                case "$second" in
-                    [IJKL]) echo "packed_satellite"; return ;;
-                esac
+                if [ "$len" -eq 8 ]; then
+                    case "$second" in
+                        [IJKL]) echo "packed_satellite"; return ;;
+                    esac
+                fi
                 ;;
         esac
     fi
@@ -504,10 +659,10 @@ detect_format() {
             ;;
     esac
 
-    # Unpacked numbered comet
+    # Also match older comet types C, X, A (rare)
     case "$desig" in
-        *[PDCXA])
-            local num="${desig%[PDCXA]}"
+        *[CXA])
+            local num="${desig%[CXA]}"
             if is_numeric "$num"; then
                 echo "unpacked_numbered_comet"
                 return
@@ -515,7 +670,7 @@ detect_format() {
             ;;
     esac
 
-    # Unpacked provisional comet
+    # Unpacked provisional comet (with or without fragment)
     case "$desig" in
         [PDCXA]/*)
             echo "unpacked_provisional_comet"
@@ -531,9 +686,14 @@ detect_format() {
             ;;
     esac
 
-    # Unpacked provisional asteroid (year + space + designation)
+    # Unpacked provisional asteroid (year + space + designation) or A-prefix format
     case "$desig" in
         [0-9][0-9][0-9][0-9]" "[A-HJ-Y][A-HJ-Z]*)
+            echo "unpacked_provisional"
+            return
+            ;;
+        [AB][0-9][0-9][0-9]" "[A-HJ-Y][A-HJ-Z]*)
+            # A-prefix format: A908 CJ, B800 AA
             echo "unpacked_provisional"
             return
             ;;
@@ -593,6 +753,383 @@ convert_simple() {
             return 1
             ;;
     esac
+}
+
+#==============================================================================
+# Helper functions for format conversion and fragment handling
+#==============================================================================
+
+# Convert minimal packed format to 12-character MPC report format
+to_report_format() {
+    local minimal="$1"
+    local len="${#minimal}"
+
+    # Numbered comet: 0001P -> "0001P       "
+    # Numbered comet with fragment: 0073Pa -> "0073P      a", 0073Paa -> "0073P     aa"
+    if [ "$len" -ge 5 ] && [ "$len" -le 7 ]; then
+        local c5="${minimal:4:1}"
+        case "$c5" in
+            [PD])
+                if is_numeric "${minimal:0:4}"; then
+                    local base="${minimal:0:5}"
+                    if [ "$len" -eq 5 ]; then
+                        printf "%s       \n" "$base"
+                    elif [ "$len" -eq 6 ]; then
+                        local frag="${minimal:5:1}"
+                        printf "%s      %s\n" "$base" "$frag"
+                    elif [ "$len" -eq 7 ]; then
+                        local frag="${minimal:5:2}"
+                        printf "%s     %s\n" "$base" "$frag"
+                    fi
+                    return
+                fi
+                ;;
+        esac
+    fi
+
+    # Other formats: right-align to 12 chars
+    printf "%12s\n" "$minimal"
+}
+
+# Convert 12-character report format to minimal packed format
+from_report_format() {
+    local report="$1"
+
+    # Check for numbered comet format (digits + P/D in positions 0-4)
+    local first5="${report:0:5}"
+    local c5="${report:4:1}"
+    if is_numeric "${report:0:4}" 2>/dev/null; then
+        case "$c5" in
+            [PD])
+                # Get fragment from positions 10-11, stripping spaces
+                local frag="${report:10:2}"
+                frag="${frag// /}"
+                if [ -n "$frag" ]; then
+                    echo "${first5}${frag}"
+                else
+                    echo "$first5"
+                fi
+                return
+                ;;
+        esac
+    fi
+
+    # Other formats: strip leading/trailing whitespace
+    local result="${report#"${report%%[![:space:]]*}"}"
+    result="${result%"${result##*[![:space:]]}"}"
+    echo "$result"
+}
+
+# Check if designation has a comet fragment suffix
+has_fragment() {
+    local desig="$1"
+    local len="${#desig}"
+
+    # Unpacked numbered comet with fragment: 73P-A, 73P-AA
+    if [[ "$desig" =~ ^[0-9]+[PD]-[A-Z]{1,2}(/.*)?$ ]]; then
+        return 0  # true
+    fi
+
+    # Unpacked provisional comet with fragment: C/1995 O1-A, D/1993 F2-AA
+    if [[ "$desig" =~ ^[PDCXA]/[0-9]{4}\ [A-Z][0-9]*-[A-Z]{1,2}$ ]]; then
+        return 0  # true
+    fi
+
+    # Packed numbered comet with fragment: 0073Pa (6), 0073Paa (7)
+    if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
+        local c5="${desig:4:1}"
+        case "$c5" in
+            [PD])
+                if is_numeric "${desig:0:4}"; then
+                    local rest="${desig:5}"
+                    case "$rest" in
+                        [a-z]|[a-z][a-z])
+                            return 0  # true
+                            ;;
+                    esac
+                fi
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with fragment: DJ93F02a (8 chars ending in lowercase)
+    if [ "$len" -eq 8 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last="${desig:7:1}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last" in
+                            [a-z])
+                                if [ "$last" != "0" ]; then
+                                    return 0  # true
+                                fi
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with 2-letter fragment: PJ30J01aa (9 chars)
+    if [ "$len" -eq 9 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last2="${desig:7:2}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last2" in
+                            [a-z][a-z])
+                                return 0  # true
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    return 1  # false
+}
+
+# Extract fragment suffix from comet designation (uppercase, e.g., "A", "AA")
+get_fragment() {
+    local desig="$1"
+    local len="${#desig}"
+
+    # Unpacked numbered comet with fragment: 73P-A, 73P-AA
+    if [[ "$desig" =~ ^[0-9]+[PD]-([A-Z]{1,2})(/.*)?$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+
+    # Unpacked provisional comet with fragment: C/1995 O1-A, D/1993 F2-AA
+    if [[ "$desig" =~ ^[PDCXA]/[0-9]{4}\ [A-Z][0-9]*-([A-Z]{1,2})$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+
+    # Packed numbered comet with fragment: 0073Pa (6), 0073Paa (7)
+    if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
+        local c5="${desig:4:1}"
+        case "$c5" in
+            [PD])
+                if is_numeric "${desig:0:4}"; then
+                    local frag="${desig:5}"
+                    case "$frag" in
+                        [a-z]|[a-z][a-z])
+                            echo "$frag" | tr 'a-z' 'A-Z'
+                            return
+                            ;;
+                    esac
+                fi
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with fragment: DJ93F02a (8 chars ending in lowercase)
+    if [ "$len" -eq 8 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last="${desig:7:1}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last" in
+                            [a-z])
+                                if [ "$last" != "0" ]; then
+                                    echo "$last" | tr 'a-z' 'A-Z'
+                                    return
+                                fi
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with 2-letter fragment: PJ30J01aa (9 chars)
+    if [ "$len" -eq 9 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last2="${desig:7:2}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last2" in
+                            [a-z][a-z])
+                                echo "$last2" | tr 'a-z' 'A-Z'
+                                return
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    echo ""
+}
+
+# Get parent comet designation without fragment suffix
+get_parent() {
+    local desig="$1"
+    local len="${#desig}"
+
+    # Unpacked numbered comet with fragment: 73P-A -> 73P
+    if [[ "$desig" =~ ^([0-9]+[PD])-[A-Z]{1,2}(/.*)?$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+
+    # Unpacked provisional comet with fragment: D/1993 F2-A -> D/1993 F2
+    if [[ "$desig" =~ ^([PDCXA]/[0-9]{4}\ [A-Z][0-9]*)-[A-Z]{1,2}$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+        return
+    fi
+
+    # Packed numbered comet with fragment: 0073Pa -> 0073P
+    if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
+        local c5="${desig:4:1}"
+        case "$c5" in
+            [PD])
+                if is_numeric "${desig:0:4}"; then
+                    local rest="${desig:5}"
+                    case "$rest" in
+                        [a-z]|[a-z][a-z])
+                            echo "${desig:0:5}"
+                            return
+                            ;;
+                    esac
+                fi
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with fragment: DJ93F02a -> DJ93F020
+    if [ "$len" -eq 8 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last="${desig:7:1}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last" in
+                            [a-z])
+                                if [ "$last" != "0" ]; then
+                                    echo "${desig:0:7}0"
+                                    return
+                                fi
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    # Packed provisional comet with 2-letter fragment: PJ30J01aa -> PJ30J010
+    if [ "$len" -eq 9 ]; then
+        local c1="${desig:0:1}"
+        local c2="${desig:1:1}"
+        local last2="${desig:7:2}"
+        case "$c1" in
+            [PDCXA])
+                case "$c2" in
+                    [A-L])
+                        case "$last2" in
+                            [a-z][a-z])
+                                echo "${desig:0:7}0"
+                                return
+                                ;;
+                        esac
+                        ;;
+                esac
+                ;;
+        esac
+    fi
+
+    # No fragment, return as-is
+    echo "$desig"
+}
+
+# Check if two designations refer to the same object
+designations_equal() {
+    local d1="$1"
+    local d2="$2"
+
+    # Try to pack both to a normalized format for comparison
+    local p1 p2
+    local format1 format2
+
+    format1=$(detect_format "$d1")
+    format2=$(detect_format "$d2")
+
+    # Convert both to packed format
+    case "$format1" in
+        packed_*)
+            p1="$d1"
+            ;;
+        unpacked_permanent)
+            p1=$(pack_permanent "$d1")
+            ;;
+        unpacked_provisional)
+            p1=$(pack_provisional "$d1")
+            ;;
+        unpacked_survey)
+            p1=$(pack_survey "$d1")
+            ;;
+        unpacked_numbered_comet)
+            p1=$(pack_numbered_comet "$d1")
+            ;;
+        unpacked_provisional_comet)
+            p1=$(pack_provisional_comet "$d1")
+            ;;
+        unpacked_satellite)
+            p1=$(pack_satellite "$d1")
+            ;;
+        *)
+            p1="$d1"
+            ;;
+    esac
+
+    case "$format2" in
+        packed_*)
+            p2="$d2"
+            ;;
+        unpacked_permanent)
+            p2=$(pack_permanent "$d2")
+            ;;
+        unpacked_provisional)
+            p2=$(pack_provisional "$d2")
+            ;;
+        unpacked_survey)
+            p2=$(pack_survey "$d2")
+            ;;
+        unpacked_numbered_comet)
+            p2=$(pack_numbered_comet "$d2")
+            ;;
+        unpacked_provisional_comet)
+            p2=$(pack_provisional_comet "$d2")
+            ;;
+        unpacked_satellite)
+            p2=$(pack_satellite "$d2")
+            ;;
+        *)
+            p2="$d2"
+            ;;
+    esac
+
+    [ "$p1" = "$p2" ]
 }
 
 #==============================================================================

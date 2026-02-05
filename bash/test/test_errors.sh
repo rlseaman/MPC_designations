@@ -67,8 +67,8 @@ test_convert "2P" "0002P"
 # Provisional comets
 test_convert "CJ95O010" "C/1995 O1"
 test_convert "C/1995 O1" "CJ95O010"
-test_convert "DJ93F02b" "D/1993 F2-b"
-test_convert "D/1993 F2-b" "DJ93F02b"
+test_convert "DJ93F02b" "D/1993 F2-B"
+test_convert "D/1993 F2-B" "DJ93F02b"
 
 # Natural satellites
 test_convert "SK19S220" "S/2019 S 22"
