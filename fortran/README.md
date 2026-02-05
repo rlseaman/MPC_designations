@@ -181,6 +181,7 @@ make test-all
 make test-errors    # Error handling tests (94 cases)
 make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ cases)
+make test-roundtrip # Roundtrip verification
 ```
 
 ## Examples
