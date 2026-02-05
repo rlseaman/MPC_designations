@@ -118,6 +118,88 @@ Detect the format of a designation without converting.
 - **Parameters:** `designation` - The MPC designation to analyze
 - **Returns:** Dictionary with format information
 
+#### `MPCDesignation::toReportFormat minimal`
+
+Convert minimal packed format to 12-character MPC report format.
+
+- **Parameters:** `minimal` - Minimal packed designation (e.g., "0073Pa")
+- **Returns:** 12-character report format (e.g., "0073P      a")
+
+#### `MPCDesignation::fromReportFormat report`
+
+Convert 12-character MPC report format to minimal packed format.
+
+- **Parameters:** `report` - 12-character report format
+- **Returns:** Minimal packed designation
+
+#### `MPCDesignation::hasFragment desig`
+
+Check if a designation has a comet fragment suffix.
+
+- **Parameters:** `desig` - Designation to check (packed or unpacked)
+- **Returns:** 1 if has fragment, 0 if not
+
+#### `MPCDesignation::getFragment desig`
+
+Extract the fragment suffix from a comet designation.
+
+- **Parameters:** `desig` - Designation (packed or unpacked)
+- **Returns:** Fragment in uppercase (e.g., "A", "AA"), or empty string
+
+#### `MPCDesignation::getParent desig`
+
+Get the parent comet designation without fragment suffix.
+
+- **Parameters:** `desig` - Designation (packed or unpacked)
+- **Returns:** Parent designation in same format as input
+
+#### `MPCDesignation::designationsEqual desig1 desig2`
+
+Check if two designations refer to the same object.
+
+- **Parameters:** `desig1`, `desig2` - Designations to compare
+- **Returns:** 1 if same object, 0 if different
+
+## Helper Functions
+
+### Format Conversion (Minimal ↔ 12-Character Report Format)
+
+Convert between minimal packed format and the 12-character MPC observation report format:
+
+```tcl
+# Minimal to 12-char report format
+set report [MPCDesignation::toReportFormat "0073Pa"]  ;# "0073P      a"
+
+# 12-char report format to minimal
+set minimal [MPCDesignation::fromReportFormat "0073P      a"]  ;# "0073Pa"
+```
+
+### Fragment Extraction
+
+```tcl
+# Check if designation has a fragment
+if {[MPCDesignation::hasFragment "73P-A"]} {
+    # Extract fragment (uppercase)
+    set frag [MPCDesignation::getFragment "73P-A"]  ;# "A"
+
+    # Get parent comet
+    set parent [MPCDesignation::getParent "73P-A"]  ;# "73P"
+}
+```
+
+### Designation Comparison
+
+Compare designations across different formats:
+
+```tcl
+# Same object, different formats
+MPCDesignation::designationsEqual "1995 XA" "J95X00A"  ;# Returns 1
+MPCDesignation::designationsEqual "73P-A" "0073Pa"     ;# Returns 1
+
+# Different objects
+MPCDesignation::designationsEqual "73P-A" "73P-B"      ;# Returns 0
+```
+
 ## Comet Fragment Handling
 
 The library supports comet fragment designations:
@@ -163,6 +245,9 @@ tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
 
 # Run fragment handling tests
 tclsh test/test_fragments.tcl
+
+# Run helper function tests
+tclsh test/test_helpers.tcl
 
 # Run conversion tests (requires decompressing test data)
 gunzip -k ../test-data/prov_unpack_to_pack.csv.gz

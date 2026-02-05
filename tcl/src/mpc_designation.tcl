@@ -1663,6 +1663,333 @@ namespace eval MPCDesignation {
         }
         return [string trim $designation]
     }
+
+    # ========================================================================
+    # FORMAT CONVERSION FUNCTIONS (minimal <-> 12-char MPC report format)
+    # ========================================================================
+
+    #
+    # Convert minimal packed format to 12-character MPC report format.
+    # The 12-character format is used in MPC observation records (columns 1-12).
+    # For numbered comets with fragments, the fragment letter(s) go in columns 11-12.
+    #
+    # Examples:
+    #   "0073Pa"   -> "0073P      a" (numbered comet with single fragment)
+    #   "0073Paa"  -> "0073P     aa" (numbered comet with double fragment)
+    #   "00001"    -> "       00001" (numbered asteroid)
+    #   "J95X00A"  -> "     J95X00A" (provisional asteroid)
+    #   "CJ95O010" -> "    CJ95O010" (provisional comet)
+    #
+    proc toReportFormat {minimal} {
+        set minimal [string trim $minimal]
+        set len [string length $minimal]
+
+        # Initialize 12-char output with spaces
+        set report "            "
+
+        # Detect format
+        set info [detectFormat $minimal]
+        set format [dict get $info format]
+        set type [dict get $info type]
+
+        if {$format ne "packed"} {
+            error "toReportFormat requires packed format input: $minimal"
+        }
+
+        switch $type {
+            permanent {
+                # Right-align 5-char designation
+                set report [format "%12s" $minimal]
+            }
+            provisional - provisional_extended - survey {
+                # Right-align 7-char designation
+                set report [format "%12s" $minimal]
+            }
+            comet_numbered {
+                # Numbered comet: first 5 chars (####P), fragment in cols 11-12
+                if {$len == 5} {
+                    # No fragment
+                    set report "[string range $minimal 0 4]       "
+                } elseif {$len == 6} {
+                    # Single-letter fragment
+                    set report "[string range $minimal 0 4]      [string index $minimal 5]"
+                } elseif {$len == 7} {
+                    # Two-letter fragment
+                    set report "[string range $minimal 0 4]     [string range $minimal 5 6]"
+                }
+            }
+            comet_provisional - comet_full - comet_ancient - comet_bce {
+                # Right-align in 12-char field
+                set report [format "%12s" $minimal]
+            }
+            satellite {
+                # Right-align 8-char designation
+                set report [format "%12s" $minimal]
+            }
+            default {
+                error "Unsupported type for report format: $type"
+            }
+        }
+
+        return $report
+    }
+
+    #
+    # Convert 12-character MPC report format to minimal packed format.
+    #
+    proc fromReportFormat {report} {
+        set len [string length $report]
+        if {$len > 12} {
+            error "Report format too long: $report"
+        }
+
+        # Pad to 12 chars if shorter
+        while {[string length $report] < 12} {
+            set report " $report"
+        }
+
+        # Check for numbered comet with fragment (fragment in cols 11-12)
+        # Pattern: ####P or ####D in cols 1-5, spaces in cols 6-10, lowercase in cols 11-12
+        set first5 [string range $report 0 4]
+        set middle [string range $report 5 9]
+        set last2 [string range $report 10 11]
+
+        if {[regexp {^[0-9]{4}[PD]$} $first5] && [string trim $middle] eq ""} {
+            # Check for fragment in last 2 positions
+            set frag1 [string index $report 10]
+            set frag2 [string index $report 11]
+
+            set result $first5
+            if {[string match {[a-z]} $frag1]} {
+                append result $frag1
+            }
+            if {[string match {[a-z]} $frag2]} {
+                append result $frag2
+            }
+            return $result
+        }
+
+        # Standard case: just trim spaces
+        return [string trim $report]
+    }
+
+    # ========================================================================
+    # FRAGMENT HELPER FUNCTIONS
+    # ========================================================================
+
+    #
+    # Check if a designation has a comet fragment suffix.
+    # Works with both packed and unpacked formats.
+    # Returns: 1 if has fragment, 0 if no fragment or not a comet
+    #
+    proc hasFragment {desig} {
+        if {[catch {detectFormat $desig} info]} {
+            return 0
+        }
+
+        set type [dict get $info type]
+
+        # Only comets can have fragments
+        if {$type ni {comet_numbered comet_provisional comet_full}} {
+            return 0
+        }
+
+        set format [dict get $info format]
+        set desig [string trim $desig]
+        set len [string length $desig]
+
+        if {$format eq "unpacked"} {
+            # Look for "-X" or "-XX" at end (use -- to prevent pattern from being treated as option)
+            if {[regexp -- {-[A-Z]{1,2}$} $desig]} {
+                return 1
+            }
+        } else {
+            # Packed format
+            if {$type eq "comet_numbered"} {
+                # Check for lowercase after P/D (position 5+)
+                if {$len > 5 && [string match {[a-z]} [string index $desig 5]]} {
+                    return 1
+                }
+            } elseif {$type eq "comet_provisional"} {
+                # 7-char: last char lowercase and not '0'
+                # 8-char: last two chars lowercase
+                set lastChar [string index $desig end]
+                if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                    return 1
+                }
+            } elseif {$type eq "comet_full"} {
+                # Check last char(s)
+                set lastChar [string index $desig end]
+                if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                    return 1
+                }
+            }
+        }
+
+        return 0
+    }
+
+    #
+    # Extract the fragment suffix from a comet designation.
+    # Works with both packed and unpacked formats.
+    # Returns: fragment in uppercase (e.g., "A", "AA"), or empty string if no fragment
+    #
+    proc getFragment {desig} {
+        if {[catch {detectFormat $desig} info]} {
+            error "Invalid designation: $desig"
+        }
+
+        set type [dict get $info type]
+
+        # Only comets can have fragments
+        if {$type ni {comet_numbered comet_provisional comet_full}} {
+            return ""
+        }
+
+        set format [dict get $info format]
+        set desig [string trim $desig]
+        set len [string length $desig]
+
+        if {$format eq "unpacked"} {
+            # Look for "-X" or "-XX" at end (use -- to prevent pattern from being treated as option)
+            if {[regexp -- {-([A-Z]{1,2})$} $desig -> frag]} {
+                return $frag
+            }
+        } else {
+            # Packed format
+            if {$type eq "comet_numbered"} {
+                # Fragment is lowercase after P/D
+                if {$len == 6} {
+                    return [string toupper [string index $desig 5]]
+                } elseif {$len == 7} {
+                    return [string toupper [string range $desig 5 6]]
+                }
+            } elseif {$type eq "comet_provisional"} {
+                # 7-char: position 6 if lowercase and not '0'
+                # 8-char: positions 6-7 if lowercase
+                if {$len == 7} {
+                    set lastChar [string index $desig 6]
+                    if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                        return [string toupper $lastChar]
+                    }
+                } elseif {$len == 8} {
+                    set frag [string range $desig 6 7]
+                    if {[regexp {^[a-z]{2}$} $frag]} {
+                        return [string toupper $frag]
+                    }
+                }
+            } elseif {$type eq "comet_full"} {
+                # 8-char: position 7 if lowercase and not '0'
+                # 9-char: positions 7-8 if lowercase
+                if {$len == 8} {
+                    set lastChar [string index $desig 7]
+                    if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                        return [string toupper $lastChar]
+                    }
+                } elseif {$len == 9} {
+                    set frag [string range $desig 7 8]
+                    if {[regexp {^[a-z]{2}$} $frag]} {
+                        return [string toupper $frag]
+                    }
+                }
+            }
+        }
+
+        return ""
+    }
+
+    #
+    # Get the parent comet designation (without fragment suffix).
+    # Works with both packed and unpacked formats.
+    # Returns the designation in the same format as input.
+    #
+    # Examples:
+    #   "73P-A"   -> "73P"
+    #   "0073Pa"  -> "0073P"
+    #   "73P"     -> "73P" (no change)
+    #
+    proc getParent {desig} {
+        if {[catch {detectFormat $desig} info]} {
+            error "Invalid designation: $desig"
+        }
+
+        set type [dict get $info type]
+
+        # Non-comets: return as-is
+        if {$type ni {comet_numbered comet_provisional comet_full}} {
+            return [string trim $desig]
+        }
+
+        set format [dict get $info format]
+        set desig [string trim $desig]
+        set len [string length $desig]
+
+        if {$format eq "unpacked"} {
+            # Remove "-X" or "-XX" suffix if present (use -- to prevent pattern from being treated as option)
+            return [regsub -- {-[A-Z]{1,2}$} $desig ""]
+        } else {
+            # Packed format
+            if {$type eq "comet_numbered"} {
+                # Remove lowercase fragment letters after P/D
+                if {$len > 5 && [string match {[a-z]} [string index $desig 5]]} {
+                    return [string range $desig 0 4]
+                }
+            } elseif {$type eq "comet_provisional"} {
+                # 7-char: replace lowercase fragment with '0'
+                # 8-char: replace 2 lowercase with '0', truncate
+                if {$len == 7} {
+                    set lastChar [string index $desig 6]
+                    if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                        return "[string range $desig 0 5]0"
+                    }
+                } elseif {$len == 8} {
+                    set frag [string range $desig 6 7]
+                    if {[regexp {^[a-z]{2}$} $frag]} {
+                        return "[string range $desig 0 5]0"
+                    }
+                }
+            } elseif {$type eq "comet_full"} {
+                # 8-char: replace fragment with '0'
+                # 9-char: replace fragment with '0', truncate
+                if {$len == 8} {
+                    set lastChar [string index $desig 7]
+                    if {[string match {[a-z]} $lastChar] && $lastChar ne "0"} {
+                        return "[string range $desig 0 6]0"
+                    }
+                } elseif {$len == 9} {
+                    set frag [string range $desig 7 8]
+                    if {[regexp {^[a-z]{2}$} $frag]} {
+                        return "[string range $desig 0 6]0"
+                    }
+                }
+            }
+
+            return $desig
+        }
+    }
+
+    # ========================================================================
+    # COMPARISON FUNCTIONS
+    # ========================================================================
+
+    #
+    # Check if two designations refer to the same object.
+    # Normalizes both designations to packed format and compares.
+    #
+    # Examples:
+    #   designationsEqual "1995 XA" "J95X00A"  -> 1 (same object)
+    #   designationsEqual "73P" "0073P"        -> 1 (same object)
+    #   designationsEqual "73P-A" "73P-B"      -> 0 (different fragments)
+    #
+    proc designationsEqual {desig1 desig2} {
+        if {[catch {pack $desig1} packed1]} {
+            return 0
+        }
+        if {[catch {pack $desig2} packed2]} {
+            return 0
+        }
+        return [expr {$packed1 eq $packed2}]
+    }
 }
 
 # Note: For CLI usage, use mpc_designation_cli.tcl which sources this library.
