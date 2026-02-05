@@ -956,12 +956,36 @@ variable pcp-year-len
 variable comet-full-len
 variable comet-full-type
 
+\ Detect asteroid-style unpacked provisional: "1995 XA" or "2013 AL76"
+\ Second character after space is uppercase letter (not digit)
+: is-asteroid-style-unpacked? ( addr len -- f )
+  \ Find space - returns address of space or 0
+  2dup find-space
+  dup 0= if drop 2drop false exit then
+  \ Stack: addr len space-addr
+  \ Position after space is half-month letter, next should be second letter or digit
+  \ Space-addr + 2 is second char after space (half-month + second-letter position)
+  2 +  \ addr of char after half-month
+  \ Check if this address is within bounds
+  2 pick 2 pick + over > if
+    c@ is-upper  \ char is uppercase = asteroid-style
+  else
+    drop false   \ out of bounds
+  then
+  -rot 2drop ;   \ cleanup original addr len
+
+\ Detect asteroid-style packed provisional: last char is uppercase (A-Z)
+\ Comet-style ends with digit (order) or lowercase (fragment)
+: is-asteroid-style-packed? ( addr len -- f )
+  + 1- c@ is-upper ;
+
 : unpack-comet-full ( addr len -- addr' len' )
   \ Format: CJ95O010 -> C/1995 O1, or 0001PJ95O010 -> 1P/1995 O1
   \ Also handles BCE: C.80K010 -> C/-119 K1
   \ Also handles ancient: C422F010 -> C/422 F1
+  \ Also handles asteroid-style: PK13A76L -> P/2013 AL76
   dup 8 = over 9 = or if
-    \ Short format: type + provisional (or BCE/ancient)
+    \ Short format: type + provisional (or BCE/ancient/asteroid-style)
     over c@ comet-full-type !
     \ Check for BCE format (position 1 is BCE prefix)
     2dup is-comet-bce-packed? if
@@ -987,7 +1011,19 @@ variable comet-full-type
       out-buf comet-full-len @ 2 +
       exit
     then
-    \ Standard format: type + 7-char provisional
+    \ Check for asteroid-style (7-char provisional ends with uppercase)
+    over 1+ over 1- is-asteroid-style-packed? if
+      over 1+ over 1- unpack-prov
+      dup comet-full-len !
+      out-buf tmp-buf comet-full-len @ move
+      comet-full-type @ out-buf c!
+      [char] / out-buf 1+ c!
+      tmp-buf out-buf 2 + comet-full-len @ move
+      2drop 2drop
+      out-buf comet-full-len @ 2 +
+      exit
+    then
+    \ Standard comet format: type + 7-char provisional
     over 1+ over 1- unpack-comet-prov
     dup comet-full-len !
     out-buf tmp-buf comet-full-len @ move
@@ -1008,8 +1044,8 @@ variable pcf-prov-len
 variable pcf-space-pos
 
 : pack-comet-full-prov ( addr len -- addr' len' )
-  \ Dispatch to appropriate packer based on year format
-  \ Input: provisional part (e.g., "-119 K1" or "422 F1" or "1995 O1")
+  \ Dispatch to appropriate packer based on format
+  \ Input: provisional part (e.g., "-119 K1" or "422 F1" or "1995 O1" or "2013 AL76")
   pcf-prov-len ! pcf-prov-addr !
   \ Check for BCE (starts with minus)
   pcf-prov-addr @ c@ [char] - = if
@@ -1023,7 +1059,11 @@ variable pcf-space-pos
   pcf-space-pos @ 4 < if
     pcf-prov-addr @ pcf-prov-len @ pack-ancient-comet-prov exit
   then
-  \ Standard 4-digit year
+  \ Check for asteroid-style (two letters after half-month)
+  pcf-prov-addr @ pcf-prov-len @ is-asteroid-style-unpacked? if
+    pcf-prov-addr @ pcf-prov-len @ pack-prov exit
+  then
+  \ Standard comet format
   pcf-prov-addr @ pcf-prov-len @ pack-comet-prov ;
 
 : pack-comet-full ( addr len -- addr' len' )
