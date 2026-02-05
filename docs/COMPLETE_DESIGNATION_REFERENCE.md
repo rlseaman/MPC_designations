@@ -210,14 +210,18 @@ The MPC Help Desk confirmed:
 
 #### 2.6.2 A-Prefix Format Specification
 
-**Format**: `[A|B][century-digit][YY] [half-month][letter]`
+**Format**: `A[century-digit][YY] [half-month][letter]`
 
 | Element | Meaning |
 |---------|---------|
-| A or B | Replaces first digit of year (A=1xxx, B=2xxx theoretically) |
+| A | Replaces first digit of year (A=1xxx, representing years 1000-1999) |
 | Century digit | 8=1800s, 9=1900s |
 | Half-month | Modern half-month code (A-Y, not I) |
 | Letter | Second letter in modern sense |
+
+**Note**: Only the 'A' prefix has been used by the MPC. There is no 'B' prefix for
+years 2000+, as provisional designations from 2000 onward use the standard 4-digit
+year format.
 
 **Examples**:
 | Unpacked | Packed | Meaning |

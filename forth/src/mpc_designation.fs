@@ -369,14 +369,10 @@ variable prov-outlen
   \ Get cycle count
   over 4 + decode-cycle prov-cycle !
   \ Check for pre-1925 A-prefix format
+  \ Note: Only 'A' prefix is used by MPC (years 1800-1924)
   prov-year @ 1925 < if
     \ A-prefix format: A908 CJ instead of 1908 CJ
-    prov-year @ 1000 / case
-      1 of [char] A endof
-      2 of [char] B endof
-      0 swap
-    endcase
-    out-buf c!
+    [char] A out-buf c!
     \ 3-digit year remainder (e.g., 908 for 1908)
     prov-year @ 1000 mod
     s>d <# # # # #> drop 3 out-buf 1+ swap move
@@ -458,22 +454,19 @@ variable prov-outlen
   then ;
 
 : is-old-style? ( addr len -- f )
-  \ Check for A908 CJ or B842 FA format (7 characters)
+  \ Check for A-prefix format (7 characters): A908 CJ, A873 OA, etc.
+  \ Note: Only 'A' prefix is used by MPC for pre-1925 designations (years 1800-1924)
   7 <> if drop false exit then
-  dup c@ dup [char] A = swap [char] B = or 0= if drop false exit then
+  dup c@ [char] A <> if drop false exit then
   dup 4 + c@ bl <> if drop false exit then
   drop true ;
 
 : pack-prov-old ( addr len -- addr' len' )
-  \ Old-style: A908 CJ -> I08C00J, A900 DA -> J00D00A
-  \ Century = millennium prefix (A=10, B=20) + hundreds digit
-  \ First get millennium base from prefix
-  over c@ case
-    [char] A of 10 endof  \ A = millennium 1 (1xxx)
-    [char] B of 20 endof  \ B = millennium 2 (2xxx)
-    0 swap
-  endcase
-  \ Stack: addr len millennium-base
+  \ A-prefix format: A908 CJ -> I08C00J, A900 DA -> J00D00A
+  \ Only 'A' prefix is used by MPC for pre-1925 designations (years 1800-1924)
+  \ Century = 10 (for A=1xxx) + hundreds digit
+  \ Stack: addr len
+  10                            \ A prefix means millennium 1 (1xxx)
   2 pick 1+ c@ [char] 0 - +    \ add hundreds digit to get century
   num>century out-buf c!
   over 2 + c@ out-buf 1+ c!     \ decade
