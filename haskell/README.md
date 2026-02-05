@@ -77,6 +77,41 @@ unpack :: String -> Either MPCError String
 detectFormat :: String -> Either MPCError FormatInfo
 ```
 
+### Helper Functions
+
+```haskell
+-- Convert minimal packed to 12-char MPC report format
+toReportFormat :: String -> String
+
+-- Convert 12-char report format to minimal packed
+fromReportFormat :: String -> Either MPCError String
+
+-- Check if designation has a comet fragment suffix
+hasFragment :: String -> Bool
+
+-- Extract fragment suffix (uppercase, e.g., "A", "AA")
+getFragment :: String -> String
+
+-- Get parent comet without fragment
+getParent :: String -> String
+
+-- Check if same object (compares packed forms)
+designationsEqual :: String -> String -> Bool
+```
+
+Helper function examples:
+
+```haskell
+toReportFormat "0073Pa"    -- "0073P      a"
+fromReportFormat "0073P      a"  -- Right "0073Pa"
+
+hasFragment "73P-A"        -- True
+getFragment "73P-A"        -- "A"
+getParent "73P-A"          -- "73P"
+
+designationsEqual "73P-A" "0073Pa"  -- True
+```
+
 ### Types
 
 ```haskell
@@ -106,10 +141,11 @@ data FormatInfo = FormatInfo
 ## Testing
 
 ```bash
-make test          # Run CSV conversion tests (2M+ cases)
-make test-errors   # Run error handling tests (94 cases)
+make test-all       # Run all tests
+make test-errors    # Run error handling tests (94 cases)
+make test-helpers   # Run helper function tests (77 cases)
+make test-csv       # Run CSV conversion tests (2M+ cases)
 make test-roundtrip # Run round-trip verification
-make test-all      # Run all tests
 ```
 
 ## Examples

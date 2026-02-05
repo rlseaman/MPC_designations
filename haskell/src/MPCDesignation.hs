@@ -35,6 +35,13 @@ module MPCDesignation
     , unpackCometFull
     , packSatellite
     , unpackSatellite
+      -- * Helper functions
+    , toReportFormat
+    , fromReportFormat
+    , hasFragment
+    , getFragment
+    , getParent
+    , designationsEqual
     ) where
 
 import Data.Char (ord, chr, isDigit, isUpper, isLower, isAlpha, toUpper, toLower)
@@ -252,15 +259,31 @@ unpackProvisional packed
             Nothing -> Left $ MPCError $ "Invalid survey: " ++ packed
     -- Standard provisional
     | length packed == 7 = do
-        centNum <- getCenturyNum (packed !! 0)
+        let centCode = packed !! 0
+        -- Validate century code for asteroids: only I-L (1800-2199) are valid
+        when (centCode `notElem` "IJKL") $
+            Left $ MPCError $ "Invalid century code for asteroid: " ++ [centCode] ++ " (must be I-L)"
+        centNum <- getCenturyNum centCode
         orderNum <- decodeCycleCount (take 2 $ drop 4 packed)
-        let year = show centNum ++ take 2 (drop 1 packed)
+        let yearStr = show centNum ++ take 2 (drop 1 packed)
+            yearInt = read yearStr :: Int
             halfMonth = packed !! 3
             secondLetter = packed !! 6
-        if orderNum == 0
-            then Right $ year ++ " " ++ [halfMonth, secondLetter]
-            else Right $ year ++ " " ++ [halfMonth, secondLetter] ++ show orderNum
+        -- Pre-1925 designations use A-prefix format
+        if yearInt < 1925
+            then let firstDigit = head yearStr
+                     yearSuffix = tail yearStr
+                     prefix = if firstDigit == '1' then 'A' else 'B'
+                 in if orderNum == 0
+                    then Right $ prefix : yearSuffix ++ " " ++ [halfMonth, secondLetter]
+                    else Right $ prefix : yearSuffix ++ " " ++ [halfMonth, secondLetter] ++ show orderNum
+            else if orderNum == 0
+                 then Right $ yearStr ++ " " ++ [halfMonth, secondLetter]
+                 else Right $ yearStr ++ " " ++ [halfMonth, secondLetter] ++ show orderNum
     | otherwise = Left $ MPCError $ "Invalid packed provisional: " ++ packed
+  where
+    when False _ = Right ()
+    when True e = e
 
 -- | Pack a provisional asteroid designation
 packProvisional :: String -> Either MPCError String
@@ -387,9 +410,18 @@ packCometProvisional unpacked = do
 -- | Unpack numbered comet designation
 unpackCometNumbered :: String -> Either MPCError String
 unpackCometNumbered packed
-    | length packed == 5 && all isDigit (take 4 packed) && last packed `elem` "PD" =
-        Right $ show (read (take 4 packed) :: Int) ++ [last packed]
+    -- Match with optional fragment: "0073P", "0073Pa", "0073Paa"
+    | len >= 5 && len <= 7 && all isDigit (take 4 packed) && packed !! 4 `elem` "PD" =
+        let numStr = take 4 packed
+            ctype = packed !! 4
+            fragment = drop 5 packed
+            num = read numStr :: Int
+        in if null fragment
+           then Right $ show num ++ [ctype]
+           else Right $ show num ++ [ctype] ++ "-" ++ map toUpper fragment
     | otherwise = Left $ MPCError $ "Invalid packed numbered comet: " ++ packed
+  where
+    len = length packed
 
 -- | Pack numbered comet designation
 packCometNumbered :: String -> Either MPCError String
@@ -397,17 +429,22 @@ packCometNumbered unpacked
     | matchNumbered =
         if num < 1 || num > 9999
         then Left $ MPCError $ "Comet number out of range: " ++ show num
-        else Right $ replicate (4 - length numStr) '0' ++ numStr ++ [ctype]
+        else Right $ replicate (4 - length numStr) '0' ++ numStr ++ [ctype] ++ map toLower fragment
     | otherwise = Left $ MPCError $ "Invalid unpacked numbered comet: " ++ unpacked
   where
     trimmed = trim unpacked
     trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
-    -- Match "1P" or "354P"
-    (matchNumbered, numStr, num, ctype) =
+    -- Match "1P", "73P-A", "73P-AA", or "1P/Halley"
+    (matchNumbered, numStr, num, ctype, fragment) =
         let (ns, rest) = span isDigit trimmed
         in if not (null ns) && length rest >= 1 && head rest `elem` "PD"
-           then (True, ns, read ns :: Int, head rest)
-           else (False, "", 0, ' ')
+           then let afterType = drop 1 rest
+                    frag = if "-" `isPrefixOf` afterType
+                           then takeWhile isAlpha (drop 1 afterType)
+                           else ""
+                in (True, ns, read ns :: Int, head rest, frag)
+           else (False, "", 0, ' ', "")
+    isPrefixOf p xs = take (length p) xs == p
 
 -- | Unpack full comet designation
 unpackCometFull :: String -> Either MPCError String
@@ -626,9 +663,14 @@ detectFormat des
     | len == 7 && take 3 trimmed `elem` map fst surveyPackedToUnpacked =
         Right $ FormatInfo Packed Survey "survey"
 
-    -- Packed numbered comet
+    -- Packed numbered comet (5 chars without fragment)
     | len == 5 && all isDigit (take 4 trimmed) && last trimmed `elem` "PD" =
         Right $ FormatInfo Packed CometNumbered "comet numbered"
+
+    -- Packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
+    | (len == 6 || len == 7) && all isDigit (take 4 trimmed) &&
+      trimmed !! 4 `elem` "PD" && all isLower (drop 5 trimmed) =
+        Right $ FormatInfo Packed CometNumbered "comet numbered with fragment"
 
     -- Packed comet provisional (7 chars, no spaces)
     | len == 7 && head trimmed `elem` map fst centuryCodes && isDigit (last trimmed) && ' ' `notElem` trimmed =
@@ -709,7 +751,7 @@ detectFormat des
     matchesCometNumbered s =
         let (numPart, rest) = span isDigit s
         in not (null numPart) && not (null rest) && head rest `elem` "PD" &&
-           (length rest == 1 || rest !! 1 == '/')
+           (length rest == 1 || rest !! 1 == '/' || rest !! 1 == '-')
 
 -- | Convert a designation (returns info dict)
 convert :: String -> Either MPCError (String, FormatInfo)
@@ -760,3 +802,174 @@ unpack des = do
         Packed -> convertSimple des
   where
     trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+-- ===========================================================================
+-- Helper functions for format conversion and fragment handling
+-- ===========================================================================
+
+-- | Convert minimal packed format to 12-character MPC observation report format.
+-- The 12-char format is used in MPC observation records (columns 1-12).
+toReportFormat :: String -> String
+toReportFormat minimal
+    -- Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
+    | len >= 5 && len <= 7 && all isDigit (take 4 m) && m !! 4 `elem` "PD" =
+        let basePart = take 5 m  -- "0073P"
+            fragment = drop 5 m
+        in if null fragment
+           then basePart ++ replicate (12 - 5) ' '  -- left-align with trailing spaces
+           else let padding = 12 - 5 - length fragment
+                in basePart ++ replicate padding ' ' ++ fragment
+    -- All other formats: right-align in 12 characters
+    | otherwise = replicate (12 - len) ' ' ++ m
+  where
+    m = trim minimal
+    len = length m
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+-- | Convert 12-character MPC report format to minimal packed format.
+fromReportFormat :: String -> Either MPCError String
+fromReportFormat report
+    | length report /= 12 = Left $ MPCError "Report format must be exactly 12 characters"
+    -- Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
+    | len5 >= 5 && all isDigit (take 4 trimLeft) && trimLeft !! 4 `elem` "PD" =
+        let basePart = take 5 trimLeft
+            afterBase = drop 5 report
+            fragment = trim afterBase
+        in if null fragment
+           then Right basePart
+           else Right $ basePart ++ fragment
+    -- All other formats: just trim whitespace
+    | otherwise = Right $ trim report
+  where
+    trimLeft = dropWhile (== ' ') report
+    len5 = length (take 5 trimLeft)
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+
+-- | Check if designation has a comet fragment suffix.
+-- Works with both packed and unpacked formats.
+hasFragment :: String -> Bool
+hasFragment des
+    -- Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    | matchUnpackedNumberedFragment = True
+    -- Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+    | matchUnpackedProvFragment = True
+    -- Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    | matchPackedNumberedFragment = True
+    -- Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa" (8-9 chars)
+    | matchPackedProvFragment = True
+    | otherwise = False
+  where
+    d = trim des
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+    len = length d
+
+    matchUnpackedNumberedFragment =
+        let (numPart, rest) = span isDigit d
+        in not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+           rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
+
+    matchUnpackedProvFragment =
+        len >= 11 && head d `elem` cometTypes && d !! 1 == '/' &&
+        '-' `elem` drop 7 d
+
+    matchPackedNumberedFragment =
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        all isLower (drop 5 d)
+
+    matchPackedProvFragment =
+        (len == 8 || len == 9) && head d `elem` cometTypes &&
+        d !! 1 `elem` map fst centuryCodes && isLower (last d)
+
+-- | Extract fragment suffix from comet designation.
+-- Returns uppercase fragment (e.g., "A", "AA"), empty string if no fragment.
+-- Works with both packed and unpacked formats.
+getFragment :: String -> String
+getFragment des
+    -- Unpacked numbered comet with fragment: "73P-A", "73P-AA"
+    | matchUnpackedNumberedFragment = map toUpper fragUnpackedNum
+    -- Unpacked provisional comet with fragment: "D/1993 F2-A", "P/1930 J1-AA"
+    | matchUnpackedProvFragment = map toUpper fragUnpackedProv
+    -- Packed numbered comet with fragment: "0073Pa", "0073Paa"
+    | matchPackedNumberedFragment = map toUpper (drop 5 d)
+    -- Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa"
+    | matchPackedProvFragment = map toUpper fragPackedProv
+    | otherwise = ""
+  where
+    d = trim des
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+    len = length d
+
+    (matchUnpackedNumberedFragment, fragUnpackedNum) =
+        let (numPart, rest) = span isDigit d
+        in if not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+              rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
+           then (True, drop 2 rest)
+           else (False, "")
+
+    (matchUnpackedProvFragment, fragUnpackedProv) =
+        if len >= 11 && head d `elem` cometTypes && d !! 1 == '/'
+        then case break (== '-') (drop 7 d) of
+            (_, '-':frag) | not (null frag) && all isAlpha frag && length frag <= 2 -> (True, frag)
+            _ -> (False, "")
+        else (False, "")
+
+    matchPackedNumberedFragment =
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        all isLower (drop 5 d)
+
+    (matchPackedProvFragment, fragPackedProv) =
+        if (len == 8 || len == 9) && head d `elem` cometTypes &&
+           d !! 1 `elem` map fst centuryCodes && isLower (last d)
+        then let frag = if len == 8 then [last d] else drop 7 d
+             in if all isLower frag then (True, frag) else (False, "")
+        else (False, "")
+
+-- | Get parent comet designation without fragment suffix.
+-- Returns in same format (packed or unpacked) as input.
+getParent :: String -> String
+getParent des
+    -- Unpacked numbered comet with fragment: "73P-A" -> "73P"
+    | matchUnpackedNumberedFragment = parentUnpackedNum
+    -- Unpacked provisional comet with fragment: "D/1993 F2-A" -> "D/1993 F2"
+    | matchUnpackedProvFragment = parentUnpackedProv
+    -- Packed numbered comet with fragment: "0073Pa" -> "0073P"
+    | matchPackedNumberedFragment = take 5 d
+    -- Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
+    | matchPackedProvFragment = take 7 d ++ "0"
+    -- No fragment found, return as-is
+    | otherwise = d
+  where
+    d = trim des
+    trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
+    len = length d
+
+    (matchUnpackedNumberedFragment, parentUnpackedNum) =
+        let (numPart, rest) = span isDigit d
+        in if not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+              rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
+           then (True, numPart ++ [head rest])
+           else (False, "")
+
+    (matchUnpackedProvFragment, parentUnpackedProv) =
+        if len >= 11 && head d `elem` cometTypes && d !! 1 == '/'
+        then case break (== '-') (drop 7 d) of
+            (before, '-':frag) | not (null frag) && all isAlpha frag && length frag <= 2 ->
+                (True, take 7 d ++ before)
+            _ -> (False, "")
+        else (False, "")
+
+    matchPackedNumberedFragment =
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        all isLower (drop 5 d)
+
+    matchPackedProvFragment =
+        (len == 8 || len == 9) && head d `elem` cometTypes &&
+        d !! 1 `elem` map fst centuryCodes && isLower (last d)
+
+-- | Check if two designations refer to the same object.
+-- Normalizes both to packed format before comparing.
+designationsEqual :: String -> String -> Bool
+designationsEqual d1 d2 =
+    case (pack d1, pack d2) of
+        (Right p1, Right p2) -> p1 == p2
+        _ -> False
