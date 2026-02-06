@@ -186,7 +186,7 @@ Where letter_position: A=0, B=1, ..., Z=24 (skipping I).
 | 2015 BA620 | _FB0000 | Year 15→F, B=half-month, seq=(620-620)×25+0=0 |
 | 2015 BB620 | _FB0001 | seq=(620-620)×25+1=1 |
 | 2015 BP620 | _FB000E | seq=(620-620)×25+14=14 (E in base62) |
-| 2024 AB631 | _OA004R | Year 24→O, A=half-month, seq=(631-620)×25+1=276 |
+| 2024 AB631 | _OA004S | Year 24→O, A=half-month, seq=(631-620)×25+1=276 |
 
 ### 2.6 Old-Style Provisional Designations
 
