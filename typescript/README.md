@@ -238,7 +238,7 @@ convertSimple('620000');      // '~0000'
 
 // Asteroids - provisional
 convertSimple('1995 XA');     // 'J95X00A'
-convertSimple('2024 AB631');  // '_4AMu1B'
+convertSimple('2024 AB631');  // '_OA004S'
 
 // Asteroids - survey
 convertSimple('2040 P-L');    // 'PLS2040'

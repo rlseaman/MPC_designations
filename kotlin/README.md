@@ -153,7 +153,7 @@ MPCDesignation.convertSimple("620000")      // "~0000"
 
 // Asteroids - provisional
 MPCDesignation.convertSimple("1995 XA")     // "J95X00A"
-MPCDesignation.convertSimple("2024 AB631")  // "_4AMu1B"
+MPCDesignation.convertSimple("2024 AB631")  // "_OA004S"
 
 // Asteroids - survey
 MPCDesignation.convertSimple("2040 P-L")    // "PLS2040"

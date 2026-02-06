@@ -183,7 +183,7 @@ MPCDesignation::designationsEqual('73P-A', '73P-B');      // false
 | Permanent (100K-620K) | 100001 - 619999 | A0001 - z9999 |
 | Permanent (620K+) | 620000+ | ~0000+ |
 | Provisional | 1995 XA | J95X00A |
-| Extended provisional | 2024 AB631 | _4AMu1B |
+| Extended provisional | 2024 AB631 | _OA004S |
 | Survey | 2040 P-L | PLS2040 |
 
 ### Comets

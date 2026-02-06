@@ -194,7 +194,7 @@ convert_simple('620000')      ! '~0000'
 
 ! Asteroids - provisional
 convert_simple('1995 XA')     ! 'J95X00A'
-convert_simple('2024 AB631')  ! '_4AMu1B'
+convert_simple('2024 AB631')  ! '_OA004S'
 
 ! Asteroids - survey
 convert_simple('2040 P-L')    ! 'PLS2040'

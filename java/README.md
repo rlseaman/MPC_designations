@@ -158,7 +158,7 @@ MPCDesignation.convertSimple("620000");   // "~0000"
 
 // Provisional asteroids
 MPCDesignation.convertSimple("1995 XA");      // "J95X00A"
-MPCDesignation.convertSimple("2024 AB631");   // "_4AMu1B"
+MPCDesignation.convertSimple("2024 AB631");   // "_OA004S"
 
 // Survey designations
 MPCDesignation.convertSimple("2040 P-L");     // "PLS2040"
