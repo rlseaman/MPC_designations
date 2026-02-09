@@ -1,10 +1,12 @@
 # Makefile for MPC designation converter (C implementation)
 
 CC = cc
-CFLAGS = -O2 -Wall -Wextra
+CFLAGS = -O3 -Wall -Wextra
 SRCDIR = src
 TESTDIR = test
 TEST_DATA = ../test-data
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
 
 # Read version from root VERSION file
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "1.0.0")
@@ -12,6 +14,11 @@ VERSION := $(shell cat ../VERSION 2>/dev/null || echo "1.0.0")
 # Include path for header and version definition
 INCLUDES = -I$(SRCDIR)
 DEFINES = -DMPC_VERSION=\"$(VERSION)\"
+ifeq ($(UNAME_S),Darwin)
+ifeq ($(UNAME_M),arm64)
+CFLAGS += -mcpu=apple-m2 -fomit-frame-pointer
+endif
+endif
 
 all: mpc_designation test_csv test_errors test_roundtrip test_fragments test_helpers
 

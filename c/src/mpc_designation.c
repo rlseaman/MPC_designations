@@ -232,6 +232,221 @@ static int validate_whitespace(const char *s) {
     return MPC_OK;
 }
 
+static int is_digit_str(const char *s, size_t len) {
+    if (len == 0) return 0;
+    for (size_t i = 0; i < len; i++) {
+        if (s[i] < '0' || s[i] > '9') return 0;
+    }
+    return 1;
+}
+
+static int is_std_packed_provisional(const char *s, size_t len) {
+    if (len != 7) return 0;
+    if (!(s[0] >= 'I' && s[0] <= 'L')) return 0;
+    if (!(s[1] >= '0' && s[1] <= '9' && s[2] >= '0' && s[2] <= '9')) return 0;
+    if (!(s[3] >= 'A' && s[3] <= 'Z')) return 0;
+    if (!((s[4] >= '0' && s[4] <= '9') || (s[4] >= 'A' && s[4] <= 'Z') || (s[4] >= 'a' && s[4] <= 'z'))) return 0;
+    if (!(s[5] >= '0' && s[5] <= '9')) return 0;
+    if (!(s[6] >= 'A' && s[6] <= 'Z')) return 0;
+    return 1;
+}
+
+static int is_std_unpacked_provisional(const char *s, size_t len) {
+    if (len < 7) return 0; /* YYYY AB */
+    if (!(s[0] >= '0' && s[0] <= '9' &&
+          s[1] >= '0' && s[1] <= '9' &&
+          s[2] >= '0' && s[2] <= '9' &&
+          s[3] >= '0' && s[3] <= '9')) return 0;
+    if (s[4] != ' ') return 0;
+    if (!(s[5] >= 'A' && s[5] <= 'Z' && s[6] >= 'A' && s[6] <= 'Z')) return 0;
+    for (size_t i = 7; i < len; i++) {
+        if (s[i] < '0' || s[i] > '9') return 0;
+    }
+    return 1;
+}
+
+static int is_packed_survey(const char *s, size_t len) {
+    if (len != 7) return 0;
+    if (s[0] == 'P' && s[1] == 'L' && s[2] == 'S') {
+        return (s[3] >= '0' && s[3] <= '9' &&
+                s[4] >= '0' && s[4] <= '9' &&
+                s[5] >= '0' && s[5] <= '9' &&
+                s[6] >= '0' && s[6] <= '9');
+    }
+    if (s[0] == 'T' && (s[1] >= '1' && s[1] <= '3') && s[2] == 'S') {
+        return (s[3] >= '0' && s[3] <= '9' &&
+                s[4] >= '0' && s[4] <= '9' &&
+                s[5] >= '0' && s[5] <= '9' &&
+                s[6] >= '0' && s[6] <= '9');
+    }
+    return 0;
+}
+
+static int is_valid_half_month(char c);
+
+static int write_u32_dec(char *dst, unsigned int v) {
+    char tmp[10];
+    int n = 0;
+    do {
+        tmp[n++] = (char)('0' + (v % 10));
+        v /= 10;
+    } while (v != 0);
+    for (int i = 0; i < n; i++) {
+        dst[i] = tmp[n - 1 - i];
+    }
+    return n;
+}
+
+static int pack_provisional_fast_std(const char *s, size_t len, char *output, size_t outlen) {
+    int year;
+    int century;
+    int year_short;
+    int century_code_int;
+    char half_month;
+    char second_letter;
+    long order_num = 0;
+
+    if (outlen < 8) return MPC_ERR_BUFFER;
+    if (len < 7) return MPC_ERR_FORMAT;
+
+    year = (s[0] - '0') * 1000 + (s[1] - '0') * 100 + (s[2] - '0') * 10 + (s[3] - '0');
+    half_month = s[5];
+    second_letter = s[6];
+
+    if (!is_valid_half_month(half_month)) return MPC_ERR_FORMAT;
+
+    for (size_t i = 7; i < len; i++) {
+        order_num = order_num * 10 + (long)(s[i] - '0');
+        if (order_num > 999999) return MPC_ERR_RANGE;
+    }
+
+    century = year / 100;
+    year_short = year % 100;
+    if (century < 18 || century > 21) return MPC_ERR_RANGE;
+
+    century_code_int = century_to_code(century);
+    if (century_code_int < 0) return MPC_ERR_FORMAT;
+
+    if (order_num >= 620) {
+        int year_digit = year % 100;
+        int letter_pos = letter_to_position(second_letter);
+        long base_sequence;
+        if (letter_pos < 1) return MPC_ERR_FORMAT;
+        base_sequence = (order_num - 620) * 25 + letter_pos - 1;
+        if (base_sequence > 14776335L) return MPC_ERR_RANGE;
+
+        output[0] = '_';
+        output[1] = num_to_base62(year_digit);
+        output[2] = half_month;
+        num_to_base62_string(base_sequence, output + 3, 4);
+        output[7] = '\0';
+        return MPC_OK;
+    }
+
+    {
+        int tens = (int)(order_num / 10);
+        int ones = (int)(order_num % 10);
+        char first;
+
+        if (tens < 10) first = (char)('0' + tens);
+        else if (tens < 36) first = (char)('A' + tens - 10);
+        else first = (char)('a' + tens - 36);
+
+        output[0] = (char)century_code_int;
+        output[1] = (char)('0' + (year_short / 10));
+        output[2] = (char)('0' + (year_short % 10));
+        output[3] = half_month;
+        output[4] = first;
+        output[5] = (char)('0' + ones);
+        output[6] = second_letter;
+        output[7] = '\0';
+    }
+
+    return MPC_OK;
+}
+
+static int decode_cycle_2chars_fast(char first, char second) {
+    int tens;
+    int ones;
+    if (first >= '0' && first <= '9') tens = first - '0';
+    else if (first >= 'A' && first <= 'Z') tens = first - 'A' + 10;
+    else if (first >= 'a' && first <= 'z') tens = first - 'a' + 36;
+    else return -1;
+    if (second < '0' || second > '9') return -1;
+    ones = second - '0';
+    return tens * 10 + ones;
+}
+
+static int unpack_provisional_fast_std(const char *s, size_t len, char *output, size_t outlen) {
+    int century;
+    int year_short;
+    int order_num;
+    int full_year;
+    char half_month;
+    char second_letter;
+    char *p = output;
+
+    if (len != 7) return MPC_ERR_FORMAT;
+    if (outlen < 16) return MPC_ERR_BUFFER;
+
+    century = code_to_century(s[0]);
+    if (century < 0) return MPC_ERR_FORMAT;
+
+    year_short = (s[1] - '0') * 10 + (s[2] - '0');
+    half_month = s[3];
+    second_letter = s[6];
+    order_num = decode_cycle_2chars_fast(s[4], s[5]);
+    if (order_num < 0) return MPC_ERR_FORMAT;
+
+    full_year = century * 100 + year_short;
+
+    if (full_year < 1925) {
+        int rest_year = full_year % 1000;
+        *p++ = 'A';
+        *p++ = (char)('0' + (rest_year / 100));
+        *p++ = (char)('0' + ((rest_year / 10) % 10));
+        *p++ = (char)('0' + (rest_year % 10));
+        *p++ = ' ';
+        *p++ = half_month;
+        *p++ = second_letter;
+    } else {
+        *p++ = (char)('0' + (full_year / 1000));
+        *p++ = (char)('0' + ((full_year / 100) % 10));
+        *p++ = (char)('0' + ((full_year / 10) % 10));
+        *p++ = (char)('0' + (full_year % 10));
+        *p++ = ' ';
+        *p++ = half_month;
+        *p++ = second_letter;
+    }
+
+    if (order_num != 0) {
+        p += write_u32_dec(p, (unsigned int)order_num);
+    }
+    *p = '\0';
+    return MPC_OK;
+}
+
+static int unpack_survey_fast(const char *s, size_t len, char *output, size_t outlen) {
+    int num;
+    char *p = output;
+    if (len != 7) return MPC_ERR_FORMAT;
+    if (outlen < 16) return MPC_ERR_BUFFER;
+
+    num = (s[3] - '0') * 1000 + (s[4] - '0') * 100 + (s[5] - '0') * 10 + (s[6] - '0');
+    p += write_u32_dec(p, (unsigned int)num);
+    *p++ = ' ';
+
+    if (s[0] == 'P' && s[1] == 'L' && s[2] == 'S') {
+        *p++ = 'P'; *p++ = '-'; *p++ = 'L';
+    } else if (s[0] == 'T' && s[2] == 'S' && (s[1] >= '1' && s[1] <= '3')) {
+        *p++ = 'T'; *p++ = '-'; *p++ = s[1];
+    } else {
+        return MPC_ERR_FORMAT;
+    }
+    *p = '\0';
+    return MPC_OK;
+}
+
 /*
  * Check if a character is a valid half-month letter (A-Y, excluding I)
  */
@@ -1649,6 +1864,62 @@ int mpc_convert(const char *input, char *output, size_t outlen, mpc_info_t *info
 }
 
 int mpc_convert_simple(const char *input, char *output, size_t outlen) {
+    long number;
+    size_t len;
+
+    if (input == NULL || output == NULL) return MPC_ERR_INVALID;
+
+    len = strlen(input);
+
+    /*
+     * Hot-path fast dispatch for high-volume batch workloads:
+     * most rows are standard asteroid permanent/provisional forms.
+     * Fall back to canonical detect/convert for all other patterns.
+     */
+    if (is_std_unpacked_provisional(input, len)) {
+        int err = pack_provisional_fast_std(input, len, output, outlen);
+        if (err == MPC_OK) return MPC_OK;
+    }
+
+    if (is_std_packed_provisional(input, len)) {
+        int err = unpack_provisional_fast_std(input, len, output, outlen);
+        if (err == MPC_OK) return MPC_OK;
+    }
+
+    if (is_packed_survey(input, len)) {
+        int err = unpack_survey_fast(input, len, output, outlen);
+        if (err == MPC_OK) return MPC_OK;
+    }
+
+    if (is_digit_str(input, len)) {
+        number = atol(input);
+        return mpc_pack_permanent(number, output, outlen);
+    }
+
+    if (len == 5) {
+        if ((input[0] >= '0' && input[0] <= '9' &&
+             input[1] >= '0' && input[1] <= '9' &&
+             input[2] >= '0' && input[2] <= '9' &&
+             input[3] >= '0' && input[3] <= '9' &&
+             input[4] >= '0' && input[4] <= '9') ||
+            (((input[0] >= 'A' && input[0] <= 'Z') || (input[0] >= 'a' && input[0] <= 'z')) &&
+             input[1] >= '0' && input[1] <= '9' &&
+             input[2] >= '0' && input[2] <= '9' &&
+             input[3] >= '0' && input[3] <= '9' &&
+             input[4] >= '0' && input[4] <= '9') ||
+            (input[0] == '~' &&
+             ((input[1] >= '0' && input[1] <= '9') || (input[1] >= 'A' && input[1] <= 'Z') || (input[1] >= 'a' && input[1] <= 'z')) &&
+             ((input[2] >= '0' && input[2] <= '9') || (input[2] >= 'A' && input[2] <= 'Z') || (input[2] >= 'a' && input[2] <= 'z')) &&
+             ((input[3] >= '0' && input[3] <= '9') || (input[3] >= 'A' && input[3] <= 'Z') || (input[3] >= 'a' && input[3] <= 'z')) &&
+             ((input[4] >= '0' && input[4] <= '9') || (input[4] >= 'A' && input[4] <= 'Z') || (input[4] >= 'a' && input[4] <= 'z')))) {
+            int err = mpc_unpack_permanent(input, &number);
+            if (err == MPC_OK) {
+                if (snprintf(output, outlen, "%ld", number) >= (int)outlen) return MPC_ERR_BUFFER;
+                return MPC_OK;
+            }
+        }
+    }
+
     return mpc_convert(input, output, outlen, NULL);
 }
 

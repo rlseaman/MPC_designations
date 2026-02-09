@@ -25,7 +25,10 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 if(MSVC)
     add_compile_options(/W4)
 else()
-    add_compile_options(-Wall -Wextra)
+    add_compile_options(-O3 -Wall -Wextra)
+    if(APPLE AND (CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64" OR CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64"))
+        add_compile_options(-mcpu=apple-m2 -fomit-frame-pointer)
+    endif()
 endif()
 
 # Version definition
