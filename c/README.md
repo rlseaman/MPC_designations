@@ -2,7 +2,7 @@
 
 C99 library and CLI tool for converting between packed and unpacked MPC designations.
 
-Performance note: this implementation includes pure-C hot-path conversion optimizations for high-volume batch workloads, with tuned compiler flags on Apple Silicon.
+Performance note: this implementation includes pure-C hot-path conversion optimizations for high-volume batch workloads.
 
 ## Quick Start
 
