@@ -134,6 +134,24 @@ int mpc_unpack(const char *input, char *output, size_t outlen);
 int mpc_convert(const char *input, char *output, size_t outlen, mpc_info_t *info);
 
 /*
+ * Length-aware variant of mpc_convert().
+ *
+ * This variant accepts explicit input length so callers can validate raw byte
+ * sequences that may contain embedded NUL bytes.
+ *
+ * Parameters:
+ *   input     - Input designation bytes
+ *   input_len - Number of input bytes
+ *   output    - Buffer to receive converted designation
+ *   outlen    - Size of output buffer
+ *   info      - Optional pointer to receive detection info (can be NULL)
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_convert_n(const char *input, size_t input_len, char *output, size_t outlen, mpc_info_t *info);
+
+/*
  * Convert a designation, returning only the result string.
  * Simplified interface for common use cases.
  *
@@ -146,6 +164,20 @@ int mpc_convert(const char *input, char *output, size_t outlen, mpc_info_t *info
  *   MPC_OK on success, error code on failure
  */
 int mpc_convert_simple(const char *input, char *output, size_t outlen);
+
+/*
+ * Length-aware variant of mpc_convert_simple().
+ *
+ * Parameters:
+ *   input     - Input designation bytes
+ *   input_len - Number of input bytes
+ *   output    - Buffer to receive converted designation
+ *   outlen    - Size of output buffer
+ *
+ * Returns:
+ *   MPC_OK on success, error code on failure
+ */
+int mpc_convert_simple_n(const char *input, size_t input_len, char *output, size_t outlen);
 
 /* =============================================================================
  * CATEGORY-SPECIFIC FUNCTIONS
@@ -270,6 +302,19 @@ int mpc_is_valid_chars(const char *input);
  *   MPC_OK on success, MPC_ERR_FORMAT if unrecognized
  */
 int mpc_detect_format(const char *input, mpc_info_t *info);
+
+/*
+ * Length-aware variant of mpc_detect_format().
+ *
+ * Parameters:
+ *   input     - Input designation bytes
+ *   input_len - Number of input bytes
+ *   info      - Pointer to receive detection info
+ *
+ * Returns:
+ *   MPC_OK on success, MPC_ERR_FORMAT if unrecognized
+ */
+int mpc_detect_format_n(const char *input, size_t input_len, mpc_info_t *info);
 
 /* =============================================================================
  * LOW-LEVEL FUNCTIONS

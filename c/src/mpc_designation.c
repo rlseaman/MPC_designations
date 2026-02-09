@@ -192,6 +192,21 @@ static int validate_raw_input(const char *s) {
 }
 
 /*
+ * Validate raw input bytes with explicit length.
+ * Rejects any non-printing/non-ASCII byte, including embedded NUL.
+ */
+static int validate_raw_input_n(const char *s, size_t len) {
+    if (s == NULL) return MPC_ERR_INVALID;
+    for (size_t i = 0; i < len; i++) {
+        unsigned char c = (unsigned char)s[i];
+        if (c < 32 || c > 126) {
+            return MPC_ERR_FORMAT;
+        }
+    }
+    return MPC_OK;
+}
+
+/*
  * Validate whitespace in a string:
  * - Reject non-printing characters (except space)
  * - Reject tabs
@@ -1635,6 +1650,41 @@ int mpc_convert(const char *input, char *output, size_t outlen, mpc_info_t *info
 
 int mpc_convert_simple(const char *input, char *output, size_t outlen) {
     return mpc_convert(input, output, outlen, NULL);
+}
+
+int mpc_detect_format_n(const char *input, size_t input_len, mpc_info_t *info) {
+    char buf[256];
+    int err;
+
+    if (input == NULL || info == NULL) return MPC_ERR_INVALID;
+    if (input_len == 0 || input_len >= sizeof(buf)) return MPC_ERR_FORMAT;
+
+    err = validate_raw_input_n(input, input_len);
+    if (err != MPC_OK) return err;
+
+    memcpy(buf, input, input_len);
+    buf[input_len] = '\0';
+    return mpc_detect_format(buf, info);
+}
+
+int mpc_convert_n(const char *input, size_t input_len, char *output, size_t outlen, mpc_info_t *info) {
+    char buf[256];
+    int err;
+
+    if (input == NULL || output == NULL) return MPC_ERR_INVALID;
+    if (outlen == 0) return MPC_ERR_BUFFER;
+    if (input_len == 0 || input_len >= sizeof(buf)) return MPC_ERR_FORMAT;
+
+    err = validate_raw_input_n(input, input_len);
+    if (err != MPC_OK) return err;
+
+    memcpy(buf, input, input_len);
+    buf[input_len] = '\0';
+    return mpc_convert(buf, output, outlen, info);
+}
+
+int mpc_convert_simple_n(const char *input, size_t input_len, char *output, size_t outlen) {
+    return mpc_convert_n(input, input_len, output, outlen, NULL);
 }
 
 const char *mpc_strerror(int errcode) {

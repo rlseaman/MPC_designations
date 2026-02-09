@@ -20,37 +20,13 @@
 #define MAX_FIELD 256
 
 /*
- * Expected skips for the C implementation.
- *
- * C strings terminate at the first null byte, so a null embedded in the
- * input is indistinguishable from end-of-string. These cases cannot be
- * detected by any pure-C implementation using standard string handling,
- * and are documented as such in docs/ERROR_CHECKING.md. Other language
- * implementations (which use length-prefixed strings) still run them.
+ * Inputs are passed with an explicit length (mpc_convert_simple_n) so that
+ * escape sequences such as \0 decode to embedded NUL bytes the library can
+ * see and reject. With plain C strings a NUL would silently end the input.
  */
-static const struct {
-    const char *category;
-    const char *subcategory;
-    const char *reason;
-} expected_skips[] = {
-    { "invalid_char", "null_byte",   "C strings terminate at null byte" },
-    { "edge_case",    "null_middle", "C strings terminate at null byte" },
-};
-static const int n_expected_skips =
-    sizeof(expected_skips) / sizeof(expected_skips[0]);
 
-static const char *skip_reason(const char *category, const char *subcategory) {
-    for (int i = 0; i < n_expected_skips; i++) {
-        if (strcmp(expected_skips[i].category, category) == 0 &&
-            strcmp(expected_skips[i].subcategory, subcategory) == 0) {
-            return expected_skips[i].reason;
-        }
-    }
-    return NULL;
-}
-
-/* Parse escape sequences in a string (modifies in place) */
-static void unescape_string(char *s) {
+/* Parse escape sequences in a string (modifies in place, returns decoded length) */
+static size_t unescape_string(char *s) {
     char *src = s;
     char *dst = s;
 
@@ -83,6 +59,7 @@ static void unescape_string(char *s) {
         }
     }
     *dst = '\0';
+    return (size_t)(dst - s);
 }
 
 /* Parse a CSV field, handling possible quotes */
@@ -172,22 +149,13 @@ int main(int argc, char *argv[]) {
         parse_csv_field(&ptr, description, sizeof(description));
 
         /* Unescape the input string */
-        unescape_string(input);
+        size_t input_len = unescape_string(input);
 
         total++;
 
-        /* Expected-skip check before running (some inputs are undetectable in C) */
-        const char *reason = skip_reason(category, subcategory);
-        if (reason) {
-            printf("SKIP [%s/%s]: '%s' (%s)\n",
-                   category, subcategory, description, reason);
-            skipped++;
-            continue;
-        }
-
         /* Run the test */
         char output[MPC_MAX_UNPACKED];  /* convert may unpack */
-        int err = mpc_convert_simple(input, output, sizeof(output));
+        int err = mpc_convert_simple_n(input, input_len, output, sizeof(output));
 
         int test_passed = 0;
 
