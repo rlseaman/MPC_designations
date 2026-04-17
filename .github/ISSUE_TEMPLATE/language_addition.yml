@@ -1,0 +1,54 @@
+name: New language implementation
+description: Propose a new language port or track the status of one in progress.
+title: "[new-lang] "
+labels: [enhancement, new-language]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a new language. Please confirm you have read
+        `CONTRIBUTING.md` and `CLAUDE_NOTES.md` (especially the "Before
+        Marking a Language Complete" checklist) before starting the port.
+  - type: input
+    id: language
+    attributes:
+      label: Language
+      placeholder: "Zig"
+    validations:
+      required: true
+  - type: input
+    id: runtime
+    attributes:
+      label: Minimum runtime / compiler version
+      placeholder: "Zig 0.13"
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why this language?
+      description: Who would use it? Is there an existing community that would benefit?
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Per-language implementation checklist
+      description: Check items as they are completed. All must be done before merge.
+      options:
+        - label: Core API (`convert_simple`, `pack`, `unpack`, `detect_format`, `is_valid_designation`)
+        - label: Six helper functions (`to_report_format`, `from_report_format`, `has_fragment`, `get_fragment`, `get_parent`, `designations_equal`)
+        - label: Numbered comet fragments (1- and 2-letter)
+        - label: Provisional comet 2-letter fragments
+        - label: Fragment letter `I` is accepted (not skipped)
+        - label: Pre-1925 A-prefix unpacking (`J08C00J` → `A908 CJ`)
+        - label: Century code validation (asteroid I–L, comet A–L)
+        - label: Error-case test suite (94 cases)
+        - label: CSV conversion test (2,022,404 entries)
+        - label: Helper-function test (77 cases)
+        - label: Roundtrip test (81 cases)
+        - label: Per-language `README.md` with API and test instructions
+        - label: Makefile targets (`test-errors`, `test-helpers`, `test-csv`, `test-roundtrip`, `test-all`)
+        - label: Top-level `Makefile` target (`test-<language>`)
+        - label: Entry in top-level `README.md` implementations table
+        - label: Entry in `CHANGELOG.md`

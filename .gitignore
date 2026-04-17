@@ -5,6 +5,9 @@ test-data/*.csv
 # Claude Code settings
 .claude/
 
+# Local scratch / experiments
+sandbox/
+
 # Python cache
 __pycache__/
 *.pyc
@@ -18,6 +21,8 @@ build/
 c/mpc_designation
 c/test_csv
 c/test_errors
+c/test_fragments
+c/test_helpers
 c/test_roundtrip
 c/examples/example_usage
 c/build/
@@ -35,6 +40,7 @@ swift/mpc_designation
 swift/test_csv
 swift/test_errors
 swift/test_errors_debug
+swift/test_helpers
 swift/test_roundtrip
 swift/test_roundtrip_debug
 swift/.build/
@@ -44,14 +50,23 @@ swift/.build/
 cpp/mpc_designation
 cpp/test_csv
 cpp/test_errors
+cpp/test_helpers
 cpp/test_roundtrip
 
 # Go build artifacts
 go/mpc_designation
 go/test_csv
 go/test_errors
+go/test_helpers
 go/test_roundtrip
 go/mpc_designation-*
+
+# Nim build artifacts
+nim/mpc_designation
+nim/test_csv
+nim/test_errors
+nim/test_helpers
+nim/test_roundtrip
 
 # C# / .NET build artifacts
 csharp/bin/

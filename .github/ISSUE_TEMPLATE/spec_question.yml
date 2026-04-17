@@ -1,0 +1,30 @@
+name: Spec question / ambiguity
+description: Report an unclear or possibly incorrect reading of the MPC specification.
+title: "[spec] "
+labels: [spec, question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for questions like "what should `X` pack to?" where the
+        answer is not obvious from the existing test corpus. If we need to
+        contact the MPC help desk, document that decision here.
+  - type: input
+    id: designation
+    attributes:
+      label: Designation in question
+      placeholder: "S/1974 J 1"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: The ambiguity
+      description: What are the candidate interpretations? What does the spec say or not say?
+    validations:
+      required: true
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Links to MPC docs, prior help-desk responses in `COMPLETE_DESIGNATION_REFERENCE.md`, related code, real-world MPEC examples, etc.

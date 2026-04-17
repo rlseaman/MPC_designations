@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use this software in published research, please cite it as below."
+title: "MPC Designations: Polyglot converter for Minor Planet Center packed and unpacked designations"
+abstract: >-
+  A reference-corpus library, implemented identically in 25 programming
+  languages, for converting between the packed and unpacked designation
+  formats used by the IAU Minor Planet Center for asteroids, comets, and
+  natural satellites. Each implementation passes the same 2,022,404-entry
+  test corpus and the same 94-case error-handling suite.
+type: software
+authors:
+  - family-names: Seaman
+    given-names: Rob
+    email: seaman@noao.edu
+license: CC0-1.0
+version: "1.0.0"
+date-released: "2026-02-05"
+repository-code: "https://github.com/rlseaman/MPC_designations"
+url: "https://github.com/rlseaman/MPC_designations"
+keywords:
+  - astronomy
+  - minor planet center
+  - mpc
+  - asteroids
+  - comets
+  - natural satellites
+  - solar system
+  - packed designation
+  - provisional designation
+  - polyglot
+  - interoperability
+references:
+  - type: generic
+    title: "Packed Provisional and Permanent Designations"
+    authors:
+      - name: "IAU Minor Planet Center"
+    url: "https://www.minorplanetcenter.net/iau/info/PackedDes.html"

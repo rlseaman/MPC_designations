@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: MPC Packed Designation specification
+    url: https://www.minorplanetcenter.net/iau/info/PackedDes.html
+    about: The upstream specification this project implements.
+  - name: Question about a specific language implementation
+    url: https://github.com/rlseaman/MPC_designations/discussions
+    about: Open a discussion instead of an issue for general usage questions.

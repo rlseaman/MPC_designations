@@ -1,0 +1,94 @@
+name: Bug report
+description: A conversion gives a wrong result, an error case is mishandled, or a language implementation disagrees with the others.
+title: "[bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing. Please provide enough detail for us to reproduce
+        the bug quickly. If the issue is a mismatch between two language
+        implementations, tag the title `[parity]`.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Affected language implementation(s)
+      description: Choose one or more. Select "multiple / parity issue" if different languages disagree.
+      multiple: true
+      options:
+        - AWK
+        - Bash
+        - C
+        - C++
+        - C#
+        - Forth
+        - Fortran
+        - Go
+        - Haskell
+        - Java
+        - JavaScript
+        - Julia
+        - Kotlin
+        - Nim
+        - Octave/MATLAB
+        - Perl
+        - PHP
+        - Python
+        - R
+        - Ruby
+        - Rust
+        - SPP/IRAF
+        - Swift
+        - Tcl
+        - TypeScript
+        - multiple / parity issue
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Library version (contents of top-level VERSION)
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: input
+    attributes:
+      label: Input designation
+      description: Exactly as passed to the library (note leading/trailing whitespace if relevant).
+      placeholder: "1995 XA"
+    validations:
+      required: true
+  - type: input
+    id: expected
+    attributes:
+      label: Expected output
+      placeholder: "J95X00A"
+    validations:
+      required: true
+  - type: input
+    id: actual
+    attributes:
+      label: Actual output (or error)
+      placeholder: "got: X95X00A"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Shell commands or a minimal script. Please include the exact command line.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, compiler/runtime version, anything unusual.
+      placeholder: "macOS 14.5, gcc 15.1.0, Python 3.12.3"
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Link to MPC spec section, help-desk correspondence, or other relevant material.
