@@ -206,9 +206,11 @@ The code assumes ASCII-compatible input, which is correct for MPC designations. 
 
 The lite modules are ideal for embedding:
 - Single-header C distribution (`mpc_designation_lite.h`)
-- Single-file Python (`lite.py`)
+- Single-file Python (`python/examples/mpc_designation_lite.py`)
 
-These should be emphasized in documentation for easy integration into other projects.
+These are provided as reading aids and copy-paste starting points rather than
+as installed package modules — the published `mpc-designation` wheel ships
+only the full implementation.
 
 ---
 

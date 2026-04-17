@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-04-17
+
+First release published to PyPI.
+
 ### Added
 - `docs/SATELLITE_NAMING_ANALYSIS.md` — research notes and scoping options for
   permanent-satellite packed format (`J013S`) and future named-body lookup
@@ -17,11 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   button.
 - `CHANGELOG.md` — this file.
 - Issue and pull-request templates under `.github/`.
+- `authors` and `maintainers` fields in Python `pyproject.toml`; `Changelog`
+  and `Issues` project URLs.
 
 ### Changed
 - `.gitignore` now covers `test_fragments`, `test_helpers`, and `test_roundtrip`
   binaries across all language directories, plus the local `sandbox/` scratch
   area.
+- Python `mpc_designation.lite` module moved out of the installed package to
+  `python/examples/mpc_designation_lite.py`. The published wheel now ships
+  only the full implementation.
 
 ## [1.0.0] — 2026-02-05
 
@@ -79,5 +88,6 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/rlseaman/MPC_designations/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/rlseaman/MPC_designations/releases/tag/v1.0.0

@@ -1,8 +1,14 @@
 # MPC Designations
 
+[![PyPI version](https://img.shields.io/pypi/v/mpc-designation.svg)](https://pypi.org/project/mpc-designation/)
+[![Python versions](https://img.shields.io/pypi/pyversions/mpc-designation.svg)](https://pypi.org/project/mpc-designation/)
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
+
 Convert between packed and unpacked Minor Planet Center (MPC) designations for asteroids, comets, and natural satellites.
 
 Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
+
+Python users: `pip install mpc-designation`. See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for every other language.
 
 ## Implementations
 
