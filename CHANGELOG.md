@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rather than `Failed: 2`, turning the C job green. Other language
   implementations continue to run these cases.
 
+### Added
+- Path-prefixed Go module tags `go/v1.0.0` and `go/v1.0.1` (in addition to
+  the existing `v1.0.0` and `v1.0.1` tags). Go's module system requires
+  submodule-prefixed tags for modules rooted in a repository subdirectory;
+  without them, `go get github.com/rlseaman/mpc_designations/go@v1.0.1`
+  fell back to commit-hash pseudo-versions rather than clean semver.
+
 ## [1.0.1] — 2026-04-17
 
 First release published to PyPI.
