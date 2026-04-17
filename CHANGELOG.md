@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   submodule-prefixed tags for modules rooted in a repository subdirectory;
   without them, `go get github.com/rlseaman/mpc_designations/go@v1.0.1`
   fell back to commit-hash pseudo-versions rather than clean semver.
+- `docs/DISTRIBUTION.md` — per-language registry publishing status and
+  playbook. Captures current state (PyPI live, conda-forge in review, Go
+  module live), blockers for each remaining language, and a priority
+  ordering for future work.
 
 ## [1.0.1] — 2026-04-17
 

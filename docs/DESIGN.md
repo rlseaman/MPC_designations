@@ -136,6 +136,8 @@ Success is:
 - [`CONTRIBUTING.md`](../CONTRIBUTING.md) — how to add a new language.
 - [`CLAUDE_NOTES.md`](../CLAUDE_NOTES.md) — per-language implementation
   checklist and the six-helper-function contract.
+- [`DISTRIBUTION.md`](DISTRIBUTION.md) — per-language registry publishing
+  status and playbook; revisit each release.
 - [`SATELLITE_NAMING_ANALYSIS.md`](SATELLITE_NAMING_ANALYSIS.md) — scoping of
   a possible future names module, which would be a sibling project rather
   than an extension of this one.
