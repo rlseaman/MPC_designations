@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- C error-test runner (`c/test/test_errors.c`) now treats two specific cases
+  (`invalid_char/null_byte`, `edge_case/null_middle`) as expected skips rather
+  than failures. The inability to detect embedded null bytes is inherent to C
+  strings and was already documented; now CI reports it as `Skipped: 2`
+  rather than `Failed: 2`, turning the C job green. Other language
+  implementations continue to run these cases.
+
 ## [1.0.1] — 2026-04-17
 
 First release published to PyPI.

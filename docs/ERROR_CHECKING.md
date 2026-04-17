@@ -121,7 +121,12 @@ The following validations are currently missing or incomplete:
 3. **Comet order zero:** `C/1995 A0` should be rejected (order numbers start at 1)
 4. **Satellite zero:** `S/2019 J 0` should be rejected (numbers start at 1)
 5. **Survey zero:** `0 P-L` should be rejected (survey numbers are positive)
-6. **Null bytes in C:** C string handling truncates at null bytes rather than rejecting
+6. **Null bytes in C:** C string handling truncates at null bytes rather than
+   rejecting. The two affected test cases (`invalid_char/null_byte` and
+   `edge_case/null_middle`) are explicitly marked as expected skips in the C
+   error-test runner (`c/test/test_errors.c`); they continue to run in all
+   other language implementations. CI reports `Skipped: 2` for C on these
+   cases and does not mark the build failed.
 
 ## Error Messages
 

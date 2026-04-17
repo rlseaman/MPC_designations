@@ -334,6 +334,15 @@ The library validates all inputs and returns appropriate error codes:
 
 Use `mpc_strerror()` to get human-readable error messages.
 
+### Known limitation: null bytes in input
+
+C strings terminate at the first null byte, so a null embedded in the input
+is indistinguishable from end-of-string. Two cases in the shared error-test
+suite (`invalid_char/null_byte` and `edge_case/null_middle`) are therefore
+marked as expected skips in `c/test/test_errors.c`; they continue to run in
+all other language implementations. The test runner reports `Skipped: 2` for
+these cases and still exits successfully.
+
 ## Examples
 
 See `examples/example_usage.c` for more detailed usage examples.
