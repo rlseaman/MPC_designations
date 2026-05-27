@@ -29,7 +29,7 @@ test: test-errors test-helpers
 
 test-errors: test_errors
 	@echo "Running error tests..."
-	./test_errors
+	./test_errors ../test-data/error_test_cases.csv
 
 test-helpers: test_helpers
 	@echo "Running helper tests..."
@@ -43,7 +43,7 @@ test-roundtrip: test_roundtrip
 
 test-all: build
 	@echo "Running all tests..."
-	./test_errors
+	./test_errors ../test-data/error_test_cases.csv
 	./test_helpers
 	@if [ -f "../test-data/prov_unpack_to_pack.csv" ]; then \
 		./test_csv ../test-data/prov_unpack_to_pack.csv; \

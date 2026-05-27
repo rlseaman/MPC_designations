@@ -1,0 +1,17 @@
+<Project>
+  <!--
+    The four test projects (TestCsv, TestErrors, TestHelpers, TestRoundtrip)
+    all live in this single directory. By default they would share test/obj
+    and test/bin, so building/running one project overwrites another's NuGet
+    assets and assemblies, causing cross-run contamination under `make test`.
+
+    Directory.Build.props is imported before Microsoft.Common.props, so setting
+    the output paths here (keyed off the project name) isolates each project's
+    intermediate (obj) and final (bin) outputs without the MSB3539 warning that
+    results from setting BaseIntermediateOutputPath inside the .csproj itself.
+  -->
+  <PropertyGroup>
+    <BaseIntermediateOutputPath>obj/$(MSBuildProjectName)/</BaseIntermediateOutputPath>
+    <BaseOutputPath>bin/$(MSBuildProjectName)/</BaseOutputPath>
+  </PropertyGroup>
+</Project>
