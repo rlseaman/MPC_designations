@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-05-27
+
+### Fixed
+- Packed-provisional detection was too loose across all 25 implementations,
+  letting non-MPC strings match the asteroid-provisional branch — notably
+  Catalina Sky Survey tracklet IDs such as `C03UYWZ` (century `C` = 1200s).
+  Detection now enforces the canonical structure
+  `^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$`: asteroid century `I-L`
+  (1800-2199; comets remain `A-L`), half-month `A-Y` skipping `I`, a digit in
+  the cycle-units position, and second letter `A-Z` skipping `I`. The pack path
+  now rejects `I` in both letter positions (standard and old-style branches).
+  This also closes a class of silent mis-conversions (e.g. `K95I00A`→`2095 IA`,
+  `K03UYWZ`→garbage, `1995 XI`→`J95X00I`) present in several implementations.
+  Verified against the full 2,022,404-row corpus in every testable language.
+- Comet provisional half-month was accepted as any `[A-Z]` in detection and was
+  not validated on the pack path across all 25 implementations, so `C/1995 I1`
+  and `C/1995 Z1` were wrongly accepted. The half-month is a calendar code
+  (24 half-months → letters `A-Y` skipping `I`; `Z` unused) and is object-type
+  independent, so the same `[A-HJ-Y]` rule now applies to comets (and natural
+  satellites) as to asteroids. Comet *fragment* letters are unaffected — they
+  legitimately include `I` (e.g. `P/1930 J1-AI`), verified preserved.
+- Nim: implemented BCE/ancient-comet unpacking (e.g. `C.53P010` → `C/-146 P1`),
+  which was missing — closing 12 round-trip failures and reaching parity with
+  the Python/Tcl references.
+- Forth: fixed a latent stack-operand bug in the `convert-simple` pass-through
+  path that the tightened detection exposed.
+- Helper functions (`getFragment`/`getParent`/`hasFragment`) in AWK, C#, Kotlin,
+  PHP, and Swift used a digits-only `\d{2}` cycle pattern that failed to match
+  packed comet fragments with cycle ≥ 100; corrected to `[0-9A-Za-z][0-9]`.
+- C# test projects shared one build-intermediate directory, cross-contaminating
+  `make test`; isolated via a per-project `Directory.Build.props`.
+
 ### Changed
 - C error-test runner (`c/test/test_errors.c`) now treats two specific cases
   (`invalid_char/null_byte`, `edge_case/null_middle`) as expected skips rather
@@ -14,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strings and was already documented; now CI reports it as `Skipped: 2`
   rather than `Failed: 2`, turning the C job green. Other language
   implementations continue to run these cases.
+- The AWK, Bash, Nim, Forth, and Haskell error-test harnesses now read the
+  shared `test-data/error_test_cases.csv` instead of bespoke hardcoded cases.
+  This surfaced pre-existing input-validation gaps in those five (numeric-range
+  checks, whitespace strictness, etc.), now tracked in `docs/VALIDATION_GAPS.md`
+  and recorded as documented expected-skips (the C null-byte precedent).
 
 ### Added
 - Path-prefixed Go module tags `go/v1.0.0` and `go/v1.0.1` (in addition to
@@ -107,6 +144,7 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/rlseaman/MPC_designations/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/rlseaman/MPC_designations/releases/tag/v1.0.0
