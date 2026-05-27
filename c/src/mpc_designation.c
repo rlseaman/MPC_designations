@@ -335,7 +335,8 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
     char half_month, second_letter;
     if (sscanf(buf, "%c%1d%2d %c%c", &prefix, &century_digit, &year_short, &half_month, &second_letter) == 5) {
         if ((prefix == 'A' || prefix == 'B') &&
-            is_valid_half_month(half_month) && isupper(second_letter)) {
+            is_valid_half_month(half_month) && isupper(second_letter) &&
+            second_letter != 'I') {
             char century_code;
             if (century_digit == 8) century_code = 'I';
             else if (century_digit == 9) century_code = 'J';
@@ -363,6 +364,11 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
 
     /* Validate half-month letter (I is not used) */
     if (!is_valid_half_month(half_month)) {
+        return MPC_ERR_FORMAT;
+    }
+
+    /* Validate second (order) letter (I is not used in either letter position) */
+    if (second_letter == 'I') {
         return MPC_ERR_FORMAT;
     }
     long order_num = 0;
@@ -540,6 +546,12 @@ static int pack_comet_provisional(const char *unpacked, char *output, size_t out
         if (sscanf(buf, "%4d %c%d", &year, &half_month, &order_num) != 3) {
             return MPC_ERR_FORMAT;
         }
+    }
+
+    /* Half-month is a calendar code (A-Y skipping I); reject invalid letters. */
+    /* The fragment legitimately includes I per MPC data and is NOT checked here. */
+    if (!is_valid_half_month(half_month)) {
+        return MPC_ERR_FORMAT;
     }
 
     /* Comet order number must be positive */
@@ -894,6 +906,11 @@ static int pack_ancient_comet(const char *unpacked, char *output, size_t outlen)
 
     if (!is_comet_type(comet_type)) return MPC_ERR_FORMAT;
 
+    /* Half-month is a calendar code (A-Y skipping I), object-type independent. */
+    if (!is_valid_half_month(half_month)) {
+        return MPC_ERR_FORMAT;
+    }
+
     /* Comet order number must be positive */
     if (order_num < 1) {
         return MPC_ERR_FORMAT;
@@ -1137,9 +1154,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     size_t orig_len = strlen(input);
 
     /* Check for packed 12-char comet before trimming */
+    /* Half-month (input[8]) is a calendar code A-Y excluding I, object-type independent */
     if (orig_len == 12) {
         char c4 = input[4];
-        if (is_comet_type(c4)) {
+        if (is_comet_type(c4) && is_valid_half_month(input[8])) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_FULL;
             strcpy(info->subtype, "comet with provisional (12-char)");
@@ -1148,8 +1166,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     }
 
     /* Check for packed 8-char comet */
+    /* Half-month (input[4]) is a calendar code A-Y excluding I */
     if (orig_len == 8 && is_comet_type(input[0]) &&
-        input[1] >= 'A' && input[1] <= 'L') {
+        input[1] >= 'A' && input[1] <= 'L' &&
+        is_valid_half_month(input[4])) {
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_COMET_FULL;
         strcpy(info->subtype, "comet with provisional (8-char)");
@@ -1157,8 +1177,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     }
 
     /* Check for packed 9-char comet with 2-letter fragment */
+    /* Half-month (input[4]) is a calendar code A-Y excluding I */
     if (orig_len == 9 && is_comet_type(input[0]) &&
         input[1] >= 'A' && input[1] <= 'L' &&
+        is_valid_half_month(input[4]) &&
         islower(input[7]) && islower(input[8])) {
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_COMET_FULL;
@@ -1167,8 +1189,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     }
 
     /* Check for packed ancient comet */
+    /* Half-month (input[4]) is a calendar code A-Y excluding I */
     if (orig_len == 8 && is_comet_type(input[0]) &&
-        isdigit(input[1]) && isdigit(input[2]) && isdigit(input[3])) {
+        isdigit(input[1]) && isdigit(input[2]) && isdigit(input[3]) &&
+        is_valid_half_month(input[4])) {
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_COMET_ANCIENT;
         strcpy(info->subtype, "comet ancient provisional");
@@ -1177,10 +1201,11 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
 
     /* Check for packed BCE comet: T + prefix + 2-digit code + half-month + 2-char order + fragment */
     /* e.g., "C.53P010" - must NOT contain space (which would indicate unpacked) */
+    /* Half-month (input[4]) is a calendar code A-Y excluding I */
     if (orig_len == 8 && is_comet_type(input[0]) &&
         (input[1] == '/' || input[1] == '.' || input[1] == '-') &&
         isdigit(input[2]) && isdigit(input[3]) &&  /* 2-digit year code */
-        isupper(input[4]) &&                        /* half-month letter */
+        is_valid_half_month(input[4]) &&            /* half-month letter (A-Y excl I) */
         strchr(input, ' ') == NULL) {               /* no space = packed format */
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_COMET_BCE;
@@ -1284,16 +1309,18 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
             return MPC_OK;
         }
         /* Standard provisional (asteroids only I-L for 1800-2199) */
+        /* Half-month (buf[3]) is A-Y excluding I; order letter (buf[6]) is A-Z excluding I */
         if (buf[0] >= 'I' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
-            isupper(buf[3]) && isupper(buf[6])) {
+            is_valid_half_month(buf[3]) && isupper(buf[6]) && buf[6] != 'I') {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PROVISIONAL;
             strcpy(info->subtype, "provisional");
             return MPC_OK;
         }
         /* Comet provisional (A-L for 1000-2199) */
+        /* Half-month (buf[3]) is a calendar code A-Y excluding I */
         if (buf[0] >= 'A' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
-            isupper(buf[3]) && (islower(buf[6]) || buf[6] == '0')) {
+            is_valid_half_month(buf[3]) && (islower(buf[6]) || buf[6] == '0')) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_PROVISIONAL;
             strcpy(info->subtype, "comet provisional");
@@ -1302,9 +1329,10 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     }
 
     /* Check for packed comet provisional with 2-letter fragment (8 chars) */
+    /* Half-month (buf[3]) is a calendar code A-Y excluding I */
     if (len == 8) {
         if (buf[0] >= 'A' && buf[0] <= 'L' && isdigit(buf[1]) && isdigit(buf[2]) &&
-            isupper(buf[3]) && islower(buf[6]) && islower(buf[7])) {
+            is_valid_half_month(buf[3]) && islower(buf[6]) && islower(buf[7])) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_PROVISIONAL;
             strcpy(info->subtype, "comet provisional with 2-letter fragment");

@@ -348,6 +348,9 @@ sub pack_provisional {
     if ($unpacked =~ /^([AB])(\d)(\d{2}) ([A-Z])([A-Z])$/) {
         my ($prefix, $century_digit, $year_short, $half_month, $second_letter) = ($1, $2, $3, $4, $5);
 
+        die "Invalid half-month letter: $half_month\n" unless is_valid_half_month($half_month);
+        die "Invalid second letter: I (letter I is not used in provisional designations)\n" if $second_letter eq 'I';
+
         my $century_code;
         if ($century_digit eq '8') {
             $century_code = 'I';
@@ -367,6 +370,7 @@ sub pack_provisional {
         my ($year, $half_month, $second_letter, $order_str) = ($1, $2, $3, $4);
 
         die "Invalid half-month letter: $half_month\n" unless is_valid_half_month($half_month);
+        die "Invalid second letter: I (letter I is not used in provisional designations)\n" if $second_letter eq 'I';
 
         # Asteroid provisionals: only years 1800-2199 valid
         my $year_int = int($year);
@@ -431,6 +435,10 @@ sub pack_comet_provisional {
 
     if ($unpacked =~ /^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$/) {
         my ($year, $half_month, $order_num, $fragment) = ($1, $2, $3, $4);
+
+        # Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+        # The fragment legitimately includes I per MPC data and is NOT checked here.
+        die "Invalid half-month letter: $half_month\n" unless is_valid_half_month($half_month);
 
         die "Comet order number must be positive: $order_num\n" if $order_num < 1;
 
@@ -573,6 +581,9 @@ sub decode_bce_year {
 sub pack_ancient_comet_provisional {
     my ($comet_type, $year, $half_month, $order_num, $fragment) = @_;
     $fragment //= '';
+
+    # Half-month is a calendar code (A-Y skipping I), object-type independent.
+    die "Invalid half-month letter: $half_month\n" unless is_valid_half_month($half_month);
 
     my $order_encoded = encode_cycle_count($order_num);
     my $fragment_code = $fragment eq '' ? '0' : lc($fragment);
@@ -726,27 +737,27 @@ sub detect_format {
 
     # Check for packed full comet (12 chars)
     if (length($designation) == 12) {
-        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$/) {
+        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (12-char)' };
         }
     }
 
     # Check for packed comet (8 chars)
     if (length($designation) == 8) {
-        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$/) {
+        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (8-char)' };
         }
-        if ($designation =~ /^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/) {
+        if ($designation =~ /^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
             return { format => 'packed', type => 'comet_ancient', subtype => 'comet ancient provisional' };
         }
-        if ($designation =~ /^([PCDXAI])([\/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/) {
+        if ($designation =~ /^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
             return { format => 'packed', type => 'comet_bce', subtype => 'comet BCE provisional' };
         }
     }
 
     # Check for packed comet with 2-letter fragment (9 chars)
     if (length($designation) == 9) {
-        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$/) {
+        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (9-char)' };
         }
     }
@@ -758,7 +769,7 @@ sub detect_format {
 
     # Packed satellite (8 chars starting with S)
     if (length($des) == 8 && substr($des, 0, 1) eq 'S') {
-        if ($des =~ /^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$/) {
+        if ($des =~ /^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$/) {
             my $planet = substr($des, 4, 1);
             my $name = $SATELLITE_PLANET_NAMES{$planet} // $planet;
             return { format => 'packed', type => 'satellite', subtype => "natural satellite ($name)" };
@@ -798,7 +809,7 @@ sub detect_format {
                 return { format => 'packed', type => 'provisional_extended', subtype => 'provisional extended' };
             }
         }
-        if ($des =~ /^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$/) {
+        if ($des =~ /^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$/) {
             return { format => 'packed', type => 'provisional', subtype => 'provisional' };
         }
         if ($des =~ /^PLS\d{4}$/) {
@@ -807,7 +818,7 @@ sub detect_format {
         if ($des =~ /^T[123]S\d{4}$/) {
             return { format => 'packed', type => 'survey', subtype => 'survey (Trojan)' };
         }
-        if ($des =~ /^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/) {
+        if ($des =~ /^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/) {
             return { format => 'packed', type => 'comet_provisional', subtype => 'comet provisional' };
         }
     }

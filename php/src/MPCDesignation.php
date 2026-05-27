@@ -361,6 +361,13 @@ class MPCDesignation {
             $halfMonth = $matches[3];
             $secondLetter = $matches[4];
 
+            if (!self::isValidHalfMonth($halfMonth)) {
+                throw new MPCDesignationException("Invalid half-month letter: $halfMonth");
+            }
+            if ($secondLetter === 'I') {
+                throw new MPCDesignationException("Invalid second letter: I (letter I is not used in provisional designations)");
+            }
+
             $centuryCode = match($centuryDigit) {
                 '8' => 'I',
                 '9' => 'J',
@@ -383,6 +390,9 @@ class MPCDesignation {
 
         if (!self::isValidHalfMonth($halfMonth)) {
             throw new MPCDesignationException("Invalid half-month letter: $halfMonth");
+        }
+        if ($secondLetter === 'I') {
+            throw new MPCDesignationException("Invalid second letter: I (letter I is not used in provisional designations)");
         }
 
         $century = (int)substr($year, 0, 2);
@@ -499,6 +509,12 @@ class MPCDesignation {
         $halfMonth = $matches[2];
         $orderStr = $matches[3];
         $fragment = $matches[4] ?? null;
+
+        // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+        // The fragment legitimately includes I per MPC data and is NOT checked here.
+        if (!self::isValidHalfMonth($halfMonth)) {
+            throw new MPCDesignationException("Invalid half-month letter: $halfMonth");
+        }
 
         if (!is_numeric($orderStr) || bccomp($orderStr, (string)PHP_INT_MAX) > 0) {
             throw new MPCDesignationException("Comet order number out of range (overflow): $orderStr");
@@ -668,6 +684,10 @@ class MPCDesignation {
     // =========================================================================
 
     private static function packAncientCometProvisional(string $cometType, int $year, string $halfMonth, int $orderNum, string $fragment): string {
+        // Half-month is a calendar code (A-Y skipping I), object-type independent.
+        if (!self::isValidHalfMonth($halfMonth)) {
+            throw new MPCDesignationException("Invalid half-month letter: $halfMonth");
+        }
         $orderEncoded = self::encodeCycleCount($orderNum);
         $fragmentCode = $fragment === '' ? '0' : strtolower($fragment);
 
@@ -853,35 +873,35 @@ class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (strlen($designation) === 12) {
-            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$/', $designation)) {
+            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (12-char)');
             }
         }
 
         // Check for packed comet designation (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (8-char)');
             }
         }
 
         // Check for packed comet with 2-letter fragment (9 chars)
         if (strlen($designation) === 9 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (9-char, 2-letter fragment)');
             }
         }
 
         // Check for packed ancient comet (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_ancient', 'comet with ancient provisional (year < 1000)');
             }
         }
 
         // Check for packed BCE comet (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([\/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_bce', 'comet with BCE provisional');
             }
         }
@@ -893,7 +913,7 @@ class MPCDesignation {
 
         // Check for packed satellite designation (8 chars starting with S)
         if (strlen($des) === 8 && $des[0] === 'S') {
-            if (preg_match('/^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$/', $des)) {
+            if (preg_match('/^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$/', $des)) {
                 $planet = $des[4];
                 $planetName = self::SATELLITE_PLANET_NAMES[$planet] ?? $planet;
                 return new FormatInfo('packed', 'satellite', "natural satellite ($planetName)");
@@ -940,7 +960,7 @@ class MPCDesignation {
                 }
             }
 
-            if (preg_match('/^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$/', $des)) {
+            if (preg_match('/^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$/', $des)) {
                 return new FormatInfo('packed', 'provisional', 'provisional');
             }
 
@@ -952,7 +972,7 @@ class MPCDesignation {
                 return new FormatInfo('packed', 'survey', "survey (Trojan T-{$des[1]})");
             }
 
-            if (preg_match('/^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/', $des)) {
+            if (preg_match('/^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/', $des)) {
                 return new FormatInfo('packed', 'comet_provisional', 'comet provisional');
             }
         }
@@ -1178,7 +1198,7 @@ class MPCDesignation {
         }
 
         // Packed provisional comet with fragment: "DJ93F02a" (8 chars: type + provisional + fragment)
-        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]$/', $desig)) {
+        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9][a-z]$/', $desig)) {
             return true;
         }
 
@@ -1203,7 +1223,7 @@ class MPCDesignation {
         }
 
         // Packed provisional comet: "DJ93F02a" -> "A" (8 chars: type + provisional + fragment)
-        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z])$/', $desig, $matches)) {
+        if (preg_match('/^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9]([a-z])$/', $desig, $matches)) {
             return strtoupper($matches[1]);
         }
 
@@ -1228,7 +1248,7 @@ class MPCDesignation {
         }
 
         // Packed provisional comet: "DJ93F02a" -> "DJ93F020"
-        if (preg_match('/^([A-L]\d{2}[A-Z]\d{2})[a-z]$/', $desig, $matches)) {
+        if (preg_match('/^([A-L]\d{2}[A-Z][0-9A-Za-z][0-9])[a-z]$/', $desig, $matches)) {
             return $matches[1] . '0';
         }
 

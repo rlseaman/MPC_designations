@@ -110,7 +110,16 @@ Chars:  0-9   A-Z    a-z
 | K | 20 | 2000-2099 | 2024 |
 | L | 21 | 2100-2199 | (future) |
 
-**Note**: Century codes A-H are defined but rarely used (ancient designations).
+**Note**: For *minor-planet (asteroid) provisional* designations, only **I-L**
+(1800-2199) are valid — and in practice only **1892 onward**, since the systematic
+provisional-designation scheme began in 1892 and no asteroid was designated before
+it. Century codes **A-H** (1000-1799) are listed here only for completeness of the
+code↔year mapping; they apply **exclusively to comet provisional designations**
+(ancient comets, back to ~1000 CE — see the Comet Provisional section) and **must be
+rejected for asteroid provisionals**. Detection patterns must therefore use `[I-L]`
+for asteroid provisionals and `[A-L]` for comet provisionals — conflating the two is
+how survey tracklet IDs such as Catalina's `C03UYWZ` (century `C` = 1200s) wrongly
+matched the asteroid branch.
 
 ### 2.3 Half-Month Codes (24 values, I is skipped)
 

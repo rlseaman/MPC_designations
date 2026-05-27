@@ -134,6 +134,16 @@ is_lower() {
     esac
 }
 
+# Check if character is a valid half-month letter (A-Y excluding I).
+# Half-month is a calendar code, object-type independent (asteroids and comets
+# alike). The fragment letters of comets are a separate field and DO include I.
+is_valid_half_month() {
+    case "$1" in
+        [A-HJ-Y]) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 # Remove leading zeros from number
 strip_leading_zeros() {
     local num="$1"
@@ -604,15 +614,12 @@ detect_format() {
     fi
 
     # Packed provisional asteroid (7 chars starting with century code)
+    # Century I-L (1800-2199); half-month A-Y skipping I; 6th char always a
+    # digit; order letter A-Z skipping I. Reject anything else.
     if [ "$len" -eq 7 ]; then
-        case "$first" in
-            [IJKL])
-                case "$desig" in
-                    */*) ;;
-                    *) echo "packed_provisional"; return ;;
-                esac
-                ;;
-        esac
+        if [[ "$desig" =~ ^[IJKL][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$ ]]; then
+            echo "packed_provisional"; return
+        fi
         # Packed survey (7 chars starting with PLS, T1S, T2S, T3S)
         local prefix="${desig:0:3}"
         case "$prefix" in
@@ -624,12 +631,18 @@ detect_format() {
     fi
 
     # Packed provisional comet (8-9 chars) or satellite (8 chars)
+    # Half-month (index 4) is a calendar code A-Y skipping I, object-type
+    # independent; reject invalid letters so I/Z never decode as a comet.
     if [ "$len" -eq 8 ] || [ "$len" -eq 9 ]; then
         local second="${desig:1:1}"
         case "$first" in
             [PDCXA])
                 case "$second" in
-                    [A-L]) echo "packed_provisional_comet"; return ;;
+                    [A-L])
+                        if is_valid_half_month "${desig:4:1}"; then
+                            echo "packed_provisional_comet"; return
+                        fi
+                        ;;
                 esac
                 ;;
             S)
@@ -671,10 +684,24 @@ detect_format() {
     esac
 
     # Unpacked provisional comet (with or without fragment)
+    # Validate the half-month (the letter after the year+space): it is a
+    # calendar code A-Y skipping I, object-type independent. Reject invalid
+    # letters (e.g. I or Z) so they fall through to "unable to detect format".
+    # The fragment (after the order digits) legitimately includes I and is
+    # not checked here.
     case "$desig" in
         [PDCXA]/*)
-            echo "unpacked_provisional_comet"
-            return
+            if [[ "$desig" =~ ^[PDCXA]/-?[0-9]+\ ([A-Za-z]) ]]; then
+                if is_valid_half_month "${BASH_REMATCH[1]}"; then
+                    echo "unpacked_provisional_comet"
+                    return
+                fi
+            else
+                # Could not locate a half-month (unusual form); defer to the
+                # packer's own handling rather than silently dropping it.
+                echo "unpacked_provisional_comet"
+                return
+            fi
             ;;
     esac
 

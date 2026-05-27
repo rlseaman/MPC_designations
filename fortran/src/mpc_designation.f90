@@ -990,7 +990,12 @@ contains
                 info%dtype = 'provisional_extended'
                 info%subtype = 'provisional (extended format, cycle >=620)'
                 return
-            else if (index(CENTURY_LETTERS, first) > 0 .and. is_upper(des(7:7)) .and. index(des(1:dlen), ' ') == 0) then
+            else if (index('IJKL', first) > 0 .and. is_valid_half_month(des(4:4)) .and. &
+                     (is_digit(des(5:5)) .or. is_upper(des(5:5)) .or. is_lower(des(5:5))) .and. &
+                     is_digit(des(6:6)) .and. is_upper(des(7:7)) .and. des(7:7) /= 'I' .and. &
+                     index(des(1:dlen), ' ') == 0) then
+                ! Asteroid provisional: century I-L, half-month A-Y skip I,
+                ! cycle-tens base62, cycle-units digit, order letter A-Z skip I
                 info%format = 'packed'
                 info%dtype = 'provisional'
                 info%subtype = 'provisional'
@@ -1000,7 +1005,8 @@ contains
                 info%dtype = 'survey'
                 info%subtype = 'survey'
                 return
-            else if (index('IJKL', first) > 0 .and. (is_digit(des(7:7)) .or. is_lower(des(7:7)))) then
+            else if (index('IJKL', first) > 0 .and. is_valid_half_month(des(4:4)) .and. &
+                     (is_digit(des(7:7)) .or. is_lower(des(7:7)))) then
                 info%format = 'packed'
                 info%dtype = 'comet_provisional'
                 info%subtype = 'comet provisional'
@@ -1017,6 +1023,9 @@ contains
         end if
 
         ! Packed comet full (8 chars with comet type prefix, no spaces)
+        ! Half-month (position 5) is a calendar code A-Y skipping I, object-type
+        ! independent. Asteroid-style provisional (uppercase order at pos 8) is
+        ! handled by unpack_provisional which validates its own half-month at pos 4.
         if (dlen == 8 .and. index(COMET_TYPES, first) > 0 .and. index(des(1:dlen), ' ') == 0) then
             ! Check if it's asteroid-style or comet-style provisional
             if (is_upper(des(8:8))) then
@@ -1024,17 +1033,18 @@ contains
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
                 return
-            else if (is_digit(des(2:2))) then
+            else if (is_digit(des(2:2)) .and. is_valid_half_month(des(5:5))) then
                 info%format = 'packed'
                 info%dtype = 'comet_ancient'
                 info%subtype = 'comet with ancient provisional'
                 return
-            else if (des(2:2) == '/' .or. des(2:2) == '.' .or. des(2:2) == '-') then
+            else if ((des(2:2) == '/' .or. des(2:2) == '.' .or. des(2:2) == '-') .and. &
+                     is_valid_half_month(des(5:5))) then
                 info%format = 'packed'
                 info%dtype = 'comet_bce'
                 info%subtype = 'comet with BCE year'
                 return
-            else
+            else if (is_valid_half_month(des(5:5))) then
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
@@ -1045,7 +1055,8 @@ contains
         ! Packed comet with 2-letter fragment (9 chars)
         if (dlen == 9 .and. index(COMET_TYPES, first) > 0 .and. index(des(1:dlen), ' ') == 0) then
             ! Check for format: comet type + century letter + 2-digit year + halfmonth + 2-char order + 2-char fragment
-            if (is_upper(des(2:2)) .and. is_lower(des(8:8)) .and. is_lower(des(9:9))) then
+            if (is_upper(des(2:2)) .and. is_valid_half_month(des(5:5)) .and. &
+                is_lower(des(8:8)) .and. is_lower(des(9:9))) then
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (9-char, fragment)'
@@ -1351,6 +1362,13 @@ contains
                     return
                 end if
 
+                ! Order/second letter: I is not used in provisional designations
+                if (second_letter == 'I') then
+                    call set_error('Invalid second letter: I (letter I is not used in provisional designations)')
+                    packed = ''
+                    return
+                end if
+
                 ! Get order number if present
                 if (len_trim(u) > 7) then
                     read(u(8:), '(I10)', iostat=ios) order_num
@@ -1413,6 +1431,13 @@ contains
         ! Second letter must be a letter (not a digit)
         if (.not. (is_upper(second_letter) .or. is_lower(second_letter))) then
             call set_error('Second letter must be alphabetic')
+            packed = ''
+            return
+        end if
+
+        ! Order/second letter: I is not used in provisional designations
+        if (second_letter == 'I' .or. second_letter == 'i') then
+            call set_error('Invalid second letter: I (letter I is not used in provisional designations)')
             packed = ''
             return
         end if
@@ -1576,6 +1601,12 @@ contains
             end if
 
             half_month = prov_part(1:1)
+            ! Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+            if (.not. is_valid_half_month(half_month)) then
+                call set_error('Invalid half-month letter')
+                packed = ''
+                return
+            end if
             read(prov_part(2:), '(I10)', iostat=ios) order_num
             if (ios /= 0) order_num = 1
 
@@ -1585,6 +1616,12 @@ contains
         else if (year < 1000) then
             ! Ancient year (1-999): use 3-digit year
             half_month = prov_part(1:1)
+            ! Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+            if (.not. is_valid_half_month(half_month)) then
+                call set_error('Invalid half-month letter')
+                packed = ''
+                return
+            end if
             read(prov_part(2:), '(I10)', iostat=ios) order_num
             if (ios /= 0) order_num = 1
 
@@ -1601,6 +1638,12 @@ contains
         else
             ! Comet-style: read half-month and order
             half_month = prov_part(1:1)
+            ! Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+            if (.not. is_valid_half_month(half_month)) then
+                call set_error('Invalid half-month letter')
+                packed = ''
+                return
+            end if
             read(prov_part(2:), '(I10)', iostat=ios) order_num
             if (ios /= 0) order_num = 1
 

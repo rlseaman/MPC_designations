@@ -364,6 +364,15 @@ object MPCDesignation {
             val halfMonth = match.groupValues[3][0]
             val secondLetter = match.groupValues[4][0]
 
+            // Letter I is not used in either letter position
+            if (!isValidHalfMonth(halfMonth)) {
+                throw MPCDesignationException("Invalid half-month letter: $halfMonth")
+            }
+            if (secondLetter == 'I') {
+                throw MPCDesignationException(
+                    "Invalid second letter: I (letter I is not used in provisional designations)")
+            }
+
             val centuryCode = when (centuryDigit) {
                 '8' -> 'I'
                 '9' -> 'J'
@@ -386,6 +395,12 @@ object MPCDesignation {
 
         if (!isValidHalfMonth(halfMonth)) {
             throw MPCDesignationException("Invalid half-month letter: $halfMonth")
+        }
+
+        // Letter I is not used in either letter position
+        if (secondLetter == 'I') {
+            throw MPCDesignationException(
+                "Invalid second letter: I (letter I is not used in provisional designations)")
         }
 
         val century = year.substring(0, 2).toInt()
@@ -498,6 +513,12 @@ object MPCDesignation {
         val halfMonth = match.groupValues[2][0]
         val orderStr = match.groupValues[3]
         val fragment = match.groupValues[4].takeIf { it.isNotEmpty() }
+
+        // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+        // The fragment (group 4) legitimately includes I per MPC data and is NOT checked here.
+        if (!isValidHalfMonth(halfMonth)) {
+            throw MPCDesignationException("Invalid half-month letter: $halfMonth")
+        }
 
         val orderNum = try {
             val orderLong = orderStr.toLong()
@@ -677,6 +698,10 @@ object MPCDesignation {
         orderNum: Int,
         fragment: String
     ): String {
+        // Half-month is a calendar code (A-Y skipping I), object-type independent.
+        if (!isValidHalfMonth(halfMonth)) {
+            throw MPCDesignationException("Invalid half-month letter: $halfMonth")
+        }
         val orderEncoded = encodeCycleCount(orderNum)
         val fragmentCode = if (fragment.isEmpty()) "0" else fragment.lowercase()
 
@@ -880,7 +905,7 @@ object MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length == 12) {
-            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$""")
+            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (12-char)")
             }
@@ -888,7 +913,7 @@ object MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$""")
+            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (8-char)")
             }
@@ -896,7 +921,7 @@ object MPCDesignation {
 
         // Check for packed comet with 2-letter fragment (9 chars)
         if (designation.length == 9 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$""")
+            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (9-char, 2-letter fragment)")
             }
@@ -904,7 +929,7 @@ object MPCDesignation {
 
         // Check for packed ancient comet (8 chars)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$""")
+            val pattern = Regex("""^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_ancient", "comet with ancient provisional (year < 1000)")
             }
@@ -912,7 +937,7 @@ object MPCDesignation {
 
         // Check for packed BCE comet (8 chars)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$""")
+            val pattern = Regex("""^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_bce", "comet with BCE provisional")
             }
@@ -925,7 +950,7 @@ object MPCDesignation {
 
         // Check for packed satellite designation (8 chars starting with S)
         if (des.length == 8 && des[0] == 'S') {
-            val pattern = Regex("""^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$""")
+            val pattern = Regex("""^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$""")
             if (pattern.matches(des)) {
                 val planet = des[4]
                 val planetName = satellitePlanetNames[planet] ?: planet.toString()
@@ -984,7 +1009,7 @@ object MPCDesignation {
             }
 
             // Standard provisional
-            val provPattern = Regex("""^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$""")
+            val provPattern = Regex("""^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$""")
             if (provPattern.matches(des)) {
                 return Info(FormatType.PACKED, "provisional", "provisional")
             }
@@ -1000,7 +1025,7 @@ object MPCDesignation {
             }
 
             // Check for packed comet provisional (7 chars)
-            val cometProvPattern = Regex("""^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$""")
+            val cometProvPattern = Regex("""^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$""")
             if (cometProvPattern.matches(des)) {
                 return Info(FormatType.PACKED, "comet_provisional", "comet provisional")
             }
@@ -1260,7 +1285,7 @@ object MPCDesignation {
         }
 
         // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa" (8-9 chars)
-        if (Regex("""^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]{1,2}$""").matches(d)) {
+        if (Regex("""^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9][a-z]{1,2}$""").matches(d)) {
             return true
         }
 
@@ -1291,7 +1316,7 @@ object MPCDesignation {
         }
 
         // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa"
-        Regex("""^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z]{1,2})$""").find(d)?.let {
+        Regex("""^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9]([a-z]{1,2})$""").find(d)?.let {
             return it.groupValues[1].uppercase()
         }
 
@@ -1321,7 +1346,7 @@ object MPCDesignation {
         }
 
         // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
-        Regex("""^([A-L]\d{2}[A-Z]\d{2})[a-z]{1,2}$""").find(d)?.let {
+        Regex("""^([A-L]\d{2}[A-Z][0-9A-Za-z][0-9])[a-z]{1,2}$""").find(d)?.let {
             return it.groupValues[1] + "0"
         }
 

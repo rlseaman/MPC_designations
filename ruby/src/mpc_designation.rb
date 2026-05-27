@@ -382,6 +382,9 @@ module MPCDesignation
         half_month = match[3]
         second_letter = match[4]
 
+        raise Error, "Invalid half-month letter: #{half_month}" unless valid_half_month?(half_month)
+        raise Error, "Invalid second letter: I (letter I is not used in provisional designations)" if second_letter == 'I'
+
         century_code = case century_digit
                        when '8' then 'I'
                        when '9' then 'J'
@@ -402,6 +405,7 @@ module MPCDesignation
       order_str = match[4]
 
       raise Error, "Invalid half-month letter: #{half_month}" unless valid_half_month?(half_month)
+      raise Error, "Invalid second letter: I (letter I is not used in provisional designations)" if second_letter == 'I'
 
       # Asteroid provisionals: only years 1800-2199 valid
       year_int = year.to_i
@@ -462,6 +466,10 @@ module MPCDesignation
       half_month = match[2]
       order_num = match[3].to_i
       fragment = match[4]
+
+      # Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+      # The fragment legitimately includes I per MPC data and is NOT checked here.
+      raise Error, "Invalid half-month letter: #{half_month}" unless valid_half_month?(half_month)
 
       raise Error, "Comet order number must be positive: #{order_num}" if order_num < 1
 
@@ -607,6 +615,8 @@ module MPCDesignation
     # =============================================================================
 
     def pack_ancient_comet_provisional(comet_type, year, half_month, order_num, fragment = '')
+      # Half-month is a calendar code (A-Y skipping I), object-type independent.
+      raise Error, "Invalid half-month letter: #{half_month}" unless valid_half_month?(half_month)
       order_encoded = encode_cycle_count(order_num)
       fragment_code = fragment.empty? ? '0' : fragment.downcase
 
@@ -759,7 +769,7 @@ module MPCDesignation
 
       # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
       if designation.length == 12
-        if designation.match(/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$/)
+        if designation.match(/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/)
           result['format'] = 'packed'
           result['type'] = 'comet_full'
           result['subtype'] = 'comet with provisional designation (12-char)'
@@ -769,7 +779,7 @@ module MPCDesignation
 
       # Check for packed comet designation (8 chars)
       if designation.length == 8
-        if designation.match(/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$/)
+        if designation.match(/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/)
           result['format'] = 'packed'
           result['type'] = 'comet_full'
           result['subtype'] = 'comet with provisional designation (8-char)'
@@ -779,7 +789,7 @@ module MPCDesignation
 
       # Check for packed comet with 2-letter fragment (9 chars)
       if designation.length == 9
-        if designation.match(/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$/)
+        if designation.match(/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$/)
           result['format'] = 'packed'
           result['type'] = 'comet_full'
           result['subtype'] = 'comet with provisional designation (9-char, 2-letter fragment)'
@@ -789,7 +799,7 @@ module MPCDesignation
 
       # Check for packed ancient comet (8 chars)
       if designation.length == 8
-        if designation.match(/^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/)
+        if designation.match(/^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/)
           result['format'] = 'packed'
           result['type'] = 'comet_ancient'
           result['subtype'] = 'comet with ancient provisional (year < 1000)'
@@ -799,7 +809,7 @@ module MPCDesignation
 
       # Check for packed BCE comet (8 chars)
       if designation.length == 8
-        if designation.match(/^([PCDXAI])([\/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/)
+        if designation.match(/^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/)
           result['format'] = 'packed'
           result['type'] = 'comet_bce'
           result['subtype'] = 'comet with BCE provisional'
@@ -812,7 +822,7 @@ module MPCDesignation
 
       # Check for packed satellite designation (8 chars starting with S)
       if des.length == 8 && des[0] == 'S'
-        if des.match(/^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$/)
+        if des.match(/^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$/)
           result['format'] = 'packed'
           result['type'] = 'satellite'
           planet = des[4]
@@ -858,7 +868,7 @@ module MPCDesignation
             return result
           end
         end
-        if des.match(/^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$/)
+        if des.match(/^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$/)
           result['format'] = 'packed'
           result['type'] = 'provisional'
           result['subtype'] = 'provisional'
@@ -903,7 +913,7 @@ module MPCDesignation
 
       # Check for packed comet provisional (7 chars starting with century code)
       if des.length == 7
-        if des.match(/^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/)
+        if des.match(/^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/)
           result['format'] = 'packed'
           result['type'] = 'comet_provisional'
           result['subtype'] = 'comet provisional'

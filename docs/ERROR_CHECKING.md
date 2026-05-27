@@ -47,10 +47,10 @@ All implementations check for invalid whitespace characters:
 
 | Check | C | Python | TCL | Description |
 |-------|---|--------|-----|-------------|
-| Invalid century code | Yes | Yes | Yes | Only A-L valid |
+| Invalid century code | Yes | Yes | Yes | Asteroid provisional: I-L (1800-2199); comet provisional: A-L (1000-2199) |
 | Invalid comet type | Yes | Yes | Yes | Only P, C, D, X, A, I valid |
 | Invalid planet code | Yes | Yes | Yes | Only J, S, U, N valid |
-| Invalid half-month letter | No | No | No | Letter I accepted (known gap) |
+| Invalid half-month letter | Yes | Yes | Yes | Half-month I (A-Y skipping I) and order letter I now rejected in detection and pack |
 | Invalid survey code | Partial | Yes | Yes | Varies by implementation |
 | Comet fragment validation | No | Partial | Partial | Numeric fragments accepted |
 
@@ -117,7 +117,12 @@ category,subcategory,input,expected_error,description
 The following validations are currently missing or incomplete:
 
 1. **Unicode handling:** Unicode characters outside ASCII are not consistently rejected
-2. **Half-month letter I:** The letter 'I' is not used as a half-month designation but is currently accepted
+2. **Half-month / order letter I:** *(Resolved)* The letter 'I' is skipped in both
+   the half-month and second-letter positions. Packed-provisional detection now uses
+   `^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$` and the pack path rejects `I` in
+   both letter positions, across all implementations. This also closed a class of
+   silent mis-conversions (e.g. `K95I00A`→`2095 IA`) and stopped survey tracklet IDs
+   such as Catalina's `C03UYWZ` from matching the asteroid-provisional branch.
 3. **Comet order zero:** `C/1995 A0` should be rejected (order numbers start at 1)
 4. **Satellite zero:** `S/2019 J 0` should be rejected (numbers start at 1)
 5. **Survey zero:** `0 P-L` should be rejected (survey numbers are positive)

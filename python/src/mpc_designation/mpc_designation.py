@@ -576,6 +576,12 @@ def pack_provisional(unpacked: str) -> str:
         half_month = match.group(3)
         second_letter = match.group(4)
 
+        # Letter I is not used in either letter position
+        if not is_valid_half_month(half_month):
+            raise MPCDesignationError(f"Invalid half-month letter: {half_month}")
+        if second_letter == 'I':
+            raise MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)")
+
         # Convert century digit to century code: 8->18(I), 9->19(J), 0->20(K)
         if century_digit == '8':
             century_code = 'I'
@@ -602,6 +608,10 @@ def pack_provisional(unpacked: str) -> str:
     # Validate half-month letter (I is not used)
     if not is_valid_half_month(half_month):
         raise MPCDesignationError(f"Invalid half-month letter: {half_month}")
+
+    # Validate second (order) letter (I is not used in either letter position)
+    if second_letter == 'I':
+        raise MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)")
 
     century = year[0:2]
     year_short = year[2:4]
@@ -690,6 +700,11 @@ def pack_comet_provisional(unpacked: str) -> str:
     half_month = match.group(2)
     order_num = int(match.group(3))
     fragment = match.group(4)
+
+    # Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+    # The fragment (group 4) legitimately includes I per MPC data and is NOT checked here.
+    if not is_valid_half_month(half_month):
+        raise MPCDesignationError(f"Invalid half-month letter: {half_month}")
 
     # Comet order number must be positive
     if order_num < 1:
@@ -901,6 +916,9 @@ def pack_ancient_comet_provisional(comet_type: str, year: int, half_month: str,
     Pack an ancient or BCE comet provisional designation.
     Format for year 1-999: TYYYHNNN where T=type, YYY=3-digit year, H=half-month, NNN=order+fragment
     """
+    # Half-month is a calendar code (A-Y skipping I), object-type independent.
+    if not is_valid_half_month(half_month):
+        raise MPCDesignationError(f"Invalid half-month letter: {half_month}")
     order_encoded = encode_cycle_count(order_num)
     fragment_code = "0" if not fragment else fragment.lower()
 
@@ -1094,7 +1112,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if len(designation) == 12:
-        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$', designation):
+        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (12-char)'
@@ -1102,7 +1120,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed comet designation (8 chars: type + 7 char provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$', designation):
+        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (8-char)'
@@ -1110,7 +1128,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed comet with 2-letter fragment (9 chars)
     if len(designation) == 9:
-        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$', designation):
+        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (9-char, 2-letter fragment)'
@@ -1118,7 +1136,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed ancient comet (8 chars: type + 3-digit year + provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$', designation):
+        if re.match(r'^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_ancient'
             result['subtype'] = 'comet with ancient provisional (year < 1000)'
@@ -1126,7 +1144,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed BCE comet (8 chars: type + BCE prefix + code + provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$', designation):
+        if re.match(r'^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_bce'
             result['subtype'] = 'comet with BCE provisional'
@@ -1139,7 +1157,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed satellite designation (8 chars starting with S)
     if len(des) == 8 and des[0] == 'S':
-        if re.match(r'^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$', des):
+        if re.match(r'^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$', des):
             result['format'] = 'packed'
             result['type'] = 'satellite'
             planet = des[4]
@@ -1181,7 +1199,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
                 result['subtype'] = 'provisional (extended format, cycle >=620)'
                 return result
         # Standard provisional or survey (asteroids only I-L for 1800-2199)
-        if re.match(r'^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$', des):
+        if re.match(r'^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$', des):
             result['format'] = 'packed'
             result['type'] = 'provisional'
             result['subtype'] = 'provisional'
@@ -1213,16 +1231,10 @@ def detect_format(designation: str) -> Dict[str, Any]:
     # Check for packed comet provisional (7 or 8 chars starting with century code)
     # 7-char: J95O010 (no fragment or single char), 8-char: J95O01aa (2-letter fragment)
     if len(des) == 7:
-        if re.match(r'^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', des):
+        if re.match(r'^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_provisional'
             result['subtype'] = 'comet provisional'
-            return result
-    if len(des) == 8:
-        if re.match(r'^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2}$', des):
-            result['format'] = 'packed'
-            result['type'] = 'comet_provisional'
-            result['subtype'] = 'comet provisional with 2-letter fragment'
             return result
 
     # --- UNPACKED FORMATS ---

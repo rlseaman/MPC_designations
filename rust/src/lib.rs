@@ -471,6 +471,14 @@ fn pack_provisional(unpacked: &str) -> Result<String> {
         let half_month = caps[4].chars().next().unwrap();
         let second_letter = caps[5].chars().next().unwrap();
 
+        // Letter I is not used in either letter position
+        if !is_valid_half_month(half_month) {
+            return Err(MPCDesignationError::new(format!("Invalid half-month letter: {}", half_month)));
+        }
+        if second_letter == 'I' {
+            return Err(MPCDesignationError::new("Invalid second letter: I (letter I is not used in provisional designations)"));
+        }
+
         let century_code = match century_digit {
             '8' => 'I',
             '9' => 'J',
@@ -492,6 +500,11 @@ fn pack_provisional(unpacked: &str) -> Result<String> {
 
         if !is_valid_half_month(half_month) {
             return Err(MPCDesignationError::new(format!("Invalid half-month letter: {}", half_month)));
+        }
+
+        // Letter I is not used in either letter position
+        if second_letter == 'I' {
+            return Err(MPCDesignationError::new("Invalid second letter: I (letter I is not used in provisional designations)"));
         }
 
         // Asteroid provisionals: only years 1800-2199 valid
@@ -578,6 +591,12 @@ fn pack_comet_provisional(unpacked: &str) -> Result<String> {
             MPCDesignationError::new(format!("Invalid order number: {}", &caps[3]))
         })?;
         let fragment = caps.get(4).map(|m| m.as_str()).unwrap_or("");
+
+        // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+        // The fragment (group 4) legitimately includes I per MPC data and is NOT checked here.
+        if !is_valid_half_month(half_month) {
+            return Err(MPCDesignationError::new(format!("Invalid half-month letter: {}", half_month)));
+        }
 
         if order_num < 1 {
             return Err(MPCDesignationError::new(format!("Comet order number must be positive: {}", order_num)));
@@ -762,6 +781,10 @@ fn is_ancient_year(year: i32) -> bool {
 // =============================================================================
 
 fn pack_ancient_comet_provisional(comet_type: char, year: i32, half_month: char, order_num: u32, fragment: &str) -> Result<String> {
+    // Half-month is a calendar code (A-Y skipping I), object-type independent.
+    if !is_valid_half_month(half_month) {
+        return Err(MPCDesignationError::new(format!("Invalid half-month letter: {}", half_month)));
+    }
     let order_encoded = encode_cycle_count(order_num)?;
     let fragment_code = if fragment.is_empty() { "0".to_string() } else { fragment.to_lowercase() };
 
@@ -942,7 +965,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed full comet designation (12 chars with spaces)
     if designation.len() == 12 {
-        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (12-char)".to_string();
@@ -952,7 +975,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet designation (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (8-char)".to_string();
@@ -962,7 +985,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet with 2-letter fragment (9 chars)
     if designation.len() == 9 {
-        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (9-char, 2-letter fragment)".to_string();
@@ -972,7 +995,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed ancient comet (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_ancient".to_string();
             info.subtype = "comet with ancient provisional (year < 1000)".to_string();
@@ -982,7 +1005,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed BCE comet (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_bce".to_string();
             info.subtype = "comet with BCE provisional".to_string();
@@ -995,7 +1018,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed satellite designation
     if des.len() == 8 && des.starts_with('S') {
-        if regex_captures!(r"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$", des).is_some() {
+        if regex_captures!(r"^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$", des).is_some() {
             let planet = des.chars().nth(4).unwrap();
             info.format = "packed".to_string();
             info.designation_type = "satellite".to_string();
@@ -1040,7 +1063,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
                 return Ok(info);
             }
         }
-        if regex_captures!(r"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$", des).is_some() {
+        if regex_captures!(r"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "provisional".to_string();
             info.subtype = "provisional".to_string();
@@ -1087,7 +1110,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet provisional
     if des.len() == 7 {
-        if regex_captures!(r"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", des).is_some() {
+        if regex_captures!(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_provisional".to_string();
             info.subtype = "comet provisional".to_string();

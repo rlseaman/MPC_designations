@@ -454,6 +454,15 @@ public class MPCDesignation {
             char halfMonth = oldStyleMatcher.group(3).charAt(0);
             char secondLetter = oldStyleMatcher.group(4).charAt(0);
 
+            // Letter I is not used in either letter position
+            if (!isValidHalfMonth(halfMonth)) {
+                throw new MPCDesignationException("Invalid half-month letter: " + halfMonth);
+            }
+            if (secondLetter == 'I') {
+                throw new MPCDesignationException(
+                    "Invalid second letter: I (letter I is not used in provisional designations)");
+            }
+
             char centuryCode;
             switch (centuryDigit) {
                 case '8': centuryCode = 'I'; break;
@@ -480,6 +489,12 @@ public class MPCDesignation {
 
         if (!isValidHalfMonth(halfMonth)) {
             throw new MPCDesignationException("Invalid half-month letter: " + halfMonth);
+        }
+
+        // Letter I is not used in either letter position
+        if (secondLetter == 'I') {
+            throw new MPCDesignationException(
+                "Invalid second letter: I (letter I is not used in provisional designations)");
         }
 
         int yearInt = Integer.parseInt(year);
@@ -604,6 +619,12 @@ public class MPCDesignation {
         char halfMonth = matcher.group(2).charAt(0);
         String orderStr = matcher.group(3);
         String fragment = matcher.group(4);
+
+        // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+        // The fragment (group 4) legitimately includes I per MPC data and is NOT checked here.
+        if (!isValidHalfMonth(halfMonth)) {
+            throw new MPCDesignationException("Invalid half-month letter: " + halfMonth);
+        }
 
         int orderNum;
         try {
@@ -799,6 +820,10 @@ public class MPCDesignation {
     private static String packAncientCometProvisional(char cometType, int year, char halfMonth,
                                                        int orderNum, String fragment)
             throws MPCDesignationException {
+        // Half-month is a calendar code (A-Y skipping I), object-type independent.
+        if (!isValidHalfMonth(halfMonth)) {
+            throw new MPCDesignationException("Invalid half-month letter: " + halfMonth);
+        }
         String orderEncoded = encodeCycleCount(orderNum);
         String fragmentCode = fragment.isEmpty() ? "0" : fragment.toLowerCase();
 
@@ -1030,7 +1055,7 @@ public class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length() == 12) {
-            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation)) {
+            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (12-char)";
@@ -1040,7 +1065,7 @@ public class MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (8-char)";
@@ -1050,7 +1075,7 @@ public class MPCDesignation {
 
         // Check for packed comet with 2-letter fragment (9 chars)
         if (designation.length() == 9 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (9-char, 2-letter fragment)";
@@ -1060,7 +1085,7 @@ public class MPCDesignation {
 
         // Check for packed ancient comet (8 chars)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_ancient";
                 info.subtype = "comet with ancient provisional (year < 1000)";
@@ -1070,7 +1095,7 @@ public class MPCDesignation {
 
         // Check for packed BCE comet (8 chars)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([/.\\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([/.\\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_bce";
                 info.subtype = "comet with BCE provisional";
@@ -1085,7 +1110,7 @@ public class MPCDesignation {
 
         // Check for packed satellite designation (8 chars starting with S)
         if (des.length() == 8 && des.charAt(0) == 'S') {
-            if (Pattern.matches("^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$", des)) {
+            if (Pattern.matches("^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "satellite";
                 char planet = des.charAt(4);
@@ -1161,7 +1186,7 @@ public class MPCDesignation {
             }
 
             // Standard provisional
-            if (Pattern.matches("^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$", des)) {
+            if (Pattern.matches("^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "provisional";
                 info.subtype = "provisional";
@@ -1184,7 +1209,7 @@ public class MPCDesignation {
             }
 
             // Check for packed comet provisional (7 chars)
-            if (Pattern.matches("^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", des)) {
+            if (Pattern.matches("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_provisional";
                 info.subtype = "comet provisional";

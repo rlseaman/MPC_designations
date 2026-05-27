@@ -4,7 +4,16 @@ This document describes the Minor Planet Center (MPC) designation formats for as
 
 ## Reference
 
-Official MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
+- Packed format mechanics: https://www.minorplanetcenter.net/iau/info/PackedDes.html
+- Unpacked provisional-designation rules (defines the half-month / second-letter
+  alphabets and the "letter I is omitted" rule): https://www.minorplanetcenter.net/mpcops/documentation/provisional-designation-definition/
+- New- and old-style designations (pre-1925 A-prefix history): https://www.minorplanetcenter.net/iau/info/OldDesDoc.html
+
+Note: `PackedDes.html` alone does **not** state that the letter `I` is skipped in the
+half-month and second-letter positions, nor that the cycle-units character is always a
+digit. Those rules come from the unpacked-designation definition above and from the
+tens/ones structure of the cycle count. See `COMPLETE_DESIGNATION_REFERENCE.md` §2.1 for
+the authoritative packed-provisional field layout and validation invariants.
 
 ## Overview
 
@@ -48,8 +57,18 @@ Format: `YYYY LLn` where:
 | With cycle | 1995 XB1 | J95X01B | 26th discovery |
 | Extended | 2024 AA631 | _OA004R | Cycle >= 620 uses extended format |
 
-Century codes:
+Century codes (asteroid provisionals): valid range **I-L** = 1800-2199
 - I = 1800s, J = 1900s, K = 2000s, L = 2100s
+
+In practice the earliest is 1892 (`I92...`, rendered as the A-prefix form `A892 …`):
+the systematic provisional scheme began in 1892 and no asteroid was designated before
+it. Comet provisionals extend the range to **A-L** (1000-2199) to cover ancient comets;
+asteroid provisionals must reject century codes A-H.
+
+The packed provisional is `[Century][YY][Half-month][Cycle-tens][Cycle-units][Second-letter]`,
+where the half-month is `A-Y` (skipping `I`, and `Z` unused), the second letter is `A-Z`
+(skipping `I`), and the **cycle-units character is always a digit `0-9`** (the cycle count
+is split tens/units; only the tens character becomes a letter, for counts ≥ 100).
 
 ### Survey Asteroids
 

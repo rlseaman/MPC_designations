@@ -379,6 +379,9 @@ function pack_provisional(unpacked::AbstractString)
         half_month = old_style_match.captures[3][1]
         second_letter = old_style_match.captures[4][1]
 
+        !is_valid_half_month(half_month) && throw(MPCDesignationError("Invalid half-month letter: $half_month"))
+        second_letter == 'I' && throw(MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)"))
+
         century_code = if century_digit == '8'
             'I'
         elseif century_digit == '9'
@@ -402,6 +405,7 @@ function pack_provisional(unpacked::AbstractString)
     order_str = prov_match.captures[4]
 
     !is_valid_half_month(half_month) && throw(MPCDesignationError("Invalid half-month letter: $half_month"))
+    second_letter == 'I' && throw(MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)"))
 
     century = parse(Int, year[1:2])
     year_short = year[3:4]
@@ -514,6 +518,10 @@ function pack_comet_provisional(unpacked::AbstractString)
     half_month = m.captures[2][1]
     order_str = m.captures[3]
     fragment = m.captures[4]
+
+    # Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+    # The fragment legitimately includes I per MPC data and is NOT checked here.
+    !is_valid_half_month(half_month) && throw(MPCDesignationError("Invalid half-month letter: $half_month"))
 
     order_num = tryparse(Int, order_str)
     order_num === nothing && throw(MPCDesignationError("Comet order number out of range (overflow): $order_str"))
@@ -684,6 +692,8 @@ end
 
 function pack_ancient_comet_provisional(comet_type::Char, year::Integer, half_month::Char,
                                          order_num::Integer, fragment::AbstractString)
+    # Half-month is a calendar code (A-Y skipping I), object-type independent.
+    !is_valid_half_month(half_month) && throw(MPCDesignationError("Invalid half-month letter: $half_month"))
     order_encoded = encode_cycle_count(order_num)
     fragment_code = isempty(fragment) ? "0" : lowercase(fragment)
 
@@ -875,35 +885,35 @@ function detect_format(designation::AbstractString)
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if length(designation) == 12
-        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation) !== nothing
+        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (12-char)")
         end
     end
 
     # Check for packed comet designation (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (8-char)")
         end
     end
 
     # Check for packed comet with 2-letter fragment (9 chars)
     if length(designation) == 9 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$", designation) !== nothing
+        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (9-char, 2-letter fragment)")
         end
     end
 
     # Check for packed ancient comet (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_ancient", "comet with ancient provisional (year < 1000)")
         end
     end
 
     # Check for packed BCE comet (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_bce", "comet with BCE provisional")
         end
     end
@@ -915,7 +925,7 @@ function detect_format(designation::AbstractString)
 
     # Check for packed satellite designation (8 chars starting with S)
     if length(des) == 8 && des[1] == 'S'
-        if match(r"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$", des) !== nothing
+        if match(r"^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$", des) !== nothing
             planet = des[5]
             planet_name = get(SATELLITE_PLANET_NAMES, planet, string(planet))
             return FormatInfo(:packed, "satellite", "natural satellite ($planet_name)")
@@ -964,7 +974,7 @@ function detect_format(designation::AbstractString)
             end
         end
 
-        if match(r"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$", des) !== nothing
+        if match(r"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$", des) !== nothing
             return FormatInfo(:packed, "provisional", "provisional")
         end
 
@@ -976,7 +986,7 @@ function detect_format(designation::AbstractString)
             return FormatInfo(:packed, "survey", "survey (Trojan T-$(des[2]))")
         end
 
-        if match(r"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", des) !== nothing
+        if match(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des) !== nothing
             return FormatInfo(:packed, "comet_provisional", "comet provisional")
         end
     end

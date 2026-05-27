@@ -37,6 +37,10 @@ create work-buf MAX-LEN allot
 : is-lower ( c -- f ) [char] a [char] z 1+ within ;
 : is-alpha ( c -- f ) dup is-upper swap is-lower or ;
 : is-alnum ( c -- f ) dup is-digit swap is-alpha or ;
+\ Half-month letter: A-Y excluding I
+: is-half-month? ( c -- f ) dup [char] A [char] Y 1+ within swap [char] I <> and ;
+\ Asteroid century code: I-L only (1800-2199)
+: is-ast-century? ( c -- f ) [char] I [char] L 1+ within ;
 
 : s= ( a1 l1 a2 l2 -- f ) compare 0= ;
 
@@ -478,8 +482,20 @@ variable prov-outlen
   out-buf 7
   2swap 2drop ;
 
+: prov-letters-valid? ( addr len -- f )
+  \ Validate unpacked provisional letters: half-month (pos 5) A-Y skip I,
+  \ order/second letter (pos 6) A-Z skip I. Both standard "1995 XA" and
+  \ old-style "A908 CJ" carry these letters at offsets 5 and 6.
+  6 < if drop false exit then
+  dup 5 + c@ is-half-month? 0= if drop false exit then
+  6 + c@ dup is-upper swap [char] I <> and ;
+
 : pack-prov ( addr len -- addr' len' )
   2dup is-survey-unpacked? if pack-survey exit then
+  \ Reject invalid half-month / order letter (e.g. I): return input unchanged
+  2dup prov-letters-valid? 0= if
+    tuck out-buf swap move out-buf swap exit
+  then
   2dup is-old-style? if pack-prov-old exit then
   pack-prov-std ;
 
@@ -927,8 +943,8 @@ variable pcp-year-len
   \ Positions 2-3 must be digits (year code)
   over 2 + c@ is-digit 0= if 2drop false exit then
   over 3 + c@ is-digit 0= if 2drop false exit then
-  \ Position 4 must be uppercase letter (half-month)
-  over 4 + c@ is-upper
+  \ Position 4 must be a valid half-month (calendar code A-Y skipping I)
+  over 4 + c@ is-half-month?
   if 2drop true else 2drop false then ;
 
 : is-comet-ancient-packed? ( addr len -- f )
@@ -939,8 +955,8 @@ variable pcp-year-len
   over 1+ c@ is-digit 0= if 2drop false exit then
   over 2 + c@ is-digit 0= if 2drop false exit then
   over 3 + c@ is-digit 0= if 2drop false exit then
-  \ Check position 4 is letter (half-month), not digit (which would be standard)
-  over 4 + c@ is-upper
+  \ Position 4 must be a valid half-month (calendar code A-Y skipping I)
+  over 4 + c@ is-half-month?
   if 2drop true else 2drop false then ;
 
 : is-comet-full-packed? ( addr len -- f )
@@ -952,25 +968,44 @@ variable pcp-year-len
   \ Exclude unpacked format (has slash at position 1 that's not BCE)
   over 1+ c@ [char] / = if 2drop false exit then
   dup 8 = if
-    \ 8-char: type + 7-char provisional
-    drop c@ is-comet-type? exit
+    \ 8-char: type + 7-char provisional.
+    \ Asteroid-style (uppercase order at last position) keeps its own
+    \ half-month validation in unpack-prov; only validate comet-style here.
+    2dup + 1- c@ is-upper if drop c@ is-comet-type? exit then
+    \ Comet-style: position 0 is type, position 4 is half-month (calendar code)
+    drop dup c@ is-comet-type? swap 4 + c@ is-half-month? and exit
   then
   dup 9 = if
     \ 9-char: type + 8-char provisional (2-letter fragment)
-    drop c@ is-comet-type? exit
+    \ position 0 is type, position 4 is half-month (calendar code)
+    drop dup c@ is-comet-type? swap 4 + c@ is-half-month? and exit
   then
   2drop false ;
+
+: comet-half-month-valid? ( addr len -- f )
+  \ For an unpacked comet "X/yyyy Hn..." (or BCE/ancient/asteroid-style),
+  \ the half-month is the first letter after the space following the year.
+  \ The half-month is a calendar code A-Y skipping I, object-type independent;
+  \ the fragment (after the order digits) legitimately includes I and is not
+  \ checked here. If there is no space (malformed), pass through unchanged so
+  \ the existing packers report their own error/return-unchanged behavior.
+  find-space dup 0= if drop false exit then  ( space-addr )
+  1+ c@ is-half-month? ;
 
 : is-comet-full-unpacked? ( addr len -- f )
   \ Check for X/yyyy pattern or nX/yyyy pattern
   \ Find slash
+  2dup comet-half-month-valid? >r          \ remember half-month validity
   0 2 pick 2 pick bounds ?do
     i c@ [char] / = if drop i leave then
   loop
-  dup 0= if drop 2drop false exit then
+  dup 0= if drop 2drop r> drop false exit then
   \ Check char before slash is comet type
   1- c@ is-comet-type?
-  -rot 2drop ;
+  -rot 2drop
+  \ Reject invalid comet half-month (e.g. I or Z): falls through to
+  \ "return input unchanged" in convert-simple.
+  r> and ;
 
 variable comet-full-len
 variable comet-full-type
@@ -1206,10 +1241,17 @@ variable sat-num-len
 : packed-prov? ( addr len -- f )
   dup 7 <> if 2drop false exit then
   over c@ [char] _ = if 2drop true exit then  \ extended format
-  over c@ century>num 0< if 2drop false exit then
   \ Exclude old-style unpacked format (has space at position 4)
   2dup has-space? if 2drop false exit then
-  2drop true ;
+  drop  ( addr )
+  \ Asteroid provisional: [I-L][YY][half-month][cycle-tens][cycle-units][order]
+  dup c@ is-ast-century? 0= if drop false exit then       \ century I-L
+  dup 1+ c@ is-digit 0= if drop false exit then            \ year tens digit
+  dup 2 + c@ is-digit 0= if drop false exit then           \ year units digit
+  dup 3 + c@ is-half-month? 0= if drop false exit then     \ half-month A-Y skip I
+  dup 4 + c@ is-alnum 0= if drop false exit then           \ cycle tens (base-62)
+  dup 5 + c@ is-digit 0= if drop false exit then           \ cycle units (always digit)
+  6 + c@ dup is-upper swap [char] I <> and ;               \ order letter A-Z skip I
 
 : unpacked-perm? ( addr len -- f )
   all-digit? ;
@@ -1238,8 +1280,8 @@ variable sat-num-len
   2dup unpacked-perm? if pack-perm exit then
   2dup unpacked-prov? if pack-prov exit then
 
-  \ Unknown format - return as-is
-  out-buf over move out-buf swap ;
+  \ Unknown format - return as-is (copy input to out-buf unchanged)
+  tuck out-buf swap move out-buf swap ;
 
 \ ============================================================================
 \ Helper functions for format conversion and fragment handling

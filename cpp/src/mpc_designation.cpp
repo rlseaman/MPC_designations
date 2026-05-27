@@ -6,9 +6,9 @@
  */
 
 #include "mpc_designation.hpp"
-#include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cstring>
 #include <sstream>
 #include <regex>
 
@@ -301,6 +301,14 @@ std::string MPCDesignation::packProvisional(const std::string& unpacked) {
         char halfMonth = oldMatch[4].str()[0];
         char secondLetter = oldMatch[5].str()[0];
 
+        // Letter I is not used in either letter position
+        if (!isValidHalfMonth(halfMonth)) {
+            throw MPCDesignationError(std::string("Invalid half-month letter: ") + halfMonth);
+        }
+        if (secondLetter == 'I') {
+            throw MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)");
+        }
+
         char centuryCode;
         if (centuryDigit == 8) centuryCode = 'I';
         else if (centuryDigit == 9) centuryCode = 'J';
@@ -326,6 +334,11 @@ std::string MPCDesignation::packProvisional(const std::string& unpacked) {
 
     if (!isValidHalfMonth(halfMonth)) {
         throw MPCDesignationError(std::string("Invalid half-month letter: ") + halfMonth);
+    }
+
+    // Letter I is not used in the second (order) letter position
+    if (secondLetter == 'I') {
+        throw MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)");
     }
 
     int century = year / 100;
@@ -414,6 +427,11 @@ std::string MPCDesignation::unpackProvisional(const std::string& packed) {
         throw MPCDesignationError(std::string("Invalid century code: ") + centuryCode);
     }
 
+    // Asteroid provisionals only valid for centuries I-L (1800-2199)
+    if (centuryCode < 'I' || centuryCode > 'L') {
+        throw MPCDesignationError(std::string("Invalid century code for asteroid provisional: ") + centuryCode + " (must be I-L)");
+    }
+
     int yearShort = std::stoi(p.substr(1, 2));
     char halfMonth = p[3];
     int orderNum = decodeCycleCount(p.substr(4, 2));
@@ -458,6 +476,12 @@ std::string MPCDesignation::packCometProvisional(const std::string& unpacked) {
     char halfMonth = match[2].str()[0];
     int orderNum = std::stoi(match[3].str());
     std::string fragment = match[4].matched ? match[4].str() : "";
+
+    // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+    // The fragment legitimately includes I per MPC data and is NOT checked here.
+    if (!isValidHalfMonth(halfMonth)) {
+        throw MPCDesignationError(std::string("Invalid half-month letter: ") + halfMonth);
+    }
 
     if (orderNum < 1) {
         throw MPCDesignationError("Comet order number must be positive");
@@ -711,6 +735,11 @@ std::string MPCDesignation::packAncientComet(const std::string& unpacked) {
     int orderNum = std::stoi(match[4].str());
     std::string fragment = match[5].matched ? match[5].str() : "";
 
+    // Half-month is a calendar code (A-Y skipping I), object-type independent.
+    if (!isValidHalfMonth(halfMonth)) {
+        throw MPCDesignationError(std::string("Invalid half-month letter: ") + halfMonth);
+    }
+
     if (orderNum < 1) {
         throw MPCDesignationError("Comet order number must be positive");
     }
@@ -720,8 +749,8 @@ std::string MPCDesignation::packAncientComet(const std::string& unpacked) {
 
     char buf[16];
     if (year < 0) {
-        auto [prefix, yearCode] = encodeBCEYear(year);
-        snprintf(buf, sizeof(buf), "%c%c%s%c%s%c", cometType, prefix, yearCode.c_str(), halfMonth, orderEncoded.c_str(), fragmentCode);
+        std::pair<char, std::string> bce = encodeBCEYear(year);
+        snprintf(buf, sizeof(buf), "%c%c%s%c%s%c", cometType, bce.first, bce.second.c_str(), halfMonth, orderEncoded.c_str(), fragmentCode);
     } else {
         snprintf(buf, sizeof(buf), "%c%03d%c%s%c", cometType, year, halfMonth, orderEncoded.c_str(), fragmentCode);
     }
@@ -888,7 +917,9 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     size_t origLen = designation.length();
 
     // Check for packed 12-char comet before trimming
-    if (origLen == 12 && isCometType(designation[4])) {
+    // Half-month (index 8) is a calendar code A-Y excluding I (object-type independent)
+    if (origLen == 12 && isCometType(designation[4]) &&
+        isValidHalfMonth(designation[8])) {
         info.format = Format::Packed;
         info.type = Type::CometFull;
         info.subtype = "comet with provisional designation (12-char)";
@@ -896,8 +927,10 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     }
 
     // Check for packed 8-char comet
+    // Half-month (index 4) is a calendar code A-Y excluding I
     if (origLen == 8 && isCometType(designation[0]) &&
-        designation[1] >= 'A' && designation[1] <= 'L') {
+        designation[1] >= 'A' && designation[1] <= 'L' &&
+        isValidHalfMonth(designation[4])) {
         info.format = Format::Packed;
         info.type = Type::CometFull;
         info.subtype = "comet with provisional designation (8-char)";
@@ -905,8 +938,10 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     }
 
     // Check for packed 9-char comet with 2-letter fragment
+    // Half-month (index 4) is a calendar code A-Y excluding I
     if (origLen == 9 && isCometType(designation[0]) &&
         designation[1] >= 'A' && designation[1] <= 'L' &&
+        isValidHalfMonth(designation[4]) &&
         std::islower(designation[7]) && std::islower(designation[8])) {
         info.format = Format::Packed;
         info.type = Type::CometFull;
@@ -915,8 +950,10 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     }
 
     // Check for packed ancient comet
+    // Half-month (index 4) is a calendar code A-Y excluding I
     if (origLen == 8 && isCometType(designation[0]) &&
-        std::isdigit(designation[1]) && std::isdigit(designation[2]) && std::isdigit(designation[3])) {
+        std::isdigit(designation[1]) && std::isdigit(designation[2]) && std::isdigit(designation[3]) &&
+        isValidHalfMonth(designation[4])) {
         info.format = Format::Packed;
         info.type = Type::CometAncient;
         info.subtype = "comet with ancient provisional (year < 1000)";
@@ -924,8 +961,10 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     }
 
     // Check for packed BCE comet
+    // Half-month (index 4) is a calendar code A-Y excluding I
     if (origLen == 8 && isCometType(designation[0]) &&
         (designation[1] == '/' || designation[1] == '.' || designation[1] == '-') &&
+        isValidHalfMonth(designation[4]) &&
         designation.find(' ') == std::string::npos) {
         info.format = Format::Packed;
         info.type = Type::CometBCE;
@@ -1033,16 +1072,19 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
             return info;
         }
 
-        if (des[0] >= 'A' && des[0] <= 'L' && std::isdigit(des[1]) && std::isdigit(des[2]) &&
-            std::isupper(des[3]) && std::isupper(des[6])) {
+        // Standard provisional (asteroids only I-L for 1800-2199)
+        // Half-month (des[3]) is A-Y excluding I; order letter (des[6]) is A-Z excluding I
+        if (des[0] >= 'I' && des[0] <= 'L' && std::isdigit(des[1]) && std::isdigit(des[2]) &&
+            isValidHalfMonth(des[3]) && std::isupper(des[6]) && des[6] != 'I') {
             info.format = Format::Packed;
             info.type = Type::Provisional;
             info.subtype = "provisional";
             return info;
         }
 
+        // Half-month (des[3]) is a calendar code A-Y excluding I
         if (des[0] >= 'I' && des[0] <= 'L' && std::isdigit(des[1]) && std::isdigit(des[2]) &&
-            std::isupper(des[3]) && (std::islower(des[6]) || des[6] == '0')) {
+            isValidHalfMonth(des[3]) && (std::islower(des[6]) || des[6] == '0')) {
             info.format = Format::Packed;
             info.type = Type::CometProvisional;
             info.subtype = "comet provisional";
