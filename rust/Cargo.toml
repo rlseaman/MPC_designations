@@ -1,6 +1,6 @@
 [package]
 name = "mpc_designation"
-version = "1.0.0"
+version = "1.1.0"
 edition = "2021"
 authors = ["MPC Designations Contributors"]
 description = "Convert between packed and unpacked MPC (Minor Planet Center) designations"
