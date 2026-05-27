@@ -9,10 +9,23 @@ all:
 	@echo "Forth is interpreted - no compilation needed."
 	@echo "Run with: $(GFORTH) src/mpc_designation_cli.fs <designation>"
 
-# Run error handling tests
+# Run error handling tests (reads the shared error_test_cases.csv).
+# Retries to work around the intermittent gforth code-loading crash on
+# Apple Silicon (see test-csv note below).
 test-errors:
 	@echo "Running error tests..."
-	$(GFORTH) test/test_errors.fs
+	@for attempt in 1 2 3 4 5; do \
+		output=$$($(GFORTH) test/test_errors.fs ../test-data/error_test_cases.csv 2>&1); \
+		echo "$$output"; \
+		if echo "$$output" | grep -q "Error Test Results"; then \
+			if echo "$$output" | grep -q "Failed:  0 "; then exit 0; else exit 1; fi; \
+		fi; \
+		if [ $$attempt -lt 5 ]; then \
+			echo "Retrying due to gforth intermittent issue (attempt $$attempt/5)..."; \
+		fi; \
+	done; \
+	echo "Test failed after 5 attempts"; \
+	exit 1
 
 # Run helper function tests
 test-helpers:

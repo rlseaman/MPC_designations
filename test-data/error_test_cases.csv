@@ -114,3 +114,8 @@ boundary,min_year,1800 AA,valid,Minimum standard year for asteroids
 boundary,max_standard_year,2199 YZ,valid,Maximum standard year (century L)
 boundary,ancient_comet,C/240 V1,valid,Ancient year comet (< 1000 CE)
 boundary,bce_comet,C/-146 P1,valid,BCE year comet
+# Detection collisions - packed-provisional structural validation (see SPECIFICATION.md)
+detection,survey_collision_century,C03UYWZ,format,Catalina survey temp ID century C=1200s must not match asteroid provisional
+detection,packed_cycle_units_letter,K03UYWZ,format,Letter W in cycle-units position must be a digit
+detection,packed_half_month_I,K95I00A,format,Half-month letter I in packed provisional is a skipped letter
+detection,packed_order_letter_I,1995 XI,format,Order letter I is skipped in provisional designations
