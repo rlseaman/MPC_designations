@@ -115,7 +115,7 @@ int	format, dtype
 
 int	len, i, dashpos, strlen(), mpc_strchr(), mpc_strstr()
 char	first, space
-bool	alldig, mpc_iscent()
+bool	alldig, mpc_iscent(), mpc_ishalfmo(), mpc_isb62(), mpc_isseclet()
 
 begin
 	format = 0
@@ -206,14 +206,19 @@ begin
 		return
 	    }
 
-	    # Exclude old-style pattern (space at position 5)
-	    if (mpc_iscent(first) && IS_UPPER(des[7]) && des[5] != ' ') {
+	    # Asteroid provisional: century I-L (1800-2199), half-month A-Y excl I,
+	    # base-62 cycle-tens, digit cycle-units, second letter A-Z excl I.
+	    # The field checks also exclude the old-style pattern (space at pos 5).
+	    if (first >= 'I' && first <= 'L' && IS_DIGIT(des[2]) &&
+		IS_DIGIT(des[3]) && mpc_ishalfmo(des[4]) && mpc_isb62(des[5]) &&
+		IS_DIGIT(des[6]) && mpc_isseclet(des[7])) {
 		format = 1
 		dtype = 2
 		return
 	    }
 
-	    if (mpc_iscent(first) && (IS_DIGIT(des[7]) || IS_LOWER(des[7])) && des[5] != ' ') {
+	    if (mpc_iscent(first) && mpc_isb62(des[5]) && IS_DIGIT(des[6]) &&
+		(IS_DIGIT(des[7]) || IS_LOWER(des[7]))) {
 		format = 1
 		dtype = 5
 		return
@@ -533,8 +538,8 @@ bool	mpc_iscent(), mpc_ishalfmo(), mpc_isseclet(), mpc_isb62()
 
 begin
 	# Validate packed format characters
-	# Position 1: century code (A-L)
-	if (!mpc_iscent (packed[1])) {
+	# Position 1: century code (asteroid provisionals: I-L only, 1800-2199)
+	if (packed[1] < 'I' || packed[1] > 'L') {
 	    unpacked[1] = EOS
 	    return
 	}
@@ -822,6 +827,7 @@ char	unpacked[ARB], packed[ARB]
 int	maxch
 
 char	prefix, centdig, centcode, halfmo, seclet
+bool	mpc_ishalfmo(), mpc_isseclet()
 int	len, strlen()
 
 begin
@@ -853,8 +859,8 @@ begin
 	    return
 	}
 
-	# Validate letters at positions 6-7
-	if (!IS_UPPER(unpacked[6]) || !IS_UPPER(unpacked[7])) {
+	# Validate letters at positions 6-7 (half-month A-Y excl I; second letter excl I)
+	if (!mpc_ishalfmo (unpacked[6]) || !mpc_isseclet (unpacked[7])) {
 	    packed[1] = EOS
 	    return
 	}
@@ -1000,8 +1006,14 @@ int	maxch
 
 int	year, order, mpc_centc(), mpc_deccyc()
 char	frag, ufrag
+bool	mpc_ishalfmo()
 
 begin
+	# Half-month is a calendar code (A-Y skipping I); reject invalid letters
+	if (!mpc_ishalfmo (packed[4])) {
+	    unpacked[1] = EOS
+	    return
+	}
 	year = mpc_centc (packed[1]) + (packed[2] - '0') * 10 + (packed[3] - '0')
 	order = mpc_deccyc (packed, 5)
 	frag = packed[7]
@@ -1145,7 +1157,7 @@ int	i, j, year, order, century, spcpos, dashpos, slashpos, absyear, bcecode
 int	mpc_strchr(), mpc_strfrom(), strlen()
 char	ctype, halfmo, frag, frag2, fragchar, centcode, yrstr[5], provpart[40], mpc_centl()
 char	slash, space, dash, bceprefix
-bool	isneg, twoletter
+bool	isneg, twoletter, mpc_ishalfmo()
 
 begin
 	slash = '/'
@@ -1192,6 +1204,12 @@ begin
 	    call pargi (mod (year, 100))
 
 	halfmo = unpacked[spcpos + 1]
+
+	# Half-month is a calendar code (A-Y skipping I); fragment may include I.
+	if (!mpc_ishalfmo (halfmo)) {
+	    packed[1] = EOS
+	    return
+	}
 
 	dashpos = mpc_strfrom (unpacked, dash, spcpos)
 	frag = '0'

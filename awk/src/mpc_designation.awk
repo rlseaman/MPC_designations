@@ -464,7 +464,9 @@ function detect_format(desig,    len, first, prefix, last) {
     }
 
     # Packed provisional asteroid (7 chars starting with century code)
-    if (len == 7 && first ~ /[IJKL]/ && index(desig, "/") == 0) {
+    # Century I-L (1800-2199); half-month A-Y skipping I; 6th char always a
+    # digit; order letter A-Z skipping I. Reject anything else.
+    if (len == 7 && desig ~ /^[IJKL][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$/) {
         return "packed_provisional"
     }
 
@@ -477,9 +479,12 @@ function detect_format(desig,    len, first, prefix, last) {
     }
 
     # Packed provisional comet or satellite (8 chars)
+    # Half-month (position 5) is a calendar code A-Y skipping I, object-type
+    # independent. This holds for both comet-style (e.g. CJ95O010) and
+    # asteroid-style (e.g. PK13A76L) provisionals, so validate it here.
     if (len == 8) {
         second = substr(desig, 2, 1)
-        if (first ~ /[PDCXA]/ && second ~ /[IJKL]/) {
+        if (first ~ /[PDCXA]/ && second ~ /[IJKL]/ && substr(desig, 5, 1) ~ /^[A-HJ-Y]$/) {
             return "packed_provisional_comet"
         }
         if (first == "S" && second ~ /[IJKL]/) {
@@ -653,7 +658,7 @@ function has_fragment(desig,    d) {
     }
 
     # Packed provisional comet with fragment: "DJ93F02a" (8 chars, last char lowercase)
-    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z][0-9][a-z]$/) {
         return 1
     }
 
@@ -678,7 +683,7 @@ function get_fragment(desig,    d, frag) {
     }
 
     # Packed provisional comet: "DJ93F02a" -> "A"
-    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z][0-9][a-z]$/) {
         return toupper(substr(d, 8, 1))
     }
 
@@ -702,7 +707,7 @@ function get_parent(desig,    d) {
     }
 
     # Packed provisional comet: "DJ93F02a" -> "DJ93F020"
-    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9]{2}[a-z]$/) {
+    if (d ~ /^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z][0-9][a-z]$/) {
         return substr(d, 1, 7) "0"
     }
 

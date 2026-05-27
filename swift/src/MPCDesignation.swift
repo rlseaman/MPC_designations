@@ -106,20 +106,20 @@ struct Patterns {
     static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
 
     // Detect format patterns - packed
-    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
-    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$"#)
-    static let packedCometFull9 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$"#)
-    static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
-    static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$"#)
-    static let packedSatellite = try! NSRegularExpression(pattern: #"^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$"#)
+    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
+    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$"#)
+    static let packedCometFull9 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$"#)
+    static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
+    static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
+    static let packedSatellite = try! NSRegularExpression(pattern: #"^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$"#)
     static let packedTilde = try! NSRegularExpression(pattern: #"^~[0-9A-Za-z]{4}$"#)
     static let packedLetterPrefix = try! NSRegularExpression(pattern: #"^[A-Za-z][0-9]{4}$"#)
     // Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
     static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$"#)
-    static let packedProvisional = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$"#)
+    static let packedProvisional = try! NSRegularExpression(pattern: #"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
     static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD][a-z]{0,2}$"#)
-    static let packedCometProv = try! NSRegularExpression(pattern: #"^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$"#)
+    static let packedCometProv = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$"#)
 
     // Detect format patterns - unpacked
     static let unpackedSatellite = try! NSRegularExpression(pattern: #"^S/\d{4} ([JSUN]) \d+$"#)
@@ -518,6 +518,14 @@ func packProvisional(_ unpacked: String) throws -> String {
         let halfMonth = String(u[Range(match.range(at: 3), in: u)!])
         let secondLetter = String(u[Range(match.range(at: 4), in: u)!])
 
+        // Letter I is not used in either letter position
+        guard let halfMonthChar = halfMonth.first, isValidHalfMonth(halfMonthChar) else {
+            throw MPCDesignationError.invalidFormat("Invalid half-month letter: \(halfMonth)")
+        }
+        if secondLetter == "I" {
+            throw MPCDesignationError.invalidFormat("Invalid second letter: I (letter I is not used in provisional designations)")
+        }
+
         let centuryCode: Character
         switch centuryDigit {
         case "8": centuryCode = "I"
@@ -543,6 +551,11 @@ func packProvisional(_ unpacked: String) throws -> String {
     // Validate half-month letter
     guard isValidHalfMonth(halfMonth) else {
         throw MPCDesignationError.invalidFormat("Invalid half-month letter: \(halfMonth)")
+    }
+
+    // Letter I is not used in either letter position
+    if secondLetter == "I" {
+        throw MPCDesignationError.invalidFormat("Invalid second letter: I (letter I is not used in provisional designations)")
     }
 
     guard let century = Int(year.prefix(2)) else {
@@ -639,6 +652,12 @@ func packCometProvisional(_ unpacked: String) throws -> String {
         throw MPCDesignationError.invalidFormat("Invalid order number in comet designation: \(unpacked)")
     }
     let fragment: String? = match.range(at: 4).length > 0 ? (Range(match.range(at: 4), in: u).map { String(u[$0]) }) : nil
+
+    // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+    // The fragment legitimately includes I per MPC data and is NOT checked here.
+    guard let halfMonthChar = halfMonth.first, isValidHalfMonth(halfMonthChar) else {
+        throw MPCDesignationError.invalidFormat("Invalid half-month letter: \(halfMonth)")
+    }
 
     // Comet order number must be positive
     guard orderNum >= 1 else {
@@ -820,6 +839,10 @@ func isAncientYear(_ year: Int) -> Bool {
 
 /// Pack an ancient or BCE comet provisional designation
 func packAncientCometProvisional(cometType: Character, year: Int, halfMonth: Character, orderNum: Int, fragment: String = "") throws -> String {
+    // Half-month is a calendar code (A-Y skipping I), object-type independent.
+    guard isValidHalfMonth(halfMonth) else {
+        throw MPCDesignationError.invalidFormat("Invalid half-month letter: \(halfMonth)")
+    }
     let orderEncoded = try encodeCycleCount(orderNum)
     let fragmentCode = fragment.isEmpty ? "0" : fragment.lowercased()
 
@@ -1440,7 +1463,7 @@ struct HelperPatterns {
     static let packedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d{4})([PD])([a-z]{1,2})$"#)
     static let packedNumberedComet = try! NSRegularExpression(pattern: #"^(\d{4})([PD])$"#)
     static let unpackedProvCometWithFrag = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$"#)
-    static let packedProvCometWithFrag = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L]\d{2}[A-Z]\d{2})([a-z]{1,2})$"#)
+    static let packedProvCometWithFrag = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L]\d{2}[A-Z][0-9A-Za-z][0-9])([a-z]{1,2})$"#)
 }
 
 /// Check if a designation has a comet fragment suffix

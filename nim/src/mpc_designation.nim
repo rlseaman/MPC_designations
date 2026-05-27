@@ -44,6 +44,10 @@ proc isAllDigits(s: string): bool =
     if c < '0' or c > '9': return false
   true
 
+# Half-month is a calendar code (A-Y excluding I, Z unused), object-type independent.
+proc isValidHalfMonth(c: char): bool {.inline.} =
+  c >= 'A' and c <= 'Y' and c != 'I'
+
 # Half-month letter to position (A=1, B=2, ..., H=8, J=9, ... Y=24, skipping I)
 proc letterToPosition(c: char): int =
   if c <= 'H': ord(c) - ord('A') + 1
@@ -153,6 +157,12 @@ proc packProvisional*(desig: string): string =
     let half = desig[5]
     let second = desig[6]
 
+    # Letter I is not used as half-month or as second/order letter
+    if not (half >= 'A' and half <= 'Y' and half != 'I'):
+      raise newException(ValueError, "Invalid half-month letter: " & half)
+    if second == 'I':
+      raise newException(ValueError, "Invalid second letter: I (letter I is not used in provisional designations)")
+
     # Convert century digit to century code: 8->18(I), 9->19(J), 0->20(K)
     let centuryChar = case centuryDigit
       of '8': 'I'
@@ -167,6 +177,12 @@ proc packProvisional*(desig: string): string =
   let half = desig[5]
   let second = desig[6]
   let cycle = if desig.len > 7: parseInt(desig[7..^1]) else: 0
+
+  # Letter I is not used as half-month or as second/order letter
+  if not (half >= 'A' and half <= 'Y' and half != 'I'):
+    raise newException(ValueError, "Invalid half-month letter: " & half)
+  if second == 'I':
+    raise newException(ValueError, "Invalid second letter: I (letter I is not used in provisional designations)")
 
   # Use extended format for cycle >= 620
   if cycle >= 620:
@@ -286,6 +302,10 @@ proc packProvisionalComet*(desig: string): string =
   let designPart = baseDesig[spaceIdx+1..^1]  # "V1" or "O1" or "AH2"
   let half = designPart[0]
 
+  # Half-month is a calendar code (A-Y skipping I), object-type independent.
+  if not isValidHalfMonth(half):
+    return "ERROR: Invalid half-month letter: " & half
+
   # BCE comets (negative years) use special century codes
   if year < 0:
     let absYear = -year
@@ -387,10 +407,29 @@ proc unpackProvisionalComet*(packed: string): string =
       # 1-letter fragment (convert to uppercase for unpacked format)
       result &= "-" & toUpperAscii(lastChar)
 
+# Decode a BCE year from packed comet format.
+# Complement encoding: year_part = 99 - code; prefix selects the century block.
+#   '/' -> 1-99 BCE, '.' -> 100-199 BCE, '-' -> 200-299 BCE
+# e.g. C.53P010 -> prefix '.', code 53 -> 99-53=46 -> -(46+100) = -146 -> C/-146 P1
+proc decodeBCEYear(prefix: char, code: string): int =
+  let codeNum = parseInt(code)
+  let yearPart = 99 - codeNum
+  case prefix
+  of '/': -yearPart
+  of '.': -(yearPart + 100)
+  of '-': -(yearPart + 200)
+  else: 0
+
 proc unpackAncientComet*(packed: string): string =
-  # Format: TYYYHNNN where T=type, YYY=3-digit year, H=half, NNN=order+fragment
+  # Two 8-char forms:
+  #   Ancient: TYYYHNNN where T=type, YYY=3-digit year, H=half, NNN=order+fragment
+  #   BCE:     T[/.-]CCHNNf where the 2 chars after type encode a negative year
   let cometType = packed[0]
-  let year = parseInt(packed[1..3])
+  var year: int
+  if packed[1] in {'/', '.', '-'}:
+    year = decodeBCEYear(packed[1], packed[2..3])
+  else:
+    year = parseInt(packed[1..3])
   let half = packed[4]
   let orderStr = packed[5..6]
   let fragment = packed[7]
@@ -483,7 +522,16 @@ proc detectFormat*(desig: string): DesignationFormat =
         return fmtPackedNumberedComet
 
   # Packed provisional asteroid (7 chars starting with century code)
-  if len == 7 and first in {'I', 'J', 'K', 'L'} and '/' notin desig:
+  # Validate full structure (mirrors reference regex
+  #   ^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$):
+  #   century I-L, year digits, half-month A-Y (skip I, no Z),
+  #   cycle-tens base-62, cycle-units digit, order letter A-Z (skip I).
+  if len == 7 and first in {'I', 'J', 'K', 'L'} and '/' notin desig and
+     desig[1] in {'0'..'9'} and desig[2] in {'0'..'9'} and
+     desig[3] in {'A'..'Y'} and desig[3] != 'I' and
+     desig[4] in {'0'..'9', 'A'..'Z', 'a'..'z'} and
+     desig[5] in {'0'..'9'} and
+     desig[6] in {'A'..'Z'} and desig[6] != 'I':
     return fmtPackedProvisional
 
   # Packed survey (7 chars starting with PLS, T1S, T2S, T3S)
@@ -496,13 +544,23 @@ proc detectFormat*(desig: string): DesignationFormat =
   if len == 7 and first == '_':
     return fmtPackedExtendedProvisional
 
-  # Packed provisional comet, ancient comet, or satellite (8 chars)
+  # Packed provisional comet, ancient comet, BCE comet, or satellite (8 chars)
   if len == 8:
     let second = desig[1]
-    if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}:
+    # Standard provisional comet: type + century[A-L] + YY + half-month + cycle + order
+    # Half-month at index 4 is a calendar code (A-Y skipping I).
+    if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'} and
+       isValidHalfMonth(desig[4]):
       return fmtPackedProvisionalComet
-    # Ancient comet: comet type + 3 digit year + half + order + fragment
-    if first in COMET_TYPES and second >= '0' and second <= '9':
+    # BCE comet: type + prefix(/ . -) + 2 digits + half-month + order + fragment
+    if first in COMET_TYPES and second in {'/', '.', '-'} and
+       desig[2] in {'0'..'9'} and desig[3] in {'0'..'9'} and
+       isValidHalfMonth(desig[4]):
+      return fmtPackedAncientComet
+    # Ancient comet: comet type + 3 digit year + half-month + order + fragment
+    if first in COMET_TYPES and second >= '0' and second <= '9' and
+       desig[2] in {'0'..'9'} and desig[3] in {'0'..'9'} and
+       isValidHalfMonth(desig[4]):
       return fmtPackedAncientComet
     if first == 'S' and second in {'I', 'J', 'K', 'L'}:
       return fmtPackedSatellite
@@ -510,7 +568,8 @@ proc detectFormat*(desig: string): DesignationFormat =
   # Packed provisional comet with 2-letter fragment (9 chars)
   if len == 9:
     let second = desig[1]
-    if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}:
+    if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'} and
+       isValidHalfMonth(desig[4]):
       return fmtPackedProvisionalComet
 
   # Unpacked numbered asteroid (all digits)
@@ -544,21 +603,30 @@ proc detectFormat*(desig: string): DesignationFormat =
       return fmtUnpackedNumberedComet
 
   # Unpacked provisional comet (must have space for year separation)
+  # Half-month (first char after the space) is a calendar code (A-Y skipping I).
   if len >= 2 and first in {'P', 'D', 'C', 'X', 'A'} and desig[1] == '/' and ' ' in desig:
-    return fmtUnpackedProvisionalComet
+    let spaceIdx = desig.find(' ')
+    if spaceIdx >= 0 and spaceIdx + 1 < desig.len and isValidHalfMonth(desig[spaceIdx + 1]):
+      return fmtUnpackedProvisionalComet
 
   # Unpacked satellite
   if desig.startsWith("S/") and ' ' in desig:
     return fmtUnpackedSatellite
 
   # Unpacked provisional asteroid (year + space + designation)
+  # Half-month A-Y (skip I, no Z); second/order letter A-Z (skip I).
   if len >= 7 and desig[4] == ' ' and desig[0..3].isAllDigits:
     let halfMonth = desig[5]
-    if halfMonth >= 'A' and halfMonth <= 'Y' and halfMonth != 'I':
+    let secondLetter = desig[6]
+    if halfMonth >= 'A' and halfMonth <= 'Y' and halfMonth != 'I' and
+       secondLetter >= 'A' and secondLetter <= 'Z' and secondLetter != 'I':
       return fmtUnpackedProvisional
 
   # Old-style provisional asteroid: A908 CJ or B842 FA
-  if len == 7 and first in {'A', 'B'} and desig[1] >= '0' and desig[1] <= '9' and desig[4] == ' ':
+  # Half-month A-Y (skip I, no Z); second/order letter A-Z (skip I).
+  if len == 7 and first in {'A', 'B'} and desig[1] >= '0' and desig[1] <= '9' and desig[4] == ' ' and
+     desig[5] >= 'A' and desig[5] <= 'Y' and desig[5] != 'I' and
+     desig[6] >= 'A' and desig[6] <= 'Z' and desig[6] != 'I':
     return fmtUnpackedProvisional
 
   fmtUnknown

@@ -107,16 +107,16 @@ namespace eval MPCDesignation {
     variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
     variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
     variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
-    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$}
-    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$}
-    variable pat_packed_comet_9_frag {^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$}
-    variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$}
-    variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$}
+    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
+    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$}
+    variable pat_packed_comet_9_frag {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$}
+    variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
+    variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
     variable pat_packed_tilde {^~[0-9A-Za-z]{4}$}
     variable pat_packed_letter_prefix {^[A-Za-z][0-9]{4}$}
     variable pat_packed_5digit {^[0-9]{5}$}
     variable pat_unpacked_number {^(\d+)$}
-    variable pat_packed_provisional {^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$}
+    variable pat_packed_provisional {^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$}
     variable pat_packed_extended {^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$}
     variable pat_packed_survey_pls {^(PLS)[0-9]{4}$}
     variable pat_packed_survey_t {^T([123])S[0-9]{4}$}
@@ -125,9 +125,9 @@ namespace eval MPCDesignation {
     variable pat_unpacked_old_style {^[AB]\d{3} [A-Z][A-Z]$}
     variable pat_unpacked_provisional {^\d{4} [A-Z][A-Z]\d*$}
     variable pat_unpacked_named {^(\d+) [A-Z][a-z]{2,}}
-    variable pat_packed_satellite {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z]{2}[0-9]$}
+    variable pat_packed_satellite {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$}
     variable pat_packed_comet_numbered {^[0-9]{4}([PD])$}
-    variable pat_packed_comet_prov {^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$}
+    variable pat_packed_comet_prov {^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$}
     variable pat_unpacked_comet_full {^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$}
     variable pat_parenthesized {^\((\d+)\)$}
     variable pat_asteroid_provisional_start {^\d{4} [A-Z][A-Z]}
@@ -553,6 +553,13 @@ namespace eval MPCDesignation {
         # Format: [AB]CYY LL where C=century digit, YY=year, LL=half-month+letter
         variable pat_old_style
         if {[regexp $pat_old_style $unpacked -> centuryDigit yearShort halfMonth secondLetter]} {
+            # Letter I is not used in either letter position
+            if {![isValidHalfMonth $halfMonth]} {
+                error "Invalid half-month letter: $halfMonth"
+            }
+            if {$secondLetter eq "I"} {
+                error "Invalid second letter: I (letter I is not used in provisional designations)"
+            }
             # Convert century digit to century code: 8->18(I), 9->19(J), 0->20(K)
             if {$centuryDigit == 8} {
                 set centuryCode "I"
@@ -576,6 +583,11 @@ namespace eval MPCDesignation {
         # Validate half-month letter (I is not used)
         if {![isValidHalfMonth $halfMonth]} {
             error "Invalid half-month letter: $halfMonth"
+        }
+
+        # Validate second (order) letter (I is not used in either letter position)
+        if {$secondLetter eq "I"} {
+            error "Invalid second letter: I (letter I is not used in provisional designations)"
         }
 
         if {$cycleStr eq ""} {
@@ -671,6 +683,11 @@ namespace eval MPCDesignation {
         variable pat_comet_prov_unpacked
         if {![regexp $pat_comet_prov_unpacked $unpacked -> year halfMonth orderNum fragment]} {
             error "Invalid unpacked comet provisional designation: $unpacked"
+        }
+
+        # Half-month is a calendar code (A-Y skipping I); fragment may include I.
+        if {![isValidHalfMonth $halfMonth]} {
+            error "Invalid half-month letter: $halfMonth"
         }
 
         # Comet order number must be positive
@@ -887,6 +904,9 @@ namespace eval MPCDesignation {
     # Format for BCE: T[/.-]CCHNNN where CC=encoded century code
     #
     proc packAncientCometProvisional {cometType year halfMonth orderNum {fragment ""}} {
+        if {![isValidHalfMonth $halfMonth]} {
+            error "Invalid half-month letter: $halfMonth"
+        }
         if {$year < 0} {
             # BCE year
             lassign [encodeBCEYear $year] prefix code

@@ -203,6 +203,34 @@ isValidHalfMonth :: Char -> Bool
 isValidHalfMonth c = isAlpha c && c' >= 'A' && c' <= 'Y' && c' /= 'I'
   where c' = toUpper c
 
+-- | Check if a packed 7-char string is a valid asteroid provisional.
+-- Mirrors reference regex: ^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$
+--   century I-L, year digits, half-month A-Y (skip I, no Z),
+--   cycle-tens base-62, cycle-units digit, order letter A-Z (skip I).
+isPackedProvisional :: String -> Bool
+isPackedProvisional [c0, c1, c2, c3, c4, c5, c6] =
+    c0 `elem` "IJKL" &&
+    isDigit c1 && isDigit c2 &&
+    isUpper c3 && c3 /= 'I' && c3 /= 'Z' &&
+    (isDigit c4 || isUpper c4 || isLower c4) &&
+    isDigit c5 &&
+    isUpper c6 && c6 /= 'I'
+isPackedProvisional _ = False
+
+-- | Check if a packed 7-char string is a valid comet provisional.
+-- Mirrors reference regex: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$
+--   century A-L, year digits, half-month A-Y (calendar code, skip I, no Z),
+--   cycle-tens base-62, cycle-units digit, fragment digit-or-lowercase.
+isPackedCometProvisional :: String -> Bool
+isPackedCometProvisional [c0, c1, c2, c3, c4, c5, c6] =
+    c0 `elem` map fst centuryCodes &&
+    isDigit c1 && isDigit c2 &&
+    isValidHalfMonth c3 &&
+    (isDigit c4 || isUpper c4 || isLower c4) &&
+    isDigit c5 &&
+    (isDigit c6 || isLower c6)
+isPackedCometProvisional _ = False
+
 -- | Unpack a permanent (numbered) asteroid designation
 unpackPermanent :: String -> Either MPCError Int
 unpackPermanent packed
@@ -294,6 +322,11 @@ packProvisional unpacked
         Nothing -> Left $ MPCError $ "Invalid survey: " ++ unpacked
     -- Old-style: "A908 CJ"
     | matchOldStyle = do
+        -- Letter I is not used as half-month or as second/order letter
+        when (not (isValidHalfMonth oldHalfMonth)) $
+            Left $ MPCError $ "Invalid half-month letter: " ++ [oldHalfMonth]
+        when (oldSecondLetter == 'I') $
+            Left $ MPCError "Invalid second letter: I (letter I is not used in provisional designations)"
         centCode <- case oldCentDigit of
             '8' -> Right 'I'
             '9' -> Right 'J'
@@ -302,6 +335,11 @@ packProvisional unpacked
         return $ centCode : oldYearShort ++ [oldHalfMonth] ++ "00" ++ [oldSecondLetter]
     -- Standard provisional: "1995 XA" or "1995 XA12"
     | matchStandard = do
+        -- Letter I is not used as half-month or as second/order letter
+        when (not (isValidHalfMonth stdHalfMonth)) $
+            Left $ MPCError $ "Invalid half-month letter: " ++ [stdHalfMonth]
+        when (stdSecondLetter == 'I') $
+            Left $ MPCError "Invalid second letter: I (letter I is not used in provisional designations)"
         let century = read (take 2 stdYear) :: Int
         centCode <- getCenturyCode century
         let orderNum = if null stdOrderStr then 0 else read stdOrderStr :: Int
@@ -338,6 +376,9 @@ packProvisional unpacked
                         isUpper (head rest) && isUpper (rest !! 1) ->
                 (True, y, head rest, rest !! 1, drop 2 rest)
             _ -> (False, "", ' ', ' ', "")
+
+    when False _ = Right ()
+    when True e = e
 
 -- | Pack extended provisional (cycle >= 620)
 packExtendedProvisional :: Int -> Char -> Char -> Int -> Either MPCError String
@@ -385,6 +426,11 @@ unpackCometProvisional packed
 packCometProvisional :: String -> Either MPCError String
 packCometProvisional unpacked = do
     (year, halfMonth, orderNum, fragment) <- parseComet unpacked
+    -- Half-month is a calendar code (A-Y skipping I), object-type independent;
+    -- reject invalid letters. The fragment legitimately includes I and is not
+    -- checked here.
+    when (not (isValidHalfMonth halfMonth)) $
+        Left $ MPCError $ "Invalid half-month letter: " ++ [halfMonth]
     let century = read (take 2 year) :: Int
     centCode <- getCenturyCode century
     orderEnc <- encodeCycleCount orderNum
@@ -523,6 +569,11 @@ packCometFull unpacked = do
 packAncientCometProvisional :: Char -> Int -> String -> Either MPCError String
 packAncientCometProvisional ctype year provPart = do
     (halfMonth, orderNum, fragment) <- parseProv provPart
+    -- Half-month is a calendar code (A-Y skipping I), object-type independent;
+    -- reject invalid letters. The fragment legitimately includes I.
+    if not (isValidHalfMonth halfMonth)
+        then Left $ MPCError $ "Invalid half-month letter: " ++ [halfMonth]
+        else Right ()
     orderEnc <- encodeCycleCount orderNum
     let fragCode = if null fragment then "0" else map toLower fragment
     if year < 0
@@ -656,7 +707,7 @@ detectFormat des
         Right $ FormatInfo Packed ProvisionalExtended "provisional extended"
 
     -- Packed provisional standard (no spaces allowed)
-    | len == 7 && head trimmed `elem` map fst centuryCodes && isUpper (last trimmed) && ' ' `notElem` trimmed =
+    | len == 7 && isPackedProvisional trimmed =
         Right $ FormatInfo Packed Provisional "provisional"
 
     -- Packed survey
@@ -673,30 +724,37 @@ detectFormat des
         Right $ FormatInfo Packed CometNumbered "comet numbered with fragment"
 
     -- Packed comet provisional (7 chars, no spaces)
-    | len == 7 && head trimmed `elem` map fst centuryCodes && isDigit (last trimmed) && ' ' `notElem` trimmed =
+    | len == 7 && isPackedCometProvisional trimmed =
         Right $ FormatInfo Packed CometProvisional "comet provisional"
 
     -- Packed ancient comet (8 chars: type + 3-digit year + provisional)
+    -- Half-month (index 4) is a calendar code A-Y skipping I, object-type
+    -- independent; reject invalid letters.
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      all isDigit (take 3 $ drop 1 trimmed) =
+      all isDigit (take 3 $ drop 1 trimmed) && isValidHalfMonth (trimmed !! 4) =
         Right $ FormatInfo Packed CometAncient "comet ancient"
 
     -- Packed BCE comet (8 chars: type + BCE prefix + 2-digit code + provisional)
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      trimmed !! 1 `elem` "./\\-" =
+      trimmed !! 1 `elem` "./\\-" && isValidHalfMonth (trimmed !! 4) =
         Right $ FormatInfo Packed CometBCE "comet BCE"
 
     -- Packed comet full (8 chars, no spaces, second char is century code not slash)
+    -- Comet-style half-month (index 4) is a calendar code A-Y skipping I.
+    -- Asteroid-style provisionals (uppercase order at the end) carry their own
+    -- half-month at the same index, also A-Y skipping I, so validate here too.
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      trimmed !! 1 `elem` map fst centuryCodes =
+      trimmed !! 1 `elem` map fst centuryCodes && isValidHalfMonth (trimmed !! 4) =
         Right $ FormatInfo Packed CometFull "comet with provisional"
 
     -- Packed comet full with 2-letter fragment (9 chars)
-    | len == 9 && head trimmed `elem` cometTypes && isLower (trimmed !! 7) && isLower (trimmed !! 8) =
+    | len == 9 && head trimmed `elem` cometTypes && isValidHalfMonth (trimmed !! 4) &&
+      isLower (trimmed !! 7) && isLower (trimmed !! 8) =
         Right $ FormatInfo Packed CometFull "comet with 2-letter fragment"
 
-    -- Packed comet full (12 chars)
-    | length des == 12 && des !! 4 `elem` cometTypes =
+    -- Packed comet full (12 chars): number + type (index 4) + 7-char provisional
+    -- whose half-month sits at index 8.
+    | length des == 12 && des !! 4 `elem` cometTypes && isValidHalfMonth (des !! 8) =
         Right $ FormatInfo Packed CometFull "comet full format"
 
     -- Unpacked satellite

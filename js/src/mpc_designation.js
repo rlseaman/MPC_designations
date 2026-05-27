@@ -468,6 +468,14 @@ function packProvisional(unpacked) {
         const halfMonth = match[4];
         const secondLetter = match[5];
 
+        // Letter I is not used in either letter position
+        if (!isValidHalfMonth(halfMonth)) {
+            throw new MPCDesignationError(`Invalid half-month letter: ${halfMonth}`);
+        }
+        if (secondLetter === 'I') {
+            throw new MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)");
+        }
+
         let centuryCode;
         if (centuryDigit === '8') {
             centuryCode = 'I';
@@ -495,6 +503,11 @@ function packProvisional(unpacked) {
 
     if (!isValidHalfMonth(halfMonth)) {
         throw new MPCDesignationError(`Invalid half-month letter: ${halfMonth}`);
+    }
+
+    // Letter I is not used in either letter position
+    if (secondLetter === 'I') {
+        throw new MPCDesignationError("Invalid second letter: I (letter I is not used in provisional designations)");
     }
 
     // Asteroid provisionals: only years 1800-2199 valid
@@ -582,6 +595,12 @@ function packCometProvisional(unpacked) {
     const halfMonth = match[2];
     const orderNum = parseInt(match[3], 10);
     const fragment = match[4];
+
+    // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+    // The fragment (match[4]) legitimately includes I per MPC data and is NOT checked here.
+    if (!isValidHalfMonth(halfMonth)) {
+        throw new MPCDesignationError(`Invalid half-month letter: ${halfMonth}`);
+    }
 
     if (orderNum < 1) {
         throw new MPCDesignationError(`Comet order number must be positive: ${orderNum}`);
@@ -782,6 +801,10 @@ function isAncientYear(year) {
  * Pack an ancient or BCE comet provisional designation.
  */
 function packAncientCometProvisional(cometType, year, halfMonth, orderNum, fragment = '') {
+    // Half-month is a calendar code (A-Y skipping I), object-type independent.
+    if (!isValidHalfMonth(halfMonth)) {
+        throw new MPCDesignationError(`Invalid half-month letter: ${halfMonth}`);
+    }
     const orderEncoded = encodeCycleCount(orderNum);
     const fragmentCode = fragment ? fragment.toLowerCase() : '0';
 
@@ -979,7 +1002,7 @@ function detectFormat(designation) {
 
     // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if (designation.length === 12) {
-        if (/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$/.test(designation)) {
+        if (/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/.test(designation)) {
             result.format = 'packed';
             result.type = 'comet_full';
             result.subtype = 'comet with provisional designation (12-char)';
@@ -989,7 +1012,7 @@ function detectFormat(designation) {
 
     // Check for packed comet designation (8 chars: type + 7 char provisional)
     if (designation.length === 8) {
-        if (/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z])$/.test(designation)) {
+        if (/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/.test(designation)) {
             result.format = 'packed';
             result.type = 'comet_full';
             result.subtype = 'comet with provisional designation (8-char)';
@@ -999,7 +1022,7 @@ function detectFormat(designation) {
 
     // Check for packed comet with 2-letter fragment (9 chars)
     if (designation.length === 9) {
-        if (/^([PCDXAI])([A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2})$/.test(designation)) {
+        if (/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$/.test(designation)) {
             result.format = 'packed';
             result.type = 'comet_full';
             result.subtype = 'comet with provisional designation (9-char, 2-letter fragment)';
@@ -1009,7 +1032,7 @@ function detectFormat(designation) {
 
     // Check for packed ancient comet (8 chars: type + 3-digit year + provisional)
     if (designation.length === 8) {
-        if (/^([PCDXAI])([0-9]{3})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/.test(designation)) {
+        if (/^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/.test(designation)) {
             result.format = 'packed';
             result.type = 'comet_ancient';
             result.subtype = 'comet with ancient provisional (year < 1000)';
@@ -1019,7 +1042,7 @@ function detectFormat(designation) {
 
     // Check for packed BCE comet (8 chars: type + BCE prefix + code + provisional)
     if (designation.length === 8) {
-        if (/^([PCDXAI])([/.\-])([0-9]{2})([A-Z][0-9A-Za-z]{2}[0-9a-z])$/.test(designation)) {
+        if (/^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/.test(designation)) {
             result.format = 'packed';
             result.type = 'comet_bce';
             result.subtype = 'comet with BCE provisional';
@@ -1032,7 +1055,7 @@ function detectFormat(designation) {
 
     // Check for packed satellite designation (8 chars starting with S)
     if (des.length === 8 && des[0] === 'S') {
-        if (/^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$/.test(des)) {
+        if (/^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$/.test(des)) {
             result.format = 'packed';
             result.type = 'satellite';
             const planet = des[4];
@@ -1080,7 +1103,7 @@ function detectFormat(designation) {
             }
         }
         // Standard provisional or survey
-        if (/^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$/.test(des)) {
+        if (/^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$/.test(des)) {
             result.format = 'packed';
             result.type = 'provisional';
             result.subtype = 'provisional';
@@ -1127,7 +1150,7 @@ function detectFormat(designation) {
 
     // Check for packed comet provisional (7 chars starting with century code)
     if (des.length === 7) {
-        if (/^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$/.test(des)) {
+        if (/^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/.test(des)) {
             result.format = 'packed';
             result.type = 'comet_provisional';
             result.subtype = 'comet provisional';

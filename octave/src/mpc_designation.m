@@ -336,6 +336,14 @@ function s = mpc_pack_provisional(unpacked)
     half_month = tokens{1}{3};
     second_letter = tokens{1}{4};
 
+    % Letter I is not used in either letter position
+    if ~is_valid_half_month(half_month)
+      error('MPCDesignationError:InvalidLetter', 'Invalid half-month letter: %s', half_month);
+    end
+    if strcmp(second_letter, 'I')
+      error('MPCDesignationError:InvalidLetter', 'Invalid second letter: I (letter I is not used in provisional designations)');
+    end
+
     if strcmp(century_digit, '8')
       century_code = 'I';
     elseif strcmp(century_digit, '9')
@@ -363,6 +371,11 @@ function s = mpc_pack_provisional(unpacked)
 
   if ~is_valid_half_month(half_month)
     error('MPCDesignationError:InvalidLetter', 'Invalid half-month letter: %s', half_month);
+  end
+
+  % Letter I is not used in either letter position
+  if strcmp(second_letter, 'I')
+    error('MPCDesignationError:InvalidLetter', 'Invalid second letter: I (letter I is not used in provisional designations)');
   end
 
   century = str2double(year(1:2));
@@ -465,6 +478,12 @@ function s = mpc_pack_comet_provisional(unpacked)
   fragment = '';
   if length(tokens{1}) >= 5
     fragment = tokens{1}{5};
+  end
+
+  % Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+  % The fragment legitimately includes I per MPC data and is NOT checked here.
+  if ~is_valid_half_month(half_month)
+    error('MPCDesignationError:InvalidLetter', 'Invalid half-month letter: %s', half_month);
   end
 
   order_num = str2double(order_str);
@@ -627,6 +646,10 @@ function year = decode_bce_year(prefix, code)
 end
 
 function s = pack_ancient_comet_provisional(comet_type, year, half_month, order_num, fragment)
+  % Half-month is a calendar code (A-Y skipping I), object-type independent.
+  if ~is_valid_half_month(half_month)
+    error('MPCDesignationError:InvalidLetter', 'Invalid half-month letter: %s', half_month);
+  end
   order_encoded = encode_cycle_count(order_num);
   if isempty(fragment)
     fragment_code = '0';
@@ -852,7 +875,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed full comet (12 chars with spaces)
   if length(designation) == 12
-    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (12-char)';
@@ -862,7 +885,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (8-char)';
@@ -872,7 +895,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed comet with 2-letter fragment (9 chars)
   if length(designation) == 9 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2}$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2}$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (9-char, 2-letter fragment)';
@@ -882,7 +905,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed ancient comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][0-9]{3}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_ancient';
       info.subtype = 'comet with ancient provisional (year < 1000)';
@@ -892,7 +915,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed BCE comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][/.\-][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][/.\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_bce';
       info.subtype = 'comet with BCE provisional';
@@ -909,7 +932,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed satellite (8 chars starting with S)
   if length(des) == 8 && des(1) == 'S'
-    if ~isempty(regexp(des, '^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$', 'once'))
+    if ~isempty(regexp(des, '^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$', 'once'))
       info.format = 'packed';
       info.type = 'satellite';
       planet = des(5);
@@ -980,7 +1003,7 @@ function info = mpc_detect_format(designation)
       end
     end
 
-    if ~isempty(regexp(des, '^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$', 'once'))
+    if ~isempty(regexp(des, '^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$', 'once'))
       info.format = 'packed';
       info.type = 'provisional';
       info.subtype = 'provisional';
@@ -1001,7 +1024,7 @@ function info = mpc_detect_format(designation)
       return;
     end
 
-    if ~isempty(regexp(des, '^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$', 'once'))
+    if ~isempty(regexp(des, '^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_provisional';
       info.subtype = 'comet provisional';

@@ -437,6 +437,14 @@ func PackProvisional(unpacked string) (string, error) {
 		halfMonth := u[5]
 		secondLetter := u[6]
 
+		// Letter I is not used in either letter position
+		if !isValidHalfMonth(halfMonth) {
+			return "", fmt.Errorf("%w: invalid half-month letter: %c", ErrInvalidFormat, halfMonth)
+		}
+		if secondLetter == 'I' {
+			return "", fmt.Errorf("%w: invalid second letter: I (letter I is not used in provisional designations)", ErrInvalidFormat)
+		}
+
 		var centuryCode byte
 		switch centuryDigit {
 		case '8':
@@ -463,6 +471,11 @@ func PackProvisional(unpacked string) (string, error) {
 
 	if !isValidHalfMonth(halfMonth) {
 		return "", fmt.Errorf("%w: invalid half-month letter: %c", ErrInvalidFormat, halfMonth)
+	}
+
+	// Letter I is not used in the second (order) letter position
+	if secondLetter == 'I' {
+		return "", fmt.Errorf("%w: invalid second letter: I (letter I is not used in provisional designations)", ErrInvalidFormat)
 	}
 
 	orderNum := 0
@@ -618,6 +631,12 @@ func PackCometProvisional(unpacked string) (string, error) {
 	// Extract half-month, order, and optional fragment
 	halfMonth := rest[0]
 	rest = rest[1:]
+
+	// Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+	// The fragment legitimately includes I per MPC data and is NOT checked here.
+	if !isValidHalfMonth(halfMonth) {
+		return "", fmt.Errorf("%w: invalid half-month letter: %c", ErrInvalidFormat, halfMonth)
+	}
 
 	var orderStr, fragment string
 	dashIdx := strings.Index(rest, "-")
@@ -1033,6 +1052,11 @@ func packAncientCometProvisional(cometType byte, year int, provPart string) (str
 
 	halfMonth = provPart[0]
 	rest := provPart[1:]
+
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(halfMonth) {
+		return "", fmt.Errorf("%w: invalid half-month letter: %c", ErrInvalidFormat, halfMonth)
+	}
 
 	dashIdx := strings.Index(rest, "-")
 	if dashIdx >= 0 {
@@ -1471,7 +1495,8 @@ func isPackedCometFull12(s string) bool {
 	if s[6] < '0' || s[6] > '9' || s[7] < '0' || s[7] > '9' {
 		return false
 	}
-	if s[8] < 'A' || s[8] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[8]) {
 		return false
 	}
 	if !isBase62(s[9]) || !isBase62(s[10]) {
@@ -1493,7 +1518,8 @@ func isPackedCometFull8(s string) bool {
 	if s[2] < '0' || s[2] > '9' || s[3] < '0' || s[3] > '9' {
 		return false
 	}
-	if s[4] < 'A' || s[4] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[4]) {
 		return false
 	}
 	if !isBase62(s[5]) || !isBase62(s[6]) || !isBase62(s[7]) {
@@ -1512,7 +1538,8 @@ func isPackedCometFull9(s string) bool {
 	if s[2] < '0' || s[2] > '9' || s[3] < '0' || s[3] > '9' {
 		return false
 	}
-	if s[4] < 'A' || s[4] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[4]) {
 		return false
 	}
 	if !isBase62(s[5]) || !isBase62(s[6]) {
@@ -1531,7 +1558,8 @@ func isPackedAncientComet(s string) bool {
 	if s[1] < '0' || s[1] > '9' || s[2] < '0' || s[2] > '9' || s[3] < '0' || s[3] > '9' {
 		return false
 	}
-	if s[4] < 'A' || s[4] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[4]) {
 		return false
 	}
 	if !isBase62(s[5]) || !isBase62(s[6]) {
@@ -1553,7 +1581,8 @@ func isPackedBCEComet(s string) bool {
 	if s[2] < '0' || s[2] > '9' || s[3] < '0' || s[3] > '9' {
 		return false
 	}
-	if s[4] < 'A' || s[4] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[4]) {
 		return false
 	}
 	if !isBase62(s[5]) || !isBase62(s[6]) {
@@ -1635,22 +1664,32 @@ func isPackedExtended(s string) bool {
 }
 
 func isPackedProvisional(s string) bool {
+	// Structural rule, matching the canonical pattern
+	// ^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$
 	if len(s) != 7 {
 		return false
 	}
-	if s[0] < 'A' || s[0] > 'L' {
+	// Century: asteroids only I-L (1800-2199)
+	if s[0] < 'I' || s[0] > 'L' {
 		return false
 	}
 	if s[1] < '0' || s[1] > '9' || s[2] < '0' || s[2] > '9' {
 		return false
 	}
-	if s[3] < 'A' || s[3] > 'Z' {
+	// Half-month: A-Y skipping I (so I and Z invalid)
+	if !isValidHalfMonth(s[3]) {
 		return false
 	}
-	if !isBase62(s[4]) || !isBase62(s[5]) {
+	// Cycle tens: any base-62 char
+	if !isBase62(s[4]) {
 		return false
 	}
-	if s[6] < 'A' || s[6] > 'Z' {
+	// Cycle units: ALWAYS a digit 0-9
+	if s[5] < '0' || s[5] > '9' {
+		return false
+	}
+	// Order letter: A-Z skipping I
+	if s[6] < 'A' || s[6] > 'Z' || s[6] == 'I' {
 		return false
 	}
 	return true
@@ -1706,7 +1745,8 @@ func isPackedCometProv(s string) bool {
 	if s[1] < '0' || s[1] > '9' || s[2] < '0' || s[2] > '9' {
 		return false
 	}
-	if s[3] < 'A' || s[3] > 'Z' {
+	// Half-month is a calendar code (A-Y skipping I), object-type independent.
+	if !isValidHalfMonth(s[3]) {
 		return false
 	}
 	if !isBase62(s[4]) || !isBase62(s[5]) {

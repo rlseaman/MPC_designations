@@ -371,6 +371,16 @@ namespace MPC
                 char halfMonth = oldStyleMatch.Groups[4].Value[0];
                 char secondLetter = oldStyleMatch.Groups[5].Value[0];
 
+                // Letter I is not used in either letter position
+                if (!IsValidHalfMonth(halfMonth))
+                {
+                    throw new MPCDesignationException($"Invalid half-month letter: {halfMonth}");
+                }
+                if (secondLetter == 'I')
+                {
+                    throw new MPCDesignationException("Invalid second letter: I (letter I is not used in provisional designations)");
+                }
+
                 char centuryCode = centuryDigit switch
                 {
                     8 => 'I',
@@ -397,6 +407,12 @@ namespace MPC
             if (!IsValidHalfMonth(hm))
             {
                 throw new MPCDesignationException($"Invalid half-month letter: {hm}");
+            }
+
+            // Letter I is not used in the second letter position
+            if (sl == 'I')
+            {
+                throw new MPCDesignationException("Invalid second letter: I (letter I is not used in provisional designations)");
             }
 
             int century = year / 100;
@@ -540,6 +556,13 @@ namespace MPC
             char halfMonth = match.Groups[2].Value[0];
             int orderNum = int.Parse(match.Groups[3].Value);
             string fragment = match.Groups[4].Success ? match.Groups[4].Value : "";
+
+            // Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+            // The fragment legitimately includes I per MPC data and is NOT checked here.
+            if (!IsValidHalfMonth(halfMonth))
+            {
+                throw new MPCDesignationException($"Invalid half-month letter: {halfMonth}");
+            }
 
             if (orderNum < 1)
             {
@@ -786,6 +809,12 @@ namespace MPC
             int orderNum = int.Parse(match.Groups[4].Value);
             string fragment = match.Groups[5].Success ? match.Groups[5].Value : "";
 
+            // Half-month is a calendar code (A-Y skipping I), object-type independent.
+            if (!IsValidHalfMonth(halfMonth))
+            {
+                throw new MPCDesignationException($"Invalid half-month letter: {halfMonth}");
+            }
+
             if (orderNum < 1)
             {
                 throw new MPCDesignationException("Comet order number must be positive");
@@ -974,7 +1003,9 @@ namespace MPC
             int origLen = designation.Length;
 
             // Check for packed 12-char comet before trimming
-            if (origLen == 12 && IsCometType(designation[4]))
+            // Half-month (index 8) is a calendar code A-Y excluding I (object-type independent)
+            if (origLen == 12 && IsCometType(designation[4]) &&
+                IsValidHalfMonth(designation[8]))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometFull;
@@ -983,8 +1014,10 @@ namespace MPC
             }
 
             // Check for packed 8-char comet
+            // Half-month (index 4) is a calendar code A-Y excluding I
             if (origLen == 8 && IsCometType(designation[0]) &&
-                designation[1] >= 'A' && designation[1] <= 'L')
+                designation[1] >= 'A' && designation[1] <= 'L' &&
+                IsValidHalfMonth(designation[4]))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometFull;
@@ -993,8 +1026,10 @@ namespace MPC
             }
 
             // Check for packed 9-char comet with 2-letter fragment
+            // Half-month (index 4) is a calendar code A-Y excluding I
             if (origLen == 9 && IsCometType(designation[0]) &&
                 designation[1] >= 'A' && designation[1] <= 'L' &&
+                IsValidHalfMonth(designation[4]) &&
                 char.IsLower(designation[7]) && char.IsLower(designation[8]))
             {
                 info.Format = Format.Packed;
@@ -1004,8 +1039,10 @@ namespace MPC
             }
 
             // Check for packed ancient comet
+            // Half-month (index 4) is a calendar code A-Y excluding I
             if (origLen == 8 && IsCometType(designation[0]) &&
-                char.IsDigit(designation[1]) && char.IsDigit(designation[2]) && char.IsDigit(designation[3]))
+                char.IsDigit(designation[1]) && char.IsDigit(designation[2]) && char.IsDigit(designation[3]) &&
+                IsValidHalfMonth(designation[4]))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometAncient;
@@ -1014,8 +1051,10 @@ namespace MPC
             }
 
             // Check for packed BCE comet
+            // Half-month (index 4) is a calendar code A-Y excluding I
             if (origLen == 8 && IsCometType(designation[0]) &&
                 (designation[1] == '/' || designation[1] == '.' || designation[1] == '-') &&
+                IsValidHalfMonth(designation[4]) &&
                 !designation.Contains(' '))
             {
                 info.Format = Format.Packed;
@@ -1029,8 +1068,12 @@ namespace MPC
 
             ValidateWhitespace(des);
 
-            // Check for packed satellite
-            if (len == 8 && des[0] == 'S' && des[1] >= 'A' && des[1] <= 'L')
+            // Check for packed satellite: ^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$
+            // Century I-L only (1800-2199); 7th char always a digit; trailing 0.
+            if (len == 8 && des[0] == 'S' && des[1] >= 'I' && des[1] <= 'L' &&
+                char.IsDigit(des[2]) && char.IsDigit(des[3]) && IsSatellitePlanet(des[4]) &&
+                (char.IsDigit(des[5]) || char.IsUpper(des[5]) || char.IsLower(des[5])) &&
+                char.IsDigit(des[6]) && des[7] == '0')
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.Satellite;
@@ -1114,8 +1157,14 @@ namespace MPC
                     return info;
                 }
 
-                if (des[0] >= 'A' && des[0] <= 'L' && char.IsDigit(des[1]) && char.IsDigit(des[2]) &&
-                    char.IsUpper(des[3]) && char.IsUpper(des[6]))
+                // Asteroid provisional: ^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$
+                // Century I-L only (1800-2199); half-month A-Y skipping I; 6th char always
+                // a digit; order letter A-Z skipping I.
+                if (des[0] >= 'I' && des[0] <= 'L' && char.IsDigit(des[1]) && char.IsDigit(des[2]) &&
+                    IsValidHalfMonth(des[3]) &&
+                    (char.IsDigit(des[4]) || char.IsUpper(des[4]) || char.IsLower(des[4])) &&
+                    char.IsDigit(des[5]) &&
+                    des[6] >= 'A' && des[6] <= 'Z' && des[6] != 'I')
                 {
                     info.Format = Format.Packed;
                     info.Type = DesignationType.Provisional;
@@ -1123,8 +1172,14 @@ namespace MPC
                     return info;
                 }
 
-                if (des[0] >= 'I' && des[0] <= 'L' && char.IsDigit(des[1]) && char.IsDigit(des[2]) &&
-                    char.IsUpper(des[3]) && (char.IsLower(des[6]) || des[6] == '0'))
+                // Comet provisional: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$
+                // Century A-L (1000-2199); half-month A-Y skipping I; 6th char always a
+                // digit; trailing 0-9 or a-z.
+                if (des[0] >= 'A' && des[0] <= 'L' && char.IsDigit(des[1]) && char.IsDigit(des[2]) &&
+                    IsValidHalfMonth(des[3]) &&
+                    (char.IsDigit(des[4]) || char.IsUpper(des[4]) || char.IsLower(des[4])) &&
+                    char.IsDigit(des[5]) &&
+                    (char.IsDigit(des[6]) || char.IsLower(des[6])))
                 {
                     info.Format = Format.Packed;
                     info.Type = DesignationType.CometProvisional;
@@ -1406,7 +1461,7 @@ namespace MPC
             }
 
             // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa" (8-9 chars)
-            if (Regex.IsMatch(d, @"^[PCDXAI][A-L]\d{2}[A-Z]\d{2}[a-z]{1,2}$"))
+            if (Regex.IsMatch(d, @"^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9][a-z]{1,2}$"))
             {
                 return true;
             }
@@ -1445,7 +1500,7 @@ namespace MPC
             }
 
             // Packed provisional comet with fragment (full format): "DJ93F02a", "PJ30J01aa"
-            match = Regex.Match(d, @"^[PCDXAI][A-L]\d{2}[A-Z]\d{2}([a-z]{1,2})$");
+            match = Regex.Match(d, @"^[PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9]([a-z]{1,2})$");
             if (match.Success)
             {
                 return match.Groups[1].Value.ToUpper();
@@ -1484,7 +1539,7 @@ namespace MPC
             }
 
             // Packed provisional comet with fragment: "DJ93F02a" -> "DJ93F020"
-            match = Regex.Match(d, @"^([PCDXAI][A-L]\d{2}[A-Z]\d{2})[a-z]{1,2}$");
+            match = Regex.Match(d, @"^([PCDXAI][A-L]\d{2}[A-Z][0-9A-Za-z][0-9])[a-z]{1,2}$");
             if (match.Success)
             {
                 return match.Groups[1].Value + "0";

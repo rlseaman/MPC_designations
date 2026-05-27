@@ -417,6 +417,14 @@ pack_provisional <- function(unpacked) {
     half_month <- m[4]
     second_letter <- m[5]
 
+    # Letter I is not used in either letter position
+    if (!is_valid_half_month(half_month)) {
+      mpc_error(sprintf("Invalid half-month letter: %s", half_month))
+    }
+    if (second_letter == "I") {
+      mpc_error("Invalid second letter: I (letter I is not used in provisional designations)")
+    }
+
     century_code <- switch(century_digit,
       "8" = "I",
       "9" = "J",
@@ -440,6 +448,11 @@ pack_provisional <- function(unpacked) {
 
   if (!is_valid_half_month(half_month)) {
     mpc_error(sprintf("Invalid half-month letter: %s", half_month))
+  }
+
+  # Letter I is not used in either letter position
+  if (second_letter == "I") {
+    mpc_error("Invalid second letter: I (letter I is not used in provisional designations)")
   }
 
   century <- as.integer(substr(year, 1, 2))
@@ -556,6 +569,12 @@ pack_comet_provisional <- function(unpacked) {
   half_month <- m[3]
   order_str <- m[4]
   fragment <- if (length(m) >= 6 && nchar(m[6]) > 0) m[6] else NULL
+
+  # Half-month is a calendar code (A-Y skipping I); reject invalid letters.
+  # The fragment legitimately includes I per MPC data and is NOT checked here.
+  if (!is_valid_half_month(half_month)) {
+    mpc_error(sprintf("Invalid half-month letter: %s", half_month))
+  }
 
   order_num <- as.integer(order_str)
   if (order_num < 1) {
@@ -751,6 +770,10 @@ decode_bce_year <- function(prefix, code) {
 #' Pack ancient comet provisional
 #' @keywords internal
 pack_ancient_comet_provisional <- function(comet_type, year, half_month, order_num, fragment) {
+  # Half-month is a calendar code (A-Y skipping I), object-type independent.
+  if (!is_valid_half_month(half_month)) {
+    mpc_error(sprintf("Invalid half-month letter: %s", half_month))
+  }
   order_encoded <- encode_cycle_count(order_num)
   fragment_code <- if (is.null(fragment) || nchar(fragment) == 0) "0" else tolower(fragment)
 
@@ -957,7 +980,7 @@ detect_format <- function(designation) {
 
   # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
   if (nchar(designation) == 12) {
-    if (grepl("^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", designation)) {
+    if (grepl("^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (12-char)"))
     }
@@ -965,7 +988,7 @@ detect_format <- function(designation) {
 
   # Check for packed comet designation (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9A-Za-z]$", designation)) {
+    if (grepl("^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (8-char)"))
     }
@@ -973,7 +996,7 @@ detect_format <- function(designation) {
 
   # Check for packed comet with 2-letter fragment (9 chars)
   if (nchar(designation) == 9 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[a-z]{2}$", designation)) {
+    if (grepl("^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2}$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (9-char, 2-letter fragment)"))
     }
@@ -981,7 +1004,7 @@ detect_format <- function(designation) {
 
   # Check for packed ancient comet (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][0-9]{3}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", designation)) {
+    if (grepl("^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
       return(list(format = "packed", type = "comet_ancient",
                   subtype = "comet with ancient provisional (year < 1000)"))
     }
@@ -989,7 +1012,7 @@ detect_format <- function(designation) {
 
   # Check for packed BCE comet (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][/.\\-][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", designation)) {
+    if (grepl("^[PCDXAI][/.\\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
       return(list(format = "packed", type = "comet_bce",
                   subtype = "comet with BCE provisional"))
     }
@@ -1002,7 +1025,7 @@ detect_format <- function(designation) {
 
   # Check for packed satellite designation (8 chars starting with S)
   if (nchar(des) == 8 && substr(des, 1, 1) == "S") {
-    if (grepl("^S[A-L][0-9]{2}[JSUN][0-9A-Za-z]{2}0$", des)) {
+    if (grepl("^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$", des)) {
       planet <- substr(des, 5, 5)
       planet_name <- SATELLITE_PLANET_NAMES[[planet]]
       return(list(format = "packed", type = "satellite",
@@ -1064,7 +1087,7 @@ detect_format <- function(designation) {
       }
     }
 
-    if (grepl("^[A-L][0-9]{2}[A-Z][0-9A-Za-z]{2}[A-Z]$", des)) {
+    if (grepl("^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$", des)) {
       return(list(format = "packed", type = "provisional", subtype = "provisional"))
     }
 
@@ -1077,7 +1100,7 @@ detect_format <- function(designation) {
                   subtype = sprintf("survey (Trojan T-%s)", substr(des, 2, 2))))
     }
 
-    if (grepl("^[IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z]$", des)) {
+    if (grepl("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des)) {
       return(list(format = "packed", type = "comet_provisional", subtype = "comet provisional"))
     }
   }
