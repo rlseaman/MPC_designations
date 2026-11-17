@@ -5,7 +5,7 @@ respective package registries. This document is descriptive and
 work-queue-shaped, not prescriptive — priorities should be revisited each
 time you pick up this chore.
 
-Current tracking version across packaging: **1.1.2**. Any fresh manifest work
+Current tracking version across packaging: **1.1.3**. Any fresh manifest work
 should target this version to stay in sync.
 
 ## What's already published

@@ -1,6 +1,6 @@
 {
   "name": "mpc-designation-ts",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Convert between packed and unpacked MPC (Minor Planet Center) designations - TypeScript",
   "main": "dist/mpc_designation.js",
   "types": "dist/mpc_designation.d.ts",

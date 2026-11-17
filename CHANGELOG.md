@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] — 2026-11-17
+
+### Added
+- All 25 implementations: interstellar objects are numbered like comets with
+  type `I`: `1I` ↔ `0001I`, `3I` ↔ `0003I`, `3I/ATLAS` → `0003I`,
+  `2I-A` ↔ `0002Ia`. The packed form was confirmed from MPC observation
+  records. Previously only the full form with a provisional
+  (`1I/2017 U1` ↔ `0001IK17U010`) worked, and only in some implementations.
+  The helper functions (`to_report_format`, `has_fragment`, etc.) handle `I`
+  as well.
+- Python: `python -m mpc_designation` now works (it was documented but there
+  was no `__main__.py`), and the package ships a `py.typed` marker so type
+  checkers use its annotations.
+
+### Changed
+- Python: `MPCDesignationError` now subclasses `ValueError`, so generic
+  `except ValueError` handlers catch it. Existing `except MPCDesignationError`
+  code is unaffected.
+- Python: the CLI's usage text names the installed `mpc-designation` command.
+- Name suffixes on numbered comets (`1P/Halley` → `0001P`) now work in C,
+  Fortran, Forth, Haskell, Nim, AWK, and SPP, matching the reference. They
+  were previously rejected or misread.
+- Comet numbers outside 1–9999 are now rejected in AWK, Bash, Nim, Forth, and
+  SPP. `0P` used to pack to `0000P`, and `10000P-A` to `10000Pa`. This closes
+  the `numbered_comet_zero` expected-skip in AWK, Nim, and Forth.
+- Shared error suite: 124 → 134 cases (interstellar; zero numbers). Interstellar
+  pairs added to the corpus (`prov_unpack_to_pack.csv.gz`: 2,110,817 pairs).
+
+### Fixed
+- All 25 implementations: unpacking an all-zero number is now an error, as
+  packing already was. `00000` → `0`, `0000P` → `0P`, and `0000PJ82U010` →
+  `0P/1982 U1` were produced by every implementation, including the Python
+  reference, but could not be packed back. C# treated number 0 as "no number"
+  (`0000PJ82U010` → `P/1982 U1`).
+- Octave and R error-test harnesses were broken. They read the category
+  column as the input and treated every row as must-error, so their reported
+  passes were meaningless. Both were rewritten to match the Python harness
+  and now pass the suite. R skips the two NUL-byte cases (R strings cannot
+  contain NUL), as C already does.
+
 ## [1.1.2] — 2026-11-17
 
 ### Fixed
@@ -238,7 +278,8 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/rlseaman/MPC_designations/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...v1.1.0
