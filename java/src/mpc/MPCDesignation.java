@@ -677,7 +677,7 @@ public class MPCDesignation {
         int length = p.length();
 
         // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
-        Pattern pattern = Pattern.compile("^(\\d{4})([PD])([a-z]{1,2})?$");
+        Pattern pattern = Pattern.compile("^(\\d{4})([PDI])([a-z]{1,2})?$");
         Matcher matcher = pattern.matcher(p);
         if (!matcher.matches()) {
             throw new MPCDesignationException("Invalid packed numbered comet designation");
@@ -702,7 +702,7 @@ public class MPCDesignation {
         String u = unpacked.trim();
 
         // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
-        Pattern pattern = Pattern.compile("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
+        Pattern pattern = Pattern.compile("^(\\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
         Matcher matcher = pattern.matcher(u);
         if (!matcher.matches()) {
             throw new MPCDesignationException("Invalid unpacked numbered comet designation");
@@ -1161,7 +1161,7 @@ public class MPCDesignation {
             }
 
             // Check for packed numbered comet (5 chars ending in P or D)
-            if (Pattern.matches("^[0-9]{4}[PD]$", des)) {
+            if (Pattern.matches("^[0-9]{4}[PDI]$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_numbered";
                 char cometType = des.charAt(4);
@@ -1173,7 +1173,7 @@ public class MPCDesignation {
 
         // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
         if (des.length() == 6 || des.length() == 7) {
-            if (Pattern.matches("^[0-9]{4}[PD][a-z]{1,2}$", des)) {
+            if (Pattern.matches("^[0-9]{4}[PDI][a-z]{1,2}$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_numbered";
                 char cometType = des.charAt(4);
@@ -1324,10 +1324,10 @@ public class MPCDesignation {
         }
 
         // Check for unpacked numbered periodic comet (with optional fragment)
-        if (Pattern.matches("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des)) {
+        if (Pattern.matches("^(\\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des)) {
             info.format = FormatType.UNPACKED;
             info.type = "comet_numbered";
-            Matcher m = Pattern.compile("^(\\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$").matcher(des);
+            Matcher m = Pattern.compile("^(\\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$").matcher(des);
             if (m.matches()) {
                 char cometType = m.group(2).charAt(0);
                 String typeDesc = COMET_TYPE_DESCRIPTIONS.getOrDefault(cometType, String.valueOf(cometType));
@@ -1583,7 +1583,7 @@ public class MPCDesignation {
         char frag2 = report.charAt(11);
 
         // Check if this is a numbered comet format
-        if (Pattern.matches("^[0-9]{4}[PD]$", first5) && middle.trim().isEmpty()) {
+        if (Pattern.matches("^[0-9]{4}[PDI]$", first5) && middle.trim().isEmpty()) {
             StringBuilder result = new StringBuilder(first5);
             if (frag1 >= 'a' && frag1 <= 'z') {
                 result.append(frag1);

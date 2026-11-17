@@ -641,7 +641,7 @@ function unpackCometNumbered(packed) {
     packed = packed.trim();
 
     // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
-    const match = packed.match(/^(\d{4})([PD])([a-z]{1,2})?$/);
+    const match = packed.match(/^(\d{4})([PDI])([a-z]{1,2})?$/);
     if (!match) {
         throw new MPCDesignationError(`Invalid packed numbered comet designation: ${packed}`);
     }
@@ -665,7 +665,7 @@ function packCometNumbered(unpacked) {
     unpacked = unpacked.trim();
 
     // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
-    const match = unpacked.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
+    const match = unpacked.match(/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
     if (!match) {
         throw new MPCDesignationError(`Invalid unpacked numbered comet designation: ${unpacked}`);
     }
@@ -1137,7 +1137,7 @@ function detectFormat(designation) {
 
     // Check for packed numbered comet (5 chars ending in P or D)
     if (des.length === 5) {
-        if (/^[0-9]{4}[PD]$/.test(des)) {
+        if (/^[0-9]{4}[PDI]$/.test(des)) {
             result.format = 'packed';
             result.type = 'comet_numbered';
             result.subtype = `comet numbered`;
@@ -1147,7 +1147,7 @@ function detectFormat(designation) {
 
     // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
     if (des.length === 6 || des.length === 7) {
-        if (/^[0-9]{4}[PD][a-z]{1,2}$/.test(des)) {
+        if (/^[0-9]{4}[PDI][a-z]{1,2}$/.test(des)) {
             result.format = 'packed';
             result.type = 'comet_numbered';
             const fragLen = des.length - 5;
@@ -1231,7 +1231,7 @@ function detectFormat(designation) {
     }
 
     // Check for unpacked numbered periodic comet "1P" or "354P" or "73P-A"
-    match = des.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
+    match = des.match(/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/);
     if (match) {
         result.format = 'unpacked';
         result.type = 'comet_numbered';
@@ -1467,7 +1467,7 @@ function fromReportFormat(report) {
     const frag2 = report[11];
 
     // Check if this is a numbered comet format
-    if (/^[0-9]{4}[PD]$/.test(first5) && middle.trim() === '') {
+    if (/^[0-9]{4}[PDI]$/.test(first5) && middle.trim() === '') {
         let result = first5;
         if (frag1 >= 'a' && frag1 <= 'z') {
             result += frag1;

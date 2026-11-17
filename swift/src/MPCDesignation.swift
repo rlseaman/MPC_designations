@@ -99,8 +99,8 @@ struct Patterns {
     static let oldStyleUnpacked = try! NSRegularExpression(pattern: #"^[AB](\d)(\d{2}) ([A-Z])([A-Z])$"#)
     static let provisionalUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])([A-Z])(\d*)$"#)
     static let cometProvUnpacked = try! NSRegularExpression(pattern: #"^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$"#)
-    static let cometNumberedPacked = try! NSRegularExpression(pattern: #"^(\d{4})([PD])([a-z]{1,2})?$"#)
-    static let cometNumberedUnpacked = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
+    static let cometNumberedPacked = try! NSRegularExpression(pattern: #"^(\d{4})([PDI])([a-z]{1,2})?$"#)
+    static let cometNumberedUnpacked = try! NSRegularExpression(pattern: #"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
     static let satelliteUnpacked = try! NSRegularExpression(pattern: #"^S/(\d{4}) ([JSUN]) (\d+)$"#)
     static let cometFullUnpacked = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) (.+)$"#)
     static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
@@ -118,7 +118,7 @@ struct Patterns {
     static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$"#)
     static let packedProvisional = try! NSRegularExpression(pattern: #"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
-    static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD][a-z]{0,2}$"#)
+    static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PDI][a-z]{0,2}$"#)
     static let packedCometProv = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$"#)
 
     // Detect format patterns - unpacked
@@ -127,7 +127,7 @@ struct Patterns {
     static let unpackedOldStyle = try! NSRegularExpression(pattern: #"^[AB]\d{3} [A-Z][A-Z]$"#)
     static let unpackedProvisional = try! NSRegularExpression(pattern: #"^\d{4} [A-Z][A-Z]\d*$"#)
     static let unpackedCometFull = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$"#)
-    static let unpackedCometNumbered = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
+    static let unpackedCometNumbered = try! NSRegularExpression(pattern: #"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$"#)
 
     // Unpack patterns
     static let asteroidStylePacked = try! NSRegularExpression(pattern: #"^\d{4} ([A-Z])(.)"#)
@@ -1421,11 +1421,11 @@ func toReportFormat(_ minimal: String) throws -> String {
     let m = minimal.trimmingCharacters(in: .whitespaces)
     let length = m.count
 
-    // Check if it's a numbered comet (5-7 chars with P or D at position 4)
+    // Check if it's a numbered comet (5-7 chars with P, D or I at position 4)
     if length >= 5 && length <= 7 {
         let chars = Array(m)
         if chars[0].isNumber && chars[1].isNumber && chars[2].isNumber && chars[3].isNumber &&
-           (chars[4] == "P" || chars[4] == "D") {
+           (chars[4] == "P" || chars[4] == "D" || chars[4] == "I") {
             // Numbered comet: "0073P" -> "0073P       "
             // With fragment: "0073Pa" -> "0073P      a", "0073Paa" -> "0073P     aa"
             let prefix = String(chars[0...4])  // e.g., "0073P"
@@ -1456,10 +1456,10 @@ func fromReportFormat(_ report: String) throws -> String {
         throw MPCDesignationError.invalidFormat("Report format must be 12 characters: \(report)")
     }
 
-    // Check if it's a numbered comet (first 4 chars are digits, 5th is P or D)
+    // Check if it's a numbered comet (first 4 chars are digits, 5th is P, D or I)
     let chars = Array(report)
     if chars[0].isNumber && chars[1].isNumber && chars[2].isNumber && chars[3].isNumber &&
-       (chars[4] == "P" || chars[4] == "D") {
+       (chars[4] == "P" || chars[4] == "D" || chars[4] == "I") {
         // Numbered comet format: columns 11-12 may have fragment letters
         let prefix = String(chars[0...4])  // e.g., "0073P"
         let suffix = String(chars[5...11]).trimmingCharacters(in: .whitespaces)
@@ -1476,10 +1476,10 @@ func fromReportFormat(_ report: String) throws -> String {
 
 /// Pre-compiled patterns for helper functions
 struct HelperPatterns {
-    static let unpackedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d+)([PD])-([A-Z]{1,2})(?:/.*)?$"#)
-    static let unpackedNumberedComet = try! NSRegularExpression(pattern: #"^(\d+)([PD])(?:/.*)?$"#)
-    static let packedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d{4})([PD])([a-z]{1,2})$"#)
-    static let packedNumberedComet = try! NSRegularExpression(pattern: #"^(\d{4})([PD])$"#)
+    static let unpackedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d+)([PDI])-([A-Z]{1,2})(?:/.*)?$"#)
+    static let unpackedNumberedComet = try! NSRegularExpression(pattern: #"^(\d+)([PDI])(?:/.*)?$"#)
+    static let packedNumberedCometWithFrag = try! NSRegularExpression(pattern: #"^(\d{4})([PDI])([a-z]{1,2})$"#)
+    static let packedNumberedComet = try! NSRegularExpression(pattern: #"^(\d{4})([PDI])$"#)
     static let unpackedProvCometWithFrag = try! NSRegularExpression(pattern: #"^(\d*)([PCDXAI])/(.+)-([A-Z]{1,2})$"#)
     static let packedProvCometWithFrag = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L]\d{2}[A-Z][0-9A-Za-z][0-9])([a-z]{1,2})$"#)
 }

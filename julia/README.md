@@ -62,7 +62,7 @@ packed = pack_permanent(100001)      # Returns "A0001"
 make test-all
 
 # Run specific tests
-make test-errors     # Error handling tests (94 cases)
+make test-errors     # Error handling tests (130 cases)
 make test-helpers    # Helper function tests (77 cases)
 make test-csv        # Conversion tests (2M+ entries)
 make test-roundtrip  # Round-trip tests

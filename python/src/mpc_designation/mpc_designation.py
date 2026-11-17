@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-mpc_designation.py - Convert between packed and unpacked MPC designations
+mpc-designation - Convert between packed and unpacked MPC designations
 
 Based on Minor Planet Center specifications:
 https://www.minorplanetcenter.net/iau/info/PackedDes.html
@@ -122,8 +122,11 @@ SATELLITE_PLANET_NAMES = {
 }
 
 
-class MPCDesignationError(Exception):
-    """Exception raised for invalid MPC designations."""
+class MPCDesignationError(ValueError):
+    """Exception raised for invalid MPC designations.
+
+    Subclasses ValueError, so generic ``except ValueError`` handlers catch it.
+    """
     pass
 
 
@@ -747,16 +750,18 @@ def pack_comet_provisional(unpacked: str) -> str:
 
 def unpack_comet_numbered(packed: str) -> str:
     """
-    Unpack a numbered periodic comet designation.
-    Input: 5, 6, or 7 character packed format like "0001P", "0073Pa", or "0073Paa"
-    Output: unpacked format like "1P", "73P-A", or "73P-AA"
+    Unpack a numbered comet designation (periodic P, defunct D, or
+    interstellar I).
+    Input: 5, 6, or 7 character packed format like "0001P", "0073Pa", "0073Paa",
+    or "0003I"
+    Output: unpacked format like "1P", "73P-A", "73P-AA", or "3I"
 
     Fragment letters include all A-Z (including I, per MPC data).
     """
     packed = packed.strip()
 
     # Match numbered comet with optional fragment: 0073P, 0073Pa, 0073Paa
-    match = re.match(r'^(\d{4})([PD])([a-z]{1,2})?$', packed)
+    match = re.match(r'^(\d{4})([PDI])([a-z]{1,2})?$', packed)
     if not match:
         raise MPCDesignationError(f"Invalid packed numbered comet designation: {packed}")
 
@@ -773,16 +778,18 @@ def unpack_comet_numbered(packed: str) -> str:
 
 def pack_comet_numbered(unpacked: str) -> str:
     """
-    Pack a numbered periodic comet designation.
-    Input: unpacked format like "1P", "73P-A", or "73P-AA"
-    Output: 5, 6, or 7 character packed format like "0001P", "0073Pa", "0073Paa"
+    Pack a numbered comet designation (periodic P, defunct D, or
+    interstellar I).
+    Input: unpacked format like "1P", "73P-A", "73P-AA", "3I", or "3I/ATLAS"
+    Output: 5, 6, or 7 character packed format like "0001P", "0073Pa", "0073Paa",
+    or "0003I"
 
     Fragment letters include all A-Z (including I, per MPC data).
     """
     unpacked = unpacked.strip()
 
-    # Match "1P", "73P-A", "73P-AA", or "1P/Halley" (with optional name after slash)
-    match = re.match(r'^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', unpacked)
+    # Match "1P", "73P-A", "73P-AA", "1P/Halley", or "3I/ATLAS" (optional name after slash)
+    match = re.match(r'^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', unpacked)
     if not match:
         raise MPCDesignationError(f"Invalid unpacked numbered comet designation: {unpacked}")
 
@@ -1229,7 +1236,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed numbered comet (5, 6, or 7 chars: ####P, ####Pa, ####Paa)
     if len(des) in (5, 6, 7):
-        if re.match(r'^[0-9]{4}[PD]([a-z]{1,2})?$', des):
+        if re.match(r'^[0-9]{4}[PDI]([a-z]{1,2})?$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_numbered'
             comet_type = des[4]
@@ -1325,7 +1332,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
         return result
 
     # Check for unpacked numbered periodic comet "1P", "354P", "73P-A", "73P-AA"
-    match = re.match(r'^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', des)
+    match = re.match(r'^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$', des)
     if match:
         result['format'] = 'unpacked'
         result['type'] = 'comet_numbered'
@@ -1757,7 +1764,7 @@ def from_report_format(report: str) -> str:
     middle = report[5:10]
     last2 = report[10:12]
 
-    if re.match(r'^[0-9]{4}[PD]$', first5) and middle.strip() == '':
+    if re.match(r'^[0-9]{4}[PDI]$', first5) and middle.strip() == '':
         # Check for fragment in last 2 positions
         frag1 = report[10]
         frag2 = report[11]
@@ -1999,7 +2006,7 @@ def designations_equal(desig1: str, desig2: str) -> bool:
 # =============================================================================
 
 def print_usage():
-    print("Usage: mpc_designation.py [-v|--verbose] <designation> [designation ...]", file=sys.stderr)
+    print("Usage: mpc-designation [-v|--verbose] <designation> [designation ...]", file=sys.stderr)
     print("", file=sys.stderr)
     print("Convert between packed and unpacked MPC designations.", file=sys.stderr)
     print("Auto-detects the input format and converts to the other.", file=sys.stderr)
@@ -2008,13 +2015,14 @@ def print_usage():
     print("  -v, --verbose   Show detailed information about the conversion", file=sys.stderr)
     print("", file=sys.stderr)
     print("Examples:", file=sys.stderr)
-    print("  mpc_designation.py 00001             -> 1", file=sys.stderr)
-    print("  mpc_designation.py 1                 -> 00001", file=sys.stderr)
-    print("  mpc_designation.py J95X00A           -> 1995 XA", file=sys.stderr)
-    print("  mpc_designation.py '1995 XA'         -> J95X00A", file=sys.stderr)
-    print("  mpc_designation.py 'C/1995 O1'       -> CJ95O010", file=sys.stderr)
-    print("  mpc_designation.py 1P                -> 0001P", file=sys.stderr)
-    print("  mpc_designation.py 'D/1993 F2-B'     -> DJ93F02b (fragment B)", file=sys.stderr)
+    print("  mpc-designation 00001             -> 1", file=sys.stderr)
+    print("  mpc-designation 1                 -> 00001", file=sys.stderr)
+    print("  mpc-designation J95X00A           -> 1995 XA", file=sys.stderr)
+    print("  mpc-designation '1995 XA'         -> J95X00A", file=sys.stderr)
+    print("  mpc-designation 'C/1995 O1'       -> CJ95O010", file=sys.stderr)
+    print("  mpc-designation 1P                -> 0001P", file=sys.stderr)
+    print("  mpc-designation 3I                -> 0003I (interstellar)", file=sys.stderr)
+    print("  mpc-designation 'D/1993 F2-B'     -> DJ93F02b (fragment B)", file=sys.stderr)
 
 
 def main():

@@ -113,7 +113,7 @@ procedure mpc_detect (des, format, dtype)
 char	des[ARB]
 int	format, dtype
 
-int	len, i, dashpos, strlen(), mpc_strchr(), mpc_strstr()
+int	len, elen, i, dashpos, strlen(), mpc_strchr(), mpc_strstr()
 char	first, space, c
 bool	alldig, mpc_iscent(), mpc_ishalfmo(), mpc_isb62(), mpc_isseclet()
 bool	mpc_isext(), mpc_isctype()
@@ -166,7 +166,7 @@ begin
 		if (!IS_DIGIT(des[i]))
 		    alldig = false
 	    }
-	    if (alldig && (des[5] == 'P' || des[5] == 'D')) {
+	    if (alldig && (des[5] == 'P' || des[5] == 'D' || des[5] == 'I')) {
 		format = 1
 		dtype = 4
 		return
@@ -180,7 +180,7 @@ begin
 		if (!IS_DIGIT(des[i]))
 		    alldig = false
 	    }
-	    if (alldig && (des[5] == 'P' || des[5] == 'D') && IS_LOWER(des[6])) {
+	    if (alldig && (des[5] == 'P' || des[5] == 'D' || des[5] == 'I') && IS_LOWER(des[6])) {
 		if (len == 7 && !IS_LOWER(des[7])) {
 		    # 7 chars but second fragment not lowercase - not valid
 		} else {
@@ -286,11 +286,21 @@ begin
 	    return
 	}
 
-	# Unpacked numbered comet (with optional fragment like "73P-A" or "73P-AA")
-	if (len >= 2 && len <= 8) {
+	# Unpacked numbered comet (with optional fragment like "73P-A" or "73P-AA"),
+	# optionally followed by a name: "1P/Halley", "3I/ATLAS".  Only the part
+	# before a slash that is followed by a letter is checked (elen).
+	elen = len
+	do i = 1, len {
+	    if (des[i] == '/') {
+		if (IS_UPPER(des[i+1]) || IS_LOWER(des[i+1]))
+		    elen = i - 1
+		break
+	    }
+	}
+	if (elen >= 2 && elen <= 8) {
 	    # Check for fragment: "73P-A" or "73P-AA"
 	    dashpos = 0
-	    do i = 1, len {
+	    do i = 1, elen {
 		if (des[i] == '-')
 		    dashpos = i
 	    }
@@ -301,27 +311,27 @@ begin
 		    if (!IS_DIGIT(des[i]))
 			alldig = false
 		}
-		if (alldig && (des[dashpos - 1] == 'P' || des[dashpos - 1] == 'D')) {
+		if (alldig && (des[dashpos - 1] == 'P' || des[dashpos - 1] == 'D' || des[dashpos - 1] == 'I')) {
 		    # Check fragment is 1-2 uppercase letters
-		    if (len == dashpos + 1 && IS_UPPER(des[dashpos + 1])) {
+		    if (elen == dashpos + 1 && IS_UPPER(des[dashpos + 1])) {
 			format = 2
 			dtype = 4
 			return
 		    }
-		    if (len == dashpos + 2 && IS_UPPER(des[dashpos + 1]) && IS_UPPER(des[dashpos + 2])) {
+		    if (elen == dashpos + 2 && IS_UPPER(des[dashpos + 1]) && IS_UPPER(des[dashpos + 2])) {
 			format = 2
 			dtype = 4
 			return
 		    }
 		}
-	    } else if (len <= 5) {
+	    } else if (elen <= 5) {
 		# No fragment
 		alldig = true
-		do i = 1, len - 1 {
+		do i = 1, elen - 1 {
 		    if (!IS_DIGIT(des[i]))
 			alldig = false
 		}
-		if (alldig && (des[len] == 'P' || des[len] == 'D')) {
+		if (alldig && (des[elen] == 'P' || des[elen] == 'D' || des[elen] == 'I')) {
 		    format = 2
 		    dtype = 4
 		    return
@@ -984,13 +994,25 @@ procedure mpc_pkcnum (unpacked, packed, maxch)
 char	unpacked[ARB], packed[ARB]
 int	maxch
 
-int	num, i, len, dashpos, mpc_strchr(), strlen()
-char	ctype, frag1, frag2, dash
+int	num, i, len, dashpos, strlen()
+char	ctype, frag1, frag2
 
 begin
-	dash = '-'
+	# Ignore an optional name after a slash ("1P/Halley", "3I/ATLAS")
 	len = strlen (unpacked)
-	dashpos = mpc_strchr (unpacked, dash)
+	do i = 1, len {
+	    if (unpacked[i] == '/') {
+		len = i - 1
+		break
+	    }
+	}
+	dashpos = 0
+	do i = 1, len {
+	    if (unpacked[i] == '-') {
+		dashpos = i
+		break
+	    }
+	}
 
 	num = 0
 	i = 1
@@ -999,13 +1021,13 @@ begin
 	    i = i + 1
 	}
 
-	# Validate comet number > 0
-	if (num <= 0) {
+	# Validate comet number (1-9999)
+	if (num <= 0 || num > 9999) {
 	    packed[1] = EOS
 	    return
 	}
 
-	# Get comet type (P or D), it's right before the dash or at the end
+	# Get comet type (P, D, or I), it's right before the dash or at the end
 	if (dashpos > 0) {
 	    ctype = unpacked[dashpos - 1]
 	} else {
@@ -1974,7 +1996,7 @@ begin
 	if ((len == 6 || len == 7) &&
 	    IS_DIGIT(minimal[1]) && IS_DIGIT(minimal[2]) &&
 	    IS_DIGIT(minimal[3]) && IS_DIGIT(minimal[4]) &&
-	    (minimal[5] == 'P' || minimal[5] == 'D') && IS_LOWER(minimal[6])) {
+	    (minimal[5] == 'P' || minimal[5] == 'D' || minimal[5] == 'I') && IS_LOWER(minimal[6])) {
 	    # Copy base (0073P)
 	    do i = 1, 5 {
 		report[i] = minimal[i]
@@ -2000,7 +2022,7 @@ begin
 	# Numbered comet without fragment (5 chars: ####P/D)
 	if (len == 5 && IS_DIGIT(minimal[1]) && IS_DIGIT(minimal[2]) &&
 	    IS_DIGIT(minimal[3]) && IS_DIGIT(minimal[4]) &&
-	    (minimal[5] == 'P' || minimal[5] == 'D')) {
+	    (minimal[5] == 'P' || minimal[5] == 'D' || minimal[5] == 'I')) {
 	    do i = 1, 5 {
 		report[i] = minimal[i]
 	    }
@@ -2042,7 +2064,7 @@ begin
 	# Handle numbered comet with fragment in columns 11-12
 	if (len >= 5 && IS_DIGIT(report[1]) && IS_DIGIT(report[2]) &&
 	    IS_DIGIT(report[3]) && IS_DIGIT(report[4]) &&
-	    (report[5] == 'P' || report[5] == 'D')) {
+	    (report[5] == 'P' || report[5] == 'D' || report[5] == 'I')) {
 	    # Copy base
 	    do i = 1, 5 {
 		minimal[i] = report[i]
@@ -2095,7 +2117,7 @@ begin
 	}
 	if (dashpos > 0) {
 	    # Check if it's a numbered comet with fragment
-	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D')) {
+	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D' || desig[dashpos - 1] == 'I')) {
 		# Check digits before type
 		i = 1
 		while (i < dashpos - 1 && IS_DIGIT(desig[i]))
@@ -2113,7 +2135,7 @@ begin
 	if ((len == 6 || len == 7) &&
 	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
 	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
-	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    (desig[5] == 'P' || desig[5] == 'D' || desig[5] == 'I') && IS_LOWER(desig[6])) {
 	    if (len == 6)
 		return (true)
 	    if (len == 7 && IS_LOWER(desig[7]))
@@ -2180,7 +2202,7 @@ begin
 	if ((len == 6 || len == 7) &&
 	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
 	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
-	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    (desig[5] == 'P' || desig[5] == 'D' || desig[5] == 'I') && IS_LOWER(desig[6])) {
 	    frag[1] = desig[6] - 32
 	    if (len == 7 && IS_LOWER(desig[7])) {
 		frag[2] = desig[7] - 32
@@ -2233,7 +2255,7 @@ begin
 	}
 	if (dashpos > 0) {
 	    # Check if this looks like a comet with fragment
-	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D')) {
+	    if (dashpos >= 3 && (desig[dashpos - 1] == 'P' || desig[dashpos - 1] == 'D' || desig[dashpos - 1] == 'I')) {
 		do i = 1, dashpos - 1 {
 		    parent[i] = desig[i]
 		}
@@ -2255,7 +2277,7 @@ begin
 	if ((len == 6 || len == 7) &&
 	    IS_DIGIT(desig[1]) && IS_DIGIT(desig[2]) &&
 	    IS_DIGIT(desig[3]) && IS_DIGIT(desig[4]) &&
-	    (desig[5] == 'P' || desig[5] == 'D') && IS_LOWER(desig[6])) {
+	    (desig[5] == 'P' || desig[5] == 'D' || desig[5] == 'I') && IS_LOWER(desig[6])) {
 	    do i = 1, 5 {
 		parent[i] = desig[i]
 	    }

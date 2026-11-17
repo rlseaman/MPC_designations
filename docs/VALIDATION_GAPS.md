@@ -23,13 +23,13 @@ check and removing the skip.
 
 | Implementation | error suite |
 |---|---|
-| Python, Tcl | 124 / 124, **0 skips** — the validation reference |
-| C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C skips 2 inherent null-byte cases) |
-| **nim** | 113 pass / **11 skip** |
-| **haskell** | 107 pass / **17 skip** |
-| **bash** | 104 pass / **20 skip** |
-| **awk** | 101 pass / **23 skip** |
-| **forth** | 95 pass / **29 skip** (most permissive; no error channel) |
+| Python, Tcl | 130 / 130, **0 skips** — the validation reference |
+| C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C and R skip 2 inherent null-byte cases; SPP reports them as failures) |
+| **nim** | 120 pass / **10 skip** |
+| **haskell** | 113 pass / **17 skip** |
+| **bash** | 110 pass / **20 skip** |
+| **awk** | 108 pass / **22 skip** |
+| **forth** | 102 pass / **28 skip** (most permissive; no error channel) |
 
 ## Gaps by theme
 
@@ -64,7 +64,7 @@ bash, forth, haskell** (varies).
 - `comet_invalid_fragment` (numeric), `comet_long_fragment` (>2 letters).
 - `old_style_invalid_prefix` (`C908`), `old_style_wrong_length` (`A90`),
   `old_style_lowercase` (`a908`).
-- `numbered_comet_zero` (`0P`).
+- `numbered_comet_zero` (`0P`) — closed in awk, nim, and forth in 1.1.3.
 - `very_long_string` (over-long digit run encoded as a tilde asteroid).
 
 ### 4. Embedded NUL bytes (inherent, shared with C)

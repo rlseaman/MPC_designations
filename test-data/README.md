@@ -6,11 +6,13 @@ This directory contains shared test data used by all language implementations.
 
 ### prov_unpack_to_pack.csv.gz
 
-Compressed CSV file containing 2,110,813 known-good provisional designation
+Compressed CSV file containing 2,110,817 known-good provisional designation
 conversion pairs: asteroid provisionals (standard, extended `_YHbbbb`,
 pre-1925 A-prefix), survey designations, and comet provisionals (modern,
 ancient, BCE, fragments, and asteroid-style including the extended form, e.g.
-`P/2025 OZ695,P_PO00Ud`).
+`P/2025 OZ695,P_PO00Ud`). Since 1.1.3 it also carries the numbered
+interstellar objects (`1I,0001I` … `3I,0003I`, `1I/2017 U1,0001IK17U010`),
+whose packed forms were confirmed from MPC observation records.
 
 Format: `unpacked,packed` (one header row)
 

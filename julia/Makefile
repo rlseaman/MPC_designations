@@ -54,7 +54,7 @@ help:
 	@echo "Targets:"
 	@echo "  all           No build step required (Julia is interpreted)"
 	@echo "  test          Run conversion tests"
-	@echo "  test-errors   Run error handling tests (94 cases)"
+	@echo "  test-errors   Run error handling tests (130 cases)"
 	@echo "  test-helpers  Run helper function tests (77 cases)"
 	@echo "  test-csv      Run CSV conversion tests (2M+ entries)"
 	@echo "  test-roundtrip Run round-trip tests"

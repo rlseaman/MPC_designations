@@ -480,7 +480,7 @@ packCometProvisional unpacked = do
 unpackCometNumbered :: String -> Either MPCError String
 unpackCometNumbered packed
     -- Match with optional fragment: "0073P", "0073Pa", "0073Paa"
-    | len >= 5 && len <= 7 && all isDigit (take 4 packed) && packed !! 4 `elem` "PD" =
+    | len >= 5 && len <= 7 && all isDigit (take 4 packed) && packed !! 4 `elem` "PDI" =
         let numStr = take 4 packed
             ctype = packed !! 4
             fragment = drop 5 packed
@@ -506,7 +506,7 @@ packCometNumbered unpacked
     -- Match "1P", "73P-A", "73P-AA", or "1P/Halley"
     (matchNumbered, numStr, num, ctype, fragment) =
         let (ns, rest) = span isDigit trimmed
-        in if not (null ns) && length rest >= 1 && head rest `elem` "PD"
+        in if not (null ns) && length rest >= 1 && head rest `elem` "PDI"
            then let afterType = drop 1 rest
                     frag = if "-" `isPrefixOf` afterType
                            then takeWhile isAlpha (drop 1 afterType)
@@ -746,12 +746,12 @@ detectFormat des
         Right $ FormatInfo Packed Survey "survey"
 
     -- Packed numbered comet (5 chars without fragment)
-    | len == 5 && all isDigit (take 4 trimmed) && last trimmed `elem` "PD" =
+    | len == 5 && all isDigit (take 4 trimmed) && last trimmed `elem` "PDI" =
         Right $ FormatInfo Packed CometNumbered "comet numbered"
 
     -- Packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
     | (len == 6 || len == 7) && all isDigit (take 4 trimmed) &&
-      trimmed !! 4 `elem` "PD" && all isLower (drop 5 trimmed) =
+      trimmed !! 4 `elem` "PDI" && all isLower (drop 5 trimmed) =
         Right $ FormatInfo Packed CometNumbered "comet numbered with fragment"
 
     -- Packed comet provisional (7 chars, no spaces)
@@ -845,11 +845,18 @@ detectFormat des
         let (numPart, rest) = span isDigit s
             afterNum = dropWhile (== ' ') rest
         in not (null afterNum) && head afterNum `elem` cometTypes &&
-           length afterNum > 1 && afterNum !! 1 == '/'
+           length afterNum > 1 && afterNum !! 1 == '/' &&
+           not (isNumberedWithName numPart rest)
+
+    -- Numbered comet with a name suffix ("1P/Halley", "3I/ATLAS"): a name
+    -- (letter after the slash) rather than a provisional designation.
+    isNumberedWithName numPart rest = case rest of
+        (t:'/':c:_) -> not (null numPart) && t `elem` "PDI" && isAlpha c
+        _ -> False
 
     matchesCometNumbered s =
         let (numPart, rest) = span isDigit s
-        in not (null numPart) && not (null rest) && head rest `elem` "PD" &&
+        in not (null numPart) && not (null rest) && head rest `elem` "PDI" &&
            (length rest == 1 || rest !! 1 == '/' || rest !! 1 == '-')
 
 -- | Convert a designation (returns info dict)
@@ -911,7 +918,7 @@ unpack des = do
 toReportFormat :: String -> String
 toReportFormat minimal
     -- Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
-    | len >= 5 && len <= 7 && all isDigit (take 4 m) && m !! 4 `elem` "PD" =
+    | len >= 5 && len <= 7 && all isDigit (take 4 m) && m !! 4 `elem` "PDI" =
         let basePart = take 5 m  -- "0073P"
             fragment = drop 5 m
         in if null fragment
@@ -930,7 +937,7 @@ fromReportFormat :: String -> Either MPCError String
 fromReportFormat report
     | length report /= 12 = Left $ MPCError "Report format must be exactly 12 characters"
     -- Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
-    | len5 >= 5 && all isDigit (take 4 trimLeft) && trimLeft !! 4 `elem` "PD" =
+    | len5 >= 5 && all isDigit (take 4 trimLeft) && trimLeft !! 4 `elem` "PDI" =
         let basePart = take 5 trimLeft
             afterBase = drop 5 report
             fragment = trim afterBase
@@ -964,7 +971,7 @@ hasFragment des
 
     matchUnpackedNumberedFragment =
         let (numPart, rest) = span isDigit d
-        in not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+        in not (null numPart) && length rest >= 3 && head rest `elem` "PDI" &&
            rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
 
     matchUnpackedProvFragment =
@@ -972,7 +979,7 @@ hasFragment des
         '-' `elem` drop 7 d
 
     matchPackedNumberedFragment =
-        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PDI" &&
         all isLower (drop 5 d)
 
     matchPackedProvFragment =
@@ -1000,7 +1007,7 @@ getFragment des
 
     (matchUnpackedNumberedFragment, fragUnpackedNum) =
         let (numPart, rest) = span isDigit d
-        in if not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+        in if not (null numPart) && length rest >= 3 && head rest `elem` "PDI" &&
               rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
            then (True, drop 2 rest)
            else (False, "")
@@ -1013,7 +1020,7 @@ getFragment des
         else (False, "")
 
     matchPackedNumberedFragment =
-        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PDI" &&
         all isLower (drop 5 d)
 
     (matchPackedProvFragment, fragPackedProv) =
@@ -1044,7 +1051,7 @@ getParent des
 
     (matchUnpackedNumberedFragment, parentUnpackedNum) =
         let (numPart, rest) = span isDigit d
-        in if not (null numPart) && length rest >= 3 && head rest `elem` "PD" &&
+        in if not (null numPart) && length rest >= 3 && head rest `elem` "PDI" &&
               rest !! 1 == '-' && all isAlpha (drop 2 rest) && length (drop 2 rest) <= 2
            then (True, numPart ++ [head rest])
            else (False, "")
@@ -1058,7 +1065,7 @@ getParent des
         else (False, "")
 
     matchPackedNumberedFragment =
-        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PD" &&
+        (len == 6 || len == 7) && all isDigit (take 4 d) && d !! 4 `elem` "PDI" &&
         all isLower (drop 5 d)
 
     matchPackedProvFragment =

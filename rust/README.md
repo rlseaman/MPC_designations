@@ -246,7 +246,7 @@ assert!(!designations_equal("73P-A", "73P-B"));    // false
 # Build and run conversion tests (2M+ cases)
 make test
 
-# Run error handling tests (94 cases)
+# Run error handling tests (130 cases)
 make test-errors
 
 # Run helper function tests (77 cases)

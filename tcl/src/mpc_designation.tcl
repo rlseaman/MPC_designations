@@ -98,12 +98,12 @@ namespace eval MPCDesignation {
     variable pat_old_style {^[AB](\d)(\d{2}) ([A-Z])([A-Z])$}
     variable pat_provisional_unpacked {^(\d{4}) ([A-Z])([A-Z])(\d*)$}
     variable pat_comet_prov_unpacked {^(\d{4}) ([A-Z])(\d+)(?:-([A-Z]{1,2}))?$}
-    variable pat_comet_numbered_packed {^(\d{4})([PD])$}
-    variable pat_comet_numbered_unpacked {^(\d+)([PD])(?:/[A-Za-z].*)?$}
+    variable pat_comet_numbered_packed {^(\d{4})([PDI])$}
+    variable pat_comet_numbered_unpacked {^(\d+)([PDI])(?:/[A-Za-z].*)?$}
     # Numbered comet with optional fragment (e.g., "73P-A" or "73P-AA")
-    variable pat_comet_numbered_frag_unpacked {^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$}
+    variable pat_comet_numbered_frag_unpacked {^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$}
     # Packed: 4-digit number + type + optional lowercase fragment(s)
-    variable pat_comet_numbered_frag_packed {^(\d{4})([PD])([a-z]{1,2})?$}
+    variable pat_comet_numbered_frag_packed {^(\d{4})([PDI])([a-z]{1,2})?$}
     variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
     variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
     variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
@@ -126,7 +126,7 @@ namespace eval MPCDesignation {
     variable pat_unpacked_provisional {^\d{4} [A-Z][A-Z]\d*$}
     variable pat_unpacked_named {^(\d+) [A-Z][a-z]{2,}}
     variable pat_packed_satellite {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$}
-    variable pat_packed_comet_numbered {^[0-9]{4}([PD])$}
+    variable pat_packed_comet_numbered {^[0-9]{4}([PDI])$}
     variable pat_packed_comet_prov {^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$}
     variable pat_unpacked_comet_full {^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$}
     variable pat_parenthesized {^\((\d+)\)$}
@@ -1761,7 +1761,7 @@ namespace eval MPCDesignation {
         set middle [string range $report 5 9]
         set last2 [string range $report 10 11]
 
-        if {[regexp {^[0-9]{4}[PD]$} $first5] && [string trim $middle] eq ""} {
+        if {[regexp {^[0-9]{4}[PDI]$} $first5] && [string trim $middle] eq ""} {
             # Check for fragment in last 2 positions
             set frag1 [string index $report 10]
             set frag2 [string index $report 11]

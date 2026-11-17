@@ -650,7 +650,7 @@ namespace MPC
             string u = Trim(unpacked);
 
             // Match "1P", "73P-A", "73P-AA", "1P/Halley" (with optional fragment and/or name)
-            var match = Regex.Match(u, @"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
+            var match = Regex.Match(u, @"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
             if (!match.Success)
             {
                 throw new MPCDesignationException("Invalid unpacked numbered comet designation");
@@ -678,7 +678,7 @@ namespace MPC
             string p = Trim(packed);
 
             // Match numbered comet with optional fragment: "0073P", "0073Pa", "0073Paa"
-            var match = Regex.Match(p, @"^(\d{4})([PD])([a-z]{1,2})?$");
+            var match = Regex.Match(p, @"^(\d{4})([PDI])([a-z]{1,2})?$");
             if (!match.Success)
             {
                 throw new MPCDesignationException("Invalid packed numbered comet designation");
@@ -1139,7 +1139,7 @@ namespace MPC
                 }
 
                 // Check for packed numbered comet
-                if (des.Take(4).All(char.IsDigit) && (des[4] == 'P' || des[4] == 'D'))
+                if (des.Take(4).All(char.IsDigit) && (des[4] == 'P' || des[4] == 'D' || des[4] == 'I'))
                 {
                     info.Format = Format.Packed;
                     info.Type = DesignationType.CometNumbered;
@@ -1150,7 +1150,7 @@ namespace MPC
 
             // Check for packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
             if ((len == 6 || len == 7) && des.Take(4).All(char.IsDigit) &&
-                (des[4] == 'P' || des[4] == 'D') && des.Skip(5).All(char.IsLower))
+                (des[4] == 'P' || des[4] == 'D' || des[4] == 'I') && des.Skip(5).All(char.IsLower))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometNumbered;
@@ -1298,7 +1298,7 @@ namespace MPC
             }
 
             // Check for unpacked numbered comet with optional fragment
-            var numberedMatch = Regex.Match(des, @"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
+            var numberedMatch = Regex.Match(des, @"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$");
             if (numberedMatch.Success)
             {
                 char cometType = numberedMatch.Groups[2].Value[0];
@@ -1416,7 +1416,7 @@ namespace MPC
             string m = Trim(minimal);
 
             // Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
-            var match = Regex.Match(m, @"^(\d{4}[PD])([a-z]{1,2})?$");
+            var match = Regex.Match(m, @"^(\d{4}[PDI])([a-z]{1,2})?$");
             if (match.Success)
             {
                 string basePart = match.Groups[1].Value;  // "0073P"
@@ -1446,7 +1446,7 @@ namespace MPC
             }
 
             // Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
-            var match = Regex.Match(report, @"^(\d{4}[PD])(\s*)([a-z]{0,2})$");
+            var match = Regex.Match(report, @"^(\d{4}[PDI])(\s*)([a-z]{0,2})$");
             if (match.Success)
             {
                 string basePart = match.Groups[1].Value;  // "0073P"
@@ -1471,7 +1471,7 @@ namespace MPC
             string d = Trim(designation);
 
             // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
-            if (Regex.IsMatch(d, @"^\d+[PD]-[A-Z]{1,2}(?:/.*)?$"))
+            if (Regex.IsMatch(d, @"^\d+[PDI]-[A-Z]{1,2}(?:/.*)?$"))
             {
                 return true;
             }
@@ -1483,7 +1483,7 @@ namespace MPC
             }
 
             // Packed numbered comet with fragment: "0073Pa", "0073Paa"
-            if (Regex.IsMatch(d, @"^\d{4}[PD][a-z]{1,2}$"))
+            if (Regex.IsMatch(d, @"^\d{4}[PDI][a-z]{1,2}$"))
             {
                 return true;
             }
@@ -1507,7 +1507,7 @@ namespace MPC
             string d = Trim(designation);
 
             // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
-            var match = Regex.Match(d, @"^\d+[PD]-([A-Z]{1,2})(?:/.*)?$");
+            var match = Regex.Match(d, @"^\d+[PDI]-([A-Z]{1,2})(?:/.*)?$");
             if (match.Success)
             {
                 return match.Groups[1].Value;
@@ -1521,7 +1521,7 @@ namespace MPC
             }
 
             // Packed numbered comet with fragment: "0073Pa", "0073Paa"
-            match = Regex.Match(d, @"^\d{4}[PD]([a-z]{1,2})$");
+            match = Regex.Match(d, @"^\d{4}[PDI]([a-z]{1,2})$");
             if (match.Success)
             {
                 return match.Groups[1].Value.ToUpper();
@@ -1546,7 +1546,7 @@ namespace MPC
             string d = Trim(designation);
 
             // Unpacked numbered comet with fragment: "73P-A" -> "73P"
-            var match = Regex.Match(d, @"^(\d+[PD])-[A-Z]{1,2}((?:/.*)?)$");
+            var match = Regex.Match(d, @"^(\d+[PDI])-[A-Z]{1,2}((?:/.*)?)$");
             if (match.Success)
             {
                 return match.Groups[1].Value + match.Groups[2].Value;
@@ -1560,7 +1560,7 @@ namespace MPC
             }
 
             // Packed numbered comet with fragment: "0073Pa" -> "0073P"
-            match = Regex.Match(d, @"^(\d{4}[PD])[a-z]{1,2}$");
+            match = Regex.Match(d, @"^(\d{4}[PDI])[a-z]{1,2}$");
             if (match.Success)
             {
                 return match.Groups[1].Value;

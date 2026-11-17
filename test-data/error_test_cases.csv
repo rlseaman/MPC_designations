@@ -147,3 +147,10 @@ comet_extended,valid_packed,P_PO00Ud,valid,Packed comet with extended provisiona
 comet_extended,valid_numbered_packed,0001P_PO00Ud,valid,12-char packed numbered comet with extended provisional
 comet_extended,packed_half_I,P_PI00Ud,format,Half-month I in packed comet extended provisional
 comet_extended,year_before_2000,C/1999 AA620,range,Comet extended provisional needs year >= 2000
+# Interstellar objects: numbered like periodic comets with type I (MPC: 1I = 0001I, 3I = 0003I)
+interstellar,numbered_1I,1I,valid,First interstellar object (1I/'Oumuamua)
+interstellar,numbered_3I_packed,0003I,valid,Packed interstellar number
+interstellar,with_name,3I/ATLAS,valid,Interstellar number with name
+interstellar,with_provisional,1I/2017 U1,valid,Interstellar number with provisional
+interstellar,number_zero,0I,range,Interstellar number zero
+interstellar,number_too_large,10000I,range,Interstellar number above 9999

@@ -688,8 +688,29 @@ static int unpack_comet_provisional(const char *packed, char *output, size_t out
 /* ========================================================================= */
 
 /*
+ * If s looks like a numbered comet with an informational name suffix
+ * ("1P/Halley", "3I/ATLAS"), i.e. matches ^[0-9]+[PDI](-[A-Z]{1,2})?/[A-Za-z],
+ * return the index of the '/'. Otherwise return 0.
+ */
+static size_t numbered_comet_name_cut(const char *s) {
+    size_t i = 0;
+    while (isdigit((unsigned char)s[i])) i++;
+    if (i == 0) return 0;
+    if (s[i] != 'P' && s[i] != 'D' && s[i] != 'I') return 0;
+    i++;
+    if (s[i] == '-') {
+        i++;
+        if (!isupper((unsigned char)s[i])) return 0;
+        i++;
+        if (isupper((unsigned char)s[i])) i++;
+    }
+    if (s[i] != '/' || !isalpha((unsigned char)s[i + 1])) return 0;
+    return i;
+}
+
+/*
  * Pack a numbered comet designation with optional fragment.
- * Input: "1P", "73P-A", "73P-AA" (fragment letters include I, per MPC data)
+ * Input: "1P", "73P-A", "73P-AA", "3I", "1P/Halley" (fragment letters include I)
  * Output: "0001P", "0073Pa", "0073Paa"
  */
 static int pack_comet_numbered(const char *unpacked, char *output, size_t outlen) {
@@ -697,6 +718,10 @@ static int pack_comet_numbered(const char *unpacked, char *output, size_t outlen
     strncpy(buf, unpacked, sizeof(buf) - 1);
     buf[sizeof(buf) - 1] = '\0';
     trim(buf);
+
+    /* Drop an informational name suffix: "1P/Halley" -> "1P" */
+    size_t cut = numbered_comet_name_cut(buf);
+    if (cut) buf[cut] = '\0';
 
     if (outlen < 8) return MPC_ERR_BUFFER;  /* Need room for 7 chars + null */
 
@@ -713,7 +738,7 @@ static int pack_comet_numbered(const char *unpacked, char *output, size_t outlen
         }
     }
 
-    if (comet_type != 'P' && comet_type != 'D') {
+    if (comet_type != 'P' && comet_type != 'D' && comet_type != 'I') {
         return MPC_ERR_FORMAT;
     }
 
@@ -755,13 +780,13 @@ static int unpack_comet_numbered(const char *packed, char *output, size_t outlen
     if (len < 5 || len > 7) return MPC_ERR_FORMAT;
     if (outlen < 12) return MPC_ERR_BUFFER;
 
-    /* Validate: first 4 chars are digits, 5th is P or D */
+    /* Validate: first 4 chars are digits, 5th is P, D, or I */
     for (int i = 0; i < 4; i++) {
         if (!isdigit(buf[i])) return MPC_ERR_FORMAT;
     }
 
     char comet_type = buf[4];
-    if (comet_type != 'P' && comet_type != 'D') {
+    if (comet_type != 'P' && comet_type != 'D' && comet_type != 'I') {
         return MPC_ERR_FORMAT;
     }
 
@@ -1292,7 +1317,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
         /* Check for packed numbered comet (no fragment) */
         if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
-            (buf[4] == 'P' || buf[4] == 'D')) {
+            (buf[4] == 'P' || buf[4] == 'D' || buf[4] == 'I')) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
             snprintf(info->subtype, sizeof(info->subtype), "comet numbered %s", get_comet_type_name(buf[4]));
@@ -1303,7 +1328,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     /* Check for packed numbered comet with fragment (6 or 7 chars) */
     if (len == 6 || len == 7) {
         if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
-            (buf[4] == 'P' || buf[4] == 'D') && islower(buf[5])) {
+            (buf[4] == 'P' || buf[4] == 'D' || buf[4] == 'I') && islower(buf[5])) {
             /* Validate remaining chars are lowercase */
             int valid = 1;
             for (size_t i = 5; i < len; i++) {
@@ -1496,12 +1521,17 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         }
     }
 
-    /* Check for unpacked numbered comet: "1P", "354P", "73P-A", "73P-AA" */
+    /* Check for unpacked numbered comet: "1P", "354P", "73P-A", "73P-AA",
+     * optionally with a name suffix ("1P/Halley", "3I/ATLAS") */
+    {
+        size_t cut = numbered_comet_name_cut(buf);
+        if (cut) { buf[cut] = '\0'; len = cut; }
+    }
     int chars_consumed = 0;
     char frag_buf[4] = {0};
     if (sscanf(buf, "%d%c-%3s%n", &comet_num, &comet_type, frag_buf, &chars_consumed) >= 2) {
         /* With fragment */
-        if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0 &&
+        if ((comet_type == 'P' || comet_type == 'D' || comet_type == 'I') && comet_num > 0 &&
             (size_t)chars_consumed == len) {
             /* Validate fragment is 1-2 uppercase letters */
             int valid_frag = 1;
@@ -1526,7 +1556,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     chars_consumed = 0;
     if (sscanf(buf, "%d%c%n", &comet_num, &comet_type, &chars_consumed) == 2) {
         /* Ensure entire string was consumed (no trailing content) */
-        if ((comet_type == 'P' || comet_type == 'D') && comet_num > 0 &&
+        if ((comet_type == 'P' || comet_type == 'D' || comet_type == 'I') && comet_num > 0 &&
             (size_t)chars_consumed == len) {
             info->format = MPC_FORMAT_UNPACKED;
             info->type = MPC_TYPE_COMET_NUMBERED;
@@ -1953,7 +1983,7 @@ int mpc_from_report_format(const char *report, char *minimal, size_t outlen) {
     /* Check for numbered comet with fragment (fragment in cols 11-12) */
     /* Pattern: ####P or ####D in cols 1-5, possible fragment in cols 11-12 */
     if (isdigit(buf[0]) && isdigit(buf[1]) && isdigit(buf[2]) && isdigit(buf[3]) &&
-        (buf[4] == 'P' || buf[4] == 'D')) {
+        (buf[4] == 'P' || buf[4] == 'D' || buf[4] == 'I')) {
         /* Check if cols 6-10 are spaces and col 11 or 12 has lowercase */
         int has_fragment = 0;
         for (int i = 5; i < 10; i++) {
@@ -2019,7 +2049,7 @@ int mpc_has_fragment(const char *desig) {
     } else {
         /* Packed format */
         if (info.type == MPC_TYPE_COMET_NUMBERED) {
-            /* Numbered comet: check for lowercase after P/D */
+            /* Numbered comet: check for lowercase after P/D/I */
             if (len > 5 && islower(buf[5])) return 1;
         } else if (info.type == MPC_TYPE_COMET_PROVISIONAL ||
                    info.type == MPC_TYPE_COMET_FULL) {
@@ -2077,7 +2107,7 @@ int mpc_get_fragment(const char *desig, char *fragment, size_t outlen) {
     } else {
         /* Packed format */
         if (info.type == MPC_TYPE_COMET_NUMBERED) {
-            /* Numbered comet: fragment is lowercase after P/D */
+            /* Numbered comet: fragment is lowercase after P/D/I */
             if (len == 6 && islower(buf[5])) {
                 fragment[0] = toupper(buf[5]);
                 fragment[1] = '\0';

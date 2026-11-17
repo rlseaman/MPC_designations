@@ -237,8 +237,10 @@ function unpack_survey(packed,    prefix, num, survey) {
 #==============================================================================
 
 function pack_numbered_comet(desig,    num, type, fragment, base_desig) {
-    # Parse: "1P", "73P-A", "73P-AA"
+    # Parse: "1P", "73P-A", "73P-AA", "3I"; an optional "/Name" suffix
+    # ("1P/Halley", "3I/ATLAS") is dropped
     fragment = ""
+    if (match(desig, /\//)) desig = substr(desig, 1, RSTART - 1)
     base_desig = desig
 
     # Check for fragment suffix
@@ -250,9 +252,10 @@ function pack_numbered_comet(desig,    num, type, fragment, base_desig) {
         base_desig = substr(desig, 1, RSTART - 1)
     }
 
-    match(base_desig, /[PD]$/)
+    match(base_desig, /[PDI]$/)
     type = substr(base_desig, RSTART, 1)
     num = substr(base_desig, 1, RSTART - 1)
+    if (length(num) > 4 || num + 0 < 1) return "ERROR: Comet number out of range (1-9999): " desig
     return sprintf("%04d", num) type fragment
 }
 
@@ -528,7 +531,7 @@ function detect_format(desig,    len, first, prefix, last) {
     first = substr(desig, 1, 1)
 
     # Packed numbered comet with fragment (6 or 7 chars: 0073Pa or 0073Paa)
-    if ((len == 6 || len == 7) && desig ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+    if ((len == 6 || len == 7) && desig ~ /^[0-9]{4}[PDI][a-z]{1,2}$/) {
         return "packed_numbered_comet"
     }
 
@@ -536,7 +539,7 @@ function detect_format(desig,    len, first, prefix, last) {
     if (len == 5 && index(desig, "/") == 0 && index(desig, " ") == 0 && index(desig, "-") == 0) {
         last = substr(desig, 5, 1)
         # Check for numbered comet
-        if (last ~ /[PD]/ && substr(desig, 1, 4) ~ /^[0-9]+$/) {
+        if (last ~ /[PDI]/ && substr(desig, 1, 4) ~ /^[0-9]+$/) {
             return "packed_numbered_comet"
         }
         return "packed_permanent"
@@ -613,22 +616,22 @@ function detect_format(desig,    len, first, prefix, last) {
     }
 
     # Unpacked numbered comet (with optional fragment)
-    if (desig ~ /^[0-9]+[PD](-[A-Z]{1,2})?$/) {
+    if (desig ~ /^[0-9]+[PDI](-[A-Z]{1,2})?(\/[A-Za-z].*)?$/) {
         return "unpacked_numbered_comet"
     }
 
     # Unpacked provisional comet (4-digit year)
-    if (desig ~ /^[PDCXA]\/[0-9]{4} [A-HJ-Y]/) {
+    if (desig ~ /^[PDCXAI]\/[0-9]{4} [A-HJ-Y]/) {
         return "unpacked_provisional_comet"
     }
 
     # Unpacked ancient comet (1-3 digit year)
-    if (desig ~ /^[PDCXA]\/[0-9]{1,3} [A-HJ-Y]/) {
+    if (desig ~ /^[PDCXAI]\/[0-9]{1,3} [A-HJ-Y]/) {
         return "unpacked_ancient_comet"
     }
 
     # Unpacked BCE comet (negative year)
-    if (desig ~ /^[PDCXA]\/-[0-9]+ [A-HJ-Y]/) {
+    if (desig ~ /^[PDCXAI]\/-[0-9]+ [A-HJ-Y]/) {
         return "unpacked_bce_comet"
     }
 
@@ -740,7 +743,7 @@ function from_report_format(report,    trimmed, base_part, fragment) {
     }
 
     # Check for numbered comet format (starts with 4 digits + P/D)
-    if (report ~ /^[0-9]{4}[PD]/) {
+    if (report ~ /^[0-9]{4}[PDI]/) {
         base_part = substr(report, 1, 5)
         # Trim spaces and get fragment if any
         fragment = substr(report, 6)
@@ -768,7 +771,7 @@ function has_fragment(desig,    d) {
     }
 
     # Packed numbered comet with fragment: "0073Pa", "0073Paa"
-    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+    if (d ~ /^[0-9]{4}[PDI][a-z]{1,2}$/) {
         return 1
     }
 
@@ -792,7 +795,7 @@ function get_fragment(desig,    d, frag) {
     }
 
     # Packed numbered comet: "0073Pa" -> "A", "0073Paa" -> "AA"
-    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+    if (d ~ /^[0-9]{4}[PDI][a-z]{1,2}$/) {
         frag = substr(d, 6)
         return toupper(frag)
     }
@@ -817,7 +820,7 @@ function get_parent(desig,    d) {
     }
 
     # Packed numbered comet: "0073Pa" -> "0073P"
-    if (d ~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+    if (d ~ /^[0-9]{4}[PDI][a-z]{1,2}$/) {
         return substr(d, 1, 5)
     }
 

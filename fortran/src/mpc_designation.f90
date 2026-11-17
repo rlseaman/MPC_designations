@@ -168,6 +168,38 @@ contains
         end do
     end function is_all_digits
 
+    !> If s is a numbered comet with an informational name suffix
+    !> ("1P/Halley", "3I/ATLAS"), i.e. matches ^[0-9]+[PDI](-[A-Z]{1,2})?/[A-Za-z],
+    !> return the position of the '/'. Otherwise return 0.
+    integer function numbered_comet_name_cut(s)
+        character(len=*), intent(in) :: s
+        integer :: i, n
+        numbered_comet_name_cut = 0
+        n = len_trim(s)
+        i = 1
+        do while (i <= n)
+            if (.not. is_digit(s(i:i))) exit
+            i = i + 1
+        end do
+        if (i == 1 .or. i > n) return
+        if (s(i:i) /= 'P' .and. s(i:i) /= 'D' .and. s(i:i) /= 'I') return
+        i = i + 1
+        if (i > n) return
+        if (s(i:i) == '-') then
+            i = i + 1
+            if (i > n) return
+            if (.not. is_upper(s(i:i))) return
+            i = i + 1
+            if (i > n) return
+            if (is_upper(s(i:i))) i = i + 1
+            if (i > n) return
+        end if
+        if (i + 1 > n) return
+        if (s(i:i) /= '/') return
+        if (.not. (is_upper(s(i+1:i+1)) .or. is_lower(s(i+1:i+1)))) return
+        numbered_comet_name_cut = i
+    end function numbered_comet_name_cut
+
     !> Check if character is valid half-month letter (A-Y excluding I)
     logical function is_valid_half_month(c)
         character(len=1), intent(in) :: c
@@ -665,7 +697,7 @@ contains
         end if
 
         ctype = p(5:5)
-        if (ctype /= 'P' .and. ctype /= 'D') then
+        if (ctype /= 'P' .and. ctype /= 'D' .and. ctype /= 'I') then
             call set_error('Invalid packed numbered comet designation')
             unpacked = ''
             return
@@ -704,14 +736,17 @@ contains
 
         call clear_error()
         u = trim_str(unpacked)
+        ! Drop an informational name suffix: "1P/Halley" -> "1P"
+        i = numbered_comet_name_cut(u)
+        if (i > 0) u = u(1:i-1)
         ulen = len_trim(u)
 
         ! Find the dash for fragment
         dash_pos = index(u, '-')
 
-        ! Find the P or D
+        ! Find the type letter (P, D, or I)
         do i = 1, ulen
-            if (u(i:i) == 'P' .or. u(i:i) == 'D') then
+            if (u(i:i) == 'P' .or. u(i:i) == 'D' .or. u(i:i) == 'I') then
                 ctype = u(i:i)
                 read(u(1:i-1), '(I10)', iostat=ios) num
                 if (ios /= 0) then
@@ -999,7 +1034,7 @@ contains
                 info%dtype = 'permanent'
                 info%subtype = 'permanent numbered (letter-prefix)'
                 return
-            else if (is_all_digits(des(1:4)) .and. (des(5:5) == 'P' .or. des(5:5) == 'D')) then
+            else if (is_all_digits(des(1:4)) .and. (des(5:5) == 'P' .or. des(5:5) == 'D' .or. des(5:5) == 'I')) then
                 info%format = 'packed'
                 info%dtype = 'comet_numbered'
                 info%subtype = 'comet numbered'
@@ -1009,7 +1044,8 @@ contains
 
         ! Packed numbered comet with fragment (6 or 7 chars)
         if (dlen == 6 .or. dlen == 7) then
-            if (is_all_digits(des(1:4)) .and. (des(5:5) == 'P' .or. des(5:5) == 'D') .and. is_lower(des(6:6))) then
+            if (is_all_digits(des(1:4)) .and. (des(5:5) == 'P' .or. des(5:5) == 'D' .or. des(5:5) == 'I') .and. &
+                is_lower(des(6:6))) then
                 if (dlen == 6 .or. (dlen == 7 .and. is_lower(des(7:7)))) then
                     info%format = 'packed'
                     info%dtype = 'comet_numbered'
@@ -1145,7 +1181,7 @@ contains
             ! Check for fragment: "73P-A" or "73P-AA"
             i = index(des(1:dlen), '-')
             if (i > 0 .and. i >= 3) then
-                if (is_all_digits(des(1:i-2)) .and. (des(i-1:i-1) == 'P' .or. des(i-1:i-1) == 'D')) then
+                if (is_all_digits(des(1:i-2)) .and. (des(i-1:i-1) == 'P' .or. des(i-1:i-1) == 'D' .or. des(i-1:i-1) == 'I')) then
                     ! Check fragment is 1-2 uppercase letters
                     if (dlen == i + 1 .and. is_upper(des(i+1:i+1))) then
                         info%format = 'unpacked'
@@ -1160,7 +1196,8 @@ contains
                     end if
                 end if
             else if (dlen <= 5) then
-                if (is_all_digits(des(1:dlen-1)) .and. (des(dlen:dlen) == 'P' .or. des(dlen:dlen) == 'D')) then
+                if (is_all_digits(des(1:dlen-1)) .and. (des(dlen:dlen) == 'P' .or. des(dlen:dlen) == 'D' .or. &
+                    des(dlen:dlen) == 'I')) then
                     info%format = 'unpacked'
                     info%dtype = 'comet_numbered'
                     info%subtype = 'comet numbered'
@@ -1174,6 +1211,14 @@ contains
             info%format = 'unpacked'
             info%dtype = 'comet_full'
             info%subtype = 'comet provisional'
+            return
+        end if
+
+        ! Unpacked numbered comet with name suffix: "1P/Halley", "3I/ATLAS"
+        if (numbered_comet_name_cut(des(1:dlen)) > 0) then
+            info%format = 'unpacked'
+            info%dtype = 'comet_numbered'
+            info%subtype = 'comet numbered (with name)'
             return
         end if
 
@@ -1840,9 +1885,9 @@ contains
         m = trim_str(minimal)
         mlen = len_trim(m)
 
-        ! Numbered comet with fragment (6-7 chars: ####P/Df or ####P/Dff)
+        ! Numbered comet with fragment (6-7 chars: ####Tf or ####Tff, T = P/D/I)
         if ((mlen == 6 .or. mlen == 7) .and. is_all_digits(m(1:4)) .and. &
-            (m(5:5) == 'P' .or. m(5:5) == 'D') .and. is_lower(m(6:6))) then
+            (m(5:5) == 'P' .or. m(5:5) == 'D' .or. m(5:5) == 'I') .and. is_lower(m(6:6))) then
             report(1:5) = m(1:5)
             if (mlen == 6) then
                 report(6:11) = '      '
@@ -1854,9 +1899,9 @@ contains
             return
         end if
 
-        ! Numbered comet without fragment (5 chars: ####P/D)
+        ! Numbered comet without fragment (5 chars: ####T, T = P/D/I)
         if (mlen == 5 .and. is_all_digits(m(1:4)) .and. &
-            (m(5:5) == 'P' .or. m(5:5) == 'D')) then
+            (m(5:5) == 'P' .or. m(5:5) == 'D' .or. m(5:5) == 'I')) then
             report(1:5) = m(1:5)
             report(6:12) = '       '
             return
@@ -1886,7 +1931,7 @@ contains
 
         ! Handle numbered comet with fragment in columns 11-12
         if (rlen >= 5 .and. is_all_digits(r(1:4)) .and. &
-            (r(5:5) == 'P' .or. r(5:5) == 'D')) then
+            (r(5:5) == 'P' .or. r(5:5) == 'D' .or. r(5:5) == 'I')) then
             minimal(1:5) = r(1:5)
             j = 6
             do i = 6, rlen
@@ -1920,7 +1965,7 @@ contains
         if (dash_pos > 0) then
             ! Numbered comet with fragment
             if (dash_pos >= 3 .and. (d(dash_pos-1:dash_pos-1) == 'P' .or. &
-                d(dash_pos-1:dash_pos-1) == 'D')) then
+                d(dash_pos-1:dash_pos-1) == 'D' .or. d(dash_pos-1:dash_pos-1) == 'I')) then
                 has_fragment = .true.
                 return
             end if
@@ -1934,7 +1979,7 @@ contains
 
         ! Packed numbered comet with fragment (6-7 chars)
         if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
-            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            (d(5:5) == 'P' .or. d(5:5) == 'D' .or. d(5:5) == 'I') .and. is_lower(d(6:6))) then
             if (dlen == 6 .or. (dlen == 7 .and. is_lower(d(7:7)))) then
                 has_fragment = .true.
                 return
@@ -1984,7 +2029,7 @@ contains
 
         ! Packed numbered comet with fragment (6-7 chars)
         if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
-            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            (d(5:5) == 'P' .or. d(5:5) == 'D' .or. d(5:5) == 'I') .and. is_lower(d(6:6))) then
             frag(1:1) = char(ichar(d(6:6)) - 32)
             if (dlen == 7 .and. is_lower(d(7:7))) then
                 frag(2:2) = char(ichar(d(7:7)) - 32)
@@ -2027,7 +2072,7 @@ contains
         if (dash_pos > 0) then
             ! Numbered comet with fragment
             if (dash_pos >= 3 .and. (d(dash_pos-1:dash_pos-1) == 'P' .or. &
-                d(dash_pos-1:dash_pos-1) == 'D')) then
+                d(dash_pos-1:dash_pos-1) == 'D' .or. d(dash_pos-1:dash_pos-1) == 'I')) then
                 parent = d(1:dash_pos-1)
                 return
             end if
@@ -2041,7 +2086,7 @@ contains
 
         ! Packed numbered comet with fragment (6-7 chars)
         if ((dlen == 6 .or. dlen == 7) .and. is_all_digits(d(1:4)) .and. &
-            (d(5:5) == 'P' .or. d(5:5) == 'D') .and. is_lower(d(6:6))) then
+            (d(5:5) == 'P' .or. d(5:5) == 'D' .or. d(5:5) == 'I') .and. is_lower(d(6:6))) then
             parent = d(1:5)
             return
         end if

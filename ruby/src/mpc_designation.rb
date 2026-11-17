@@ -504,7 +504,7 @@ module MPCDesignation
       packed = packed.strip
 
       # Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
-      match = packed.match(/^(\d{4})([PD])([a-z]{1,2})?$/)
+      match = packed.match(/^(\d{4})([PDI])([a-z]{1,2})?$/)
       raise Error, "Invalid packed numbered comet designation: #{packed}" unless match
 
       number = match[1].to_i
@@ -521,7 +521,7 @@ module MPCDesignation
       unpacked = unpacked.strip
 
       # Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
-      match = unpacked.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/)
+      match = unpacked.match(/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/)
       raise Error, "Invalid unpacked numbered comet designation: #{unpacked}" unless match
 
       number = match[1].to_i
@@ -904,7 +904,7 @@ module MPCDesignation
 
       # Check for packed numbered comet (5 chars ending in P or D)
       if des.length == 5
-        if des.match(/^[0-9]{4}[PD]$/)
+        if des.match(/^[0-9]{4}[PDI]$/)
           result['format'] = 'packed'
           result['type'] = 'comet_numbered'
           comet_type = des[4]
@@ -916,7 +916,7 @@ module MPCDesignation
 
       # Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
       if des.length == 6 || des.length == 7
-        if des.match(/^[0-9]{4}[PD][a-z]{1,2}$/)
+        if des.match(/^[0-9]{4}[PDI][a-z]{1,2}$/)
           result['format'] = 'packed'
           result['type'] = 'comet_numbered'
           frag_len = des.length - 5
@@ -1011,7 +1011,7 @@ module MPCDesignation
       end
 
       # Check for unpacked numbered periodic comet "1P" or "354P" or "73P-A"
-      if (match = des.match(/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/))
+      if (match = des.match(/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/))
         result['format'] = 'unpacked'
         result['type'] = 'comet_numbered'
         comet_type = match[2]
@@ -1176,7 +1176,7 @@ module MPCDesignation
       frag2 = report[11]
 
       # Check if this is a numbered comet format
-      if first5 =~ /^[0-9]{4}[PD]$/ && middle.strip.empty?
+      if first5 =~ /^[0-9]{4}[PDI]$/ && middle.strip.empty?
         result = first5
         result += frag1 if frag1 >= 'a' && frag1 <= 'z'
         result += frag2 if frag2 >= 'a' && frag2 <= 'z'

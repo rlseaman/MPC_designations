@@ -219,7 +219,7 @@ make clean
 # Conversion tests (2M+ test cases)
 make test
 
-# Error handling tests (94 test cases)
+# Error handling tests (130 test cases)
 make test-errors
 
 # Fragment handling tests

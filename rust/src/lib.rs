@@ -648,7 +648,7 @@ fn unpack_comet_numbered(packed: &str) -> Result<String> {
     let packed = packed.trim();
 
     // Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
-    if let Some(caps) = regex_captures!(r"^(\d{4})([PD])([a-z]{1,2})?$", packed) {
+    if let Some(caps) = regex_captures!(r"^(\d{4})([PDI])([a-z]{1,2})?$", packed) {
         let number: u32 = caps[1].parse().unwrap();
         let comet_type = &caps[2];
         let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
@@ -670,7 +670,7 @@ fn pack_comet_numbered(unpacked: &str) -> Result<String> {
     let unpacked = unpacked.trim();
 
     // Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley" (with optional name after slash)
-    if let Some(caps) = regex_captures!(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", unpacked) {
+    if let Some(caps) = regex_captures!(r"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", unpacked) {
         let number: u32 = caps[1].parse().map_err(|_| {
             MPCDesignationError::new(format!("Invalid comet number: {}", &caps[1]))
         })?;
@@ -1108,7 +1108,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed numbered comet (with optional fragment)
     if des.len() == 5 {
-        if regex_captures!(r"^[0-9]{4}[PD]$", des).is_some() {
+        if regex_captures!(r"^[0-9]{4}[PDI]$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_numbered".to_string();
             info.subtype = "comet numbered".to_string();
@@ -1118,7 +1118,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
     if des.len() == 6 || des.len() == 7 {
-        if regex_captures!(r"^[0-9]{4}[PD][a-z]{1,2}$", des).is_some() {
+        if regex_captures!(r"^[0-9]{4}[PDI][a-z]{1,2}$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_numbered".to_string();
             let frag_len = des.len() - 5;
@@ -1197,7 +1197,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
     }
 
     // Check for unpacked numbered comet (with optional fragment)
-    if let Some(caps) = regex_captures!(r"^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des) {
+    if let Some(caps) = regex_captures!(r"^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$", des) {
         info.format = "unpacked".to_string();
         info.designation_type = "comet_numbered".to_string();
         let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
@@ -1407,7 +1407,7 @@ pub fn from_report_format(report: &str) -> Result<String> {
     let frag2 = chars[11];
 
     // Check if this is a numbered comet format
-    if regex_captures!(r"^[0-9]{4}[PD]$", &first5).is_some() && middle.trim().is_empty() {
+    if regex_captures!(r"^[0-9]{4}[PDI]$", &first5).is_some() && middle.trim().is_empty() {
         let mut result = first5;
         if frag1 >= 'a' && frag1 <= 'z' {
             result.push(frag1);

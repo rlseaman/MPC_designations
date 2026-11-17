@@ -439,8 +439,17 @@ pack_numbered_comet() {
     local fragment=""
     local base_desig="$desig"
 
+    # Comet number must be 1-9999
+    if [[ "$desig" =~ ^([0-9]+) ]]; then
+        local n="${BASH_REMATCH[1]}"
+        if [ "${#n}" -gt 4 ] || [ "$((10#$n))" -lt 1 ]; then
+            echo "ERROR: Comet number out of range (1-9999): $desig" >&2
+            return 1
+        fi
+    fi
+
     # Check for fragment suffix: 73P-A or 73P-AA
-    if [[ "$desig" =~ ^([0-9]+)([PD])-([A-Z]{1,2})(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^([0-9]+)([PDI])-([A-Z]{1,2})(/.*)?$ ]]; then
         local num="${BASH_REMATCH[1]}"
         local type="${BASH_REMATCH[2]}"
         fragment="${BASH_REMATCH[3]}"
@@ -451,7 +460,7 @@ pack_numbered_comet() {
     fi
 
     # Check for base comet with optional name suffix: 73P or 73P/Schwassmann-Wachmann
-    if [[ "$desig" =~ ^([0-9]+)([PDCXA])(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^([0-9]+)([PDCXAI])(/.*)?$ ]]; then
         local num="${BASH_REMATCH[1]}"
         local type="${BASH_REMATCH[2]}"
         printf "%04d%s\n" "$num" "$type"
@@ -725,7 +734,7 @@ detect_format() {
     if [ "$len" -ge 5 ] && [ "$len" -le 7 ]; then
         local c5="${desig:4:1}"
         case "$c5" in
-            [PD])
+            [PDI])
                 if is_numeric "${desig:0:4}"; then
                     if [ "$len" -eq 5 ]; then
                         echo "packed_numbered_comet"
@@ -747,7 +756,7 @@ detect_format() {
     # Unpacked numbered comet (with or without fragment)
     # Match: 73P, 73P-A, 73P-AA, 73P/Name, 73P-A/Name
     # Unpacked should NOT have leading zeros (e.g., 73P not 073P)
-    if [[ "$desig" =~ ^([1-9][0-9]*)([PD])(-[A-Z]{1,2})?(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^([1-9][0-9]*)([PDI])(-[A-Z]{1,2})?(/.*)?$ ]]; then
         echo "unpacked_numbered_comet"
         return
     fi
@@ -963,7 +972,7 @@ to_report_format() {
     if [ "$len" -ge 5 ] && [ "$len" -le 7 ]; then
         local c5="${minimal:4:1}"
         case "$c5" in
-            [PD])
+            [PDI])
                 if is_numeric "${minimal:0:4}"; then
                     local base="${minimal:0:5}"
                     if [ "$len" -eq 5 ]; then
@@ -994,7 +1003,7 @@ from_report_format() {
     local c5="${report:4:1}"
     if is_numeric "${report:0:4}" 2>/dev/null; then
         case "$c5" in
-            [PD])
+            [PDI])
                 # Get fragment from positions 10-11, stripping spaces
                 local frag="${report:10:2}"
                 frag="${frag// /}"
@@ -1020,12 +1029,12 @@ has_fragment() {
     local len="${#desig}"
 
     # Unpacked numbered comet with fragment: 73P-A, 73P-AA
-    if [[ "$desig" =~ ^[0-9]+[PD]-[A-Z]{1,2}(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^[0-9]+[PDI]-[A-Z]{1,2}(/.*)?$ ]]; then
         return 0  # true
     fi
 
     # Unpacked provisional comet with fragment: C/1995 O1-A, D/1993 F2-AA
-    if [[ "$desig" =~ ^[PDCXA]/[0-9]{4}\ [A-Z][0-9]*-[A-Z]{1,2}$ ]]; then
+    if [[ "$desig" =~ ^[PDCXAI]/[0-9]{4}\ [A-Z][0-9]*-[A-Z]{1,2}$ ]]; then
         return 0  # true
     fi
 
@@ -1033,7 +1042,7 @@ has_fragment() {
     if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
         local c5="${desig:4:1}"
         case "$c5" in
-            [PD])
+            [PDI])
                 if is_numeric "${desig:0:4}"; then
                     local rest="${desig:5}"
                     case "$rest" in
@@ -1052,7 +1061,7 @@ has_fragment() {
         local c2="${desig:1:1}"
         local last="${desig:7:1}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last" in
@@ -1074,7 +1083,7 @@ has_fragment() {
         local c2="${desig:1:1}"
         local last2="${desig:7:2}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last2" in
@@ -1097,13 +1106,13 @@ get_fragment() {
     local len="${#desig}"
 
     # Unpacked numbered comet with fragment: 73P-A, 73P-AA
-    if [[ "$desig" =~ ^[0-9]+[PD]-([A-Z]{1,2})(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^[0-9]+[PDI]-([A-Z]{1,2})(/.*)?$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return
     fi
 
     # Unpacked provisional comet with fragment: C/1995 O1-A, D/1993 F2-AA
-    if [[ "$desig" =~ ^[PDCXA]/[0-9]{4}\ [A-Z][0-9]*-([A-Z]{1,2})$ ]]; then
+    if [[ "$desig" =~ ^[PDCXAI]/[0-9]{4}\ [A-Z][0-9]*-([A-Z]{1,2})$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return
     fi
@@ -1112,7 +1121,7 @@ get_fragment() {
     if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
         local c5="${desig:4:1}"
         case "$c5" in
-            [PD])
+            [PDI])
                 if is_numeric "${desig:0:4}"; then
                     local frag="${desig:5}"
                     case "$frag" in
@@ -1132,7 +1141,7 @@ get_fragment() {
         local c2="${desig:1:1}"
         local last="${desig:7:1}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last" in
@@ -1155,7 +1164,7 @@ get_fragment() {
         local c2="${desig:1:1}"
         local last2="${desig:7:2}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last2" in
@@ -1179,13 +1188,13 @@ get_parent() {
     local len="${#desig}"
 
     # Unpacked numbered comet with fragment: 73P-A -> 73P
-    if [[ "$desig" =~ ^([0-9]+[PD])-[A-Z]{1,2}(/.*)?$ ]]; then
+    if [[ "$desig" =~ ^([0-9]+[PDI])-[A-Z]{1,2}(/.*)?$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return
     fi
 
     # Unpacked provisional comet with fragment: D/1993 F2-A -> D/1993 F2
-    if [[ "$desig" =~ ^([PDCXA]/[0-9]{4}\ [A-Z][0-9]*)-[A-Z]{1,2}$ ]]; then
+    if [[ "$desig" =~ ^([PDCXAI]/[0-9]{4}\ [A-Z][0-9]*)-[A-Z]{1,2}$ ]]; then
         echo "${BASH_REMATCH[1]}"
         return
     fi
@@ -1194,7 +1203,7 @@ get_parent() {
     if [ "$len" -ge 6 ] && [ "$len" -le 7 ]; then
         local c5="${desig:4:1}"
         case "$c5" in
-            [PD])
+            [PDI])
                 if is_numeric "${desig:0:4}"; then
                     local rest="${desig:5}"
                     case "$rest" in
@@ -1214,7 +1223,7 @@ get_parent() {
         local c2="${desig:1:1}"
         local last="${desig:7:1}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last" in
@@ -1237,7 +1246,7 @@ get_parent() {
         local c2="${desig:1:1}"
         local last2="${desig:7:2}"
         case "$c1" in
-            [PDCXA])
+            [PDCXAI])
                 case "$c2" in
                     [A-L])
                         case "$last2" in

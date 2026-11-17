@@ -619,7 +619,7 @@ unpack_comet_numbered <- function(packed) {
   len <- nchar(p)
 
   # Match numbered comet with optional fragment: 0073P, 0073Pa, 0073Paa
-  if (len < 5 || len > 7 || !grepl("^\\d{4}[PD][a-z]{0,2}$", p)) {
+  if (len < 5 || len > 7 || !grepl("^\\d{4}[PDI][a-z]{0,2}$", p)) {
     mpc_error("Invalid packed numbered comet designation")
   }
 
@@ -642,11 +642,11 @@ pack_comet_numbered <- function(unpacked) {
   u <- trimws(unpacked)
 
   # Match "1P", "73P-A", "73P-AA", or "1P/Halley" (with optional fragment and name)
-  if (!grepl("^\\d+[PD](-[A-Z]{1,2})?(/[A-Za-z].*)?$", u)) {
+  if (!grepl("^\\d+[PDI](-[A-Z]{1,2})?(/[A-Za-z].*)?$", u)) {
     mpc_error("Invalid unpacked numbered comet designation")
   }
 
-  m <- regmatches(u, regexec("^(\\d+)([PD])(-([A-Z]{1,2}))?", u))[[1]]
+  m <- regmatches(u, regexec("^(\\d+)([PDI])(-([A-Z]{1,2}))?", u))[[1]]
   number <- as.integer(m[2])
   comet_type <- m[3]
   fragment <- if (length(m) >= 5 && nchar(m[5]) > 0) m[5] else ""
@@ -1070,7 +1070,7 @@ detect_format <- function(designation) {
     }
 
     # Check for packed numbered comet (no fragment)
-    if (grepl("^[0-9]{4}[PD]$", des)) {
+    if (grepl("^[0-9]{4}[PDI]$", des)) {
       comet_type <- substr(des, 5, 5)
       type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
       return(list(format = "packed", type = "comet_numbered",
@@ -1079,7 +1079,7 @@ detect_format <- function(designation) {
   }
 
   # Check for packed numbered comet with single-letter fragment (6 chars)
-  if (nchar(des) == 6 && grepl("^[0-9]{4}[PD][a-z]$", des)) {
+  if (nchar(des) == 6 && grepl("^[0-9]{4}[PDI][a-z]$", des)) {
     comet_type <- substr(des, 5, 5)
     type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
     return(list(format = "packed", type = "comet_numbered",
@@ -1087,7 +1087,7 @@ detect_format <- function(designation) {
   }
 
   # Check for packed numbered comet with two-letter fragment (7 chars)
-  if (nchar(des) == 7 && grepl("^[0-9]{4}[PD][a-z]{2}$", des)) {
+  if (nchar(des) == 7 && grepl("^[0-9]{4}[PDI][a-z]{2}$", des)) {
     comet_type <- substr(des, 5, 5)
     type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
     return(list(format = "packed", type = "comet_numbered",
@@ -1195,8 +1195,8 @@ detect_format <- function(designation) {
   }
 
   # Check for unpacked numbered periodic comet (with optional fragment)
-  if (grepl("^\\d+[PD](-[A-Z]{1,2})?(/[A-Za-z].*)?$", des)) {
-    m <- regmatches(des, regexec("^\\d+([PD])", des))[[1]]
+  if (grepl("^\\d+[PDI](-[A-Z]{1,2})?(/[A-Za-z].*)?$", des)) {
+    m <- regmatches(des, regexec("^\\d+([PDI])", des))[[1]]
     comet_type <- m[2]
     type_desc <- COMET_TYPE_DESCRIPTIONS[[comet_type]]
     has_frag <- grepl("-[A-Z]{1,2}", des)
@@ -1415,7 +1415,7 @@ from_report_format <- function(report) {
   middle <- substr(report, 6, 10)
   last2 <- substr(report, 11, 12)
 
-  if (grepl("^[0-9]{4}[PD]$", first5) && trimws(middle) == "") {
+  if (grepl("^[0-9]{4}[PDI]$", first5) && trimws(middle) == "") {
     frag1 <- substr(report, 11, 11)
     frag2 <- substr(report, 12, 12)
 
@@ -1466,7 +1466,7 @@ has_fragment <- function(desig) {
   } else {
     # Packed format
     if (dtype == "comet_numbered") {
-      # Check for lowercase after P/D (position 6+)
+      # Check for lowercase after P/D/I (position 6+)
       if (len > 5 && grepl("[a-z]", substr(desig, 6, 6))) {
         return(TRUE)
       }
@@ -1524,7 +1524,7 @@ get_fragment <- function(desig) {
   } else {
     # Packed format
     if (dtype == "comet_numbered") {
-      # Fragment is lowercase after P/D
+      # Fragment is lowercase after P/D/I
       if (len == 6) {
         return(toupper(substr(desig, 6, 6)))
       } else if (len == 7) {
@@ -1586,7 +1586,7 @@ get_parent <- function(desig) {
   } else {
     # Packed format
     if (dtype == "comet_numbered") {
-      # Remove lowercase fragment letters after P/D
+      # Remove lowercase fragment letters after P/D/I
       if (len > 5 && grepl("[a-z]", substr(desig, 6, 6))) {
         return(substr(desig, 1, 5))
       }

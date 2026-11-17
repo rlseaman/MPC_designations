@@ -36,7 +36,6 @@ const expectedSkips: seq[(string, string, string)] = @[
   ("format",        "satellite_negative",       "no satellite negative-number check"),
   ("format",        "survey_zero",          "no survey number-zero check"),
   ("format",        "survey_negative",      "no survey negative-number check"),
-  ("format",        "numbered_comet_zero",  "no numbered-comet number-zero check"),
 ]
 
 proc skipReason(category, subcategory: string): string =

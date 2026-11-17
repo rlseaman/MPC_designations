@@ -487,7 +487,7 @@ sub unpack_comet_numbered {
     $packed =~ s/^\s+|\s+$//g;
 
     # Match with optional lowercase fragment: 0073P, 0073Pa, or 0073Paa
-    if ($packed =~ /^(\d{4})([PD])([a-z]{1,2})?$/) {
+    if ($packed =~ /^(\d{4})([PDI])([a-z]{1,2})?$/) {
         my $number = int($1);
         my $comet_type = $2;
         my $fragment = $3 // '';
@@ -506,7 +506,7 @@ sub pack_comet_numbered {
     $unpacked =~ s/^\s+|\s+$//g;
 
     # Match "1P" or "354P" or "73P-A" or "73P-AA" or "1P/Halley"
-    if ($unpacked =~ /^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
+    if ($unpacked =~ /^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
         my $number = int($1);
         my $comet_type = $2;
         my $fragment = $3 // '';
@@ -815,14 +815,14 @@ sub detect_format {
         } elsif ($des =~ /^[A-Za-z][0-9]{4}$/) {
             return { format => 'packed', type => 'permanent', subtype => 'permanent numbered (letter-prefix)' };
         }
-        if ($des =~ /^[0-9]{4}[PD]$/) {
+        if ($des =~ /^[0-9]{4}[PDI]$/) {
             return { format => 'packed', type => 'comet_numbered', subtype => 'comet numbered' };
         }
     }
 
     # Packed numbered comet with fragment (6-7 chars: ####Pa or ####Paa)
     if (length($des) == 6 || length($des) == 7) {
-        if ($des =~ /^[0-9]{4}[PD][a-z]{1,2}$/) {
+        if ($des =~ /^[0-9]{4}[PDI][a-z]{1,2}$/) {
             my $frag_len = length($des) - 5;
             my $subtype = $frag_len == 1 ? 'comet numbered with fragment' : 'comet numbered with 2-letter fragment';
             return { format => 'packed', type => 'comet_numbered', subtype => $subtype };
@@ -886,7 +886,7 @@ sub detect_format {
     }
 
     # Unpacked numbered comet "1P" or "354P" or "73P-A"
-    if ($des =~ /^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
+    if ($des =~ /^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/) {
         my $fragment = $3 // '';
         my $subtype;
         if ($fragment eq '') {
@@ -1049,7 +1049,7 @@ sub from_report_format {
     my $frag2 = substr($report, 11, 1);
 
     # Check if this is a numbered comet format
-    if ($first5 =~ /^[0-9]{4}[PD]$/) {
+    if ($first5 =~ /^[0-9]{4}[PDI]$/) {
         my $middle_trimmed = $middle;
         $middle_trimmed =~ s/^\s+|\s+$//g;
         if ($middle_trimmed eq '') {

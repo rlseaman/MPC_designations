@@ -558,7 +558,7 @@ class MPCDesignation {
     public static function unpackCometNumbered(string $packed): string {
         $p = trim($packed);
 
-        if (!preg_match('/^(\d{4})([PD])([a-z]{1,2})?$/', $p, $matches)) {
+        if (!preg_match('/^(\d{4})([PDI])([a-z]{1,2})?$/', $p, $matches)) {
             throw new MPCDesignationException("Invalid packed numbered comet designation");
         }
 
@@ -575,7 +575,7 @@ class MPCDesignation {
     public static function packCometNumbered(string $unpacked): string {
         $u = trim($unpacked);
 
-        if (!preg_match('/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $u, $matches)) {
+        if (!preg_match('/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $u, $matches)) {
             throw new MPCDesignationException("Invalid unpacked numbered comet designation");
         }
 
@@ -957,7 +957,7 @@ class MPCDesignation {
             }
 
             // Check for packed numbered comet
-            if (preg_match('/^[0-9]{4}[PD]$/', $des)) {
+            if (preg_match('/^[0-9]{4}[PDI]$/', $des)) {
                 $cometType = $des[4];
                 $typeDesc = self::COMET_TYPE_DESCRIPTIONS[$cometType] ?? $cometType;
                 return new FormatInfo('packed', 'comet_numbered', "comet numbered $typeDesc");
@@ -966,7 +966,7 @@ class MPCDesignation {
 
         // Check for packed numbered comet with fragment (6 or 7 chars: 0073Pa or 0073Paa)
         if (strlen($des) === 6 || strlen($des) === 7) {
-            if (preg_match('/^[0-9]{4}[PD][a-z]{1,2}$/', $des)) {
+            if (preg_match('/^[0-9]{4}[PDI][a-z]{1,2}$/', $des)) {
                 $cometType = $des[4];
                 $typeDesc = self::COMET_TYPE_DESCRIPTIONS[$cometType] ?? $cometType;
                 return new FormatInfo('packed', 'comet_numbered', "comet numbered $typeDesc with fragment");
@@ -1058,7 +1058,7 @@ class MPCDesignation {
         }
 
         // Check for unpacked numbered periodic comet (with optional fragment)
-        if (preg_match('/^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $des, $matches)) {
+        if (preg_match('/^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:\/[A-Za-z].*)?$/', $des, $matches)) {
             $cometType = $matches[2];
             $fragment = $matches[3] ?? '';
             $typeDesc = self::COMET_TYPE_DESCRIPTIONS[$cometType] ?? $cometType;
@@ -1165,7 +1165,7 @@ class MPCDesignation {
         // Numbered comets: right-pad to 12 chars (format: "0073P       ")
         // Handle fragments: "0073Pa" -> "0073P      a", "0073Paa" -> "0073P     aa"
         if ($info->type === 'comet_numbered') {
-            if (preg_match('/^(\d{4}[PD])([a-z]{1,2})?$/', $packed, $matches)) {
+            if (preg_match('/^(\d{4}[PDI])([a-z]{1,2})?$/', $packed, $matches)) {
                 $basePart = $matches[1];  // "0073P"
                 $fragment = $matches[2] ?? '';
                 if ($fragment !== '') {
@@ -1191,7 +1191,7 @@ class MPCDesignation {
         }
 
         // Check for numbered comet format (starts with 4 digits + P/D)
-        if (preg_match('/^(\d{4}[PD])(\s*)([a-z]{0,2})$/', $reportFormat, $matches)) {
+        if (preg_match('/^(\d{4}[PDI])(\s*)([a-z]{0,2})$/', $reportFormat, $matches)) {
             $basePart = $matches[1];
             $fragment = $matches[3];
             return $basePart . $fragment;
@@ -1214,7 +1214,7 @@ class MPCDesignation {
         }
 
         // Packed numbered comet with fragment: "0073Pa", "0073Paa"
-        if (preg_match('/^\d{4}[PD][a-z]{1,2}$/', $desig)) {
+        if (preg_match('/^\d{4}[PDI][a-z]{1,2}$/', $desig)) {
             return true;
         }
 
@@ -1239,7 +1239,7 @@ class MPCDesignation {
         }
 
         // Packed numbered comet: "0073Pa" -> "A", "0073Paa" -> "AA"
-        if (preg_match('/^\d{4}[PD]([a-z]{1,2})$/', $desig, $matches)) {
+        if (preg_match('/^\d{4}[PDI]([a-z]{1,2})$/', $desig, $matches)) {
             return strtoupper($matches[1]);
         }
 
@@ -1264,7 +1264,7 @@ class MPCDesignation {
         }
 
         // Packed numbered comet: "0073Pa" -> "0073P"
-        if (preg_match('/^(\d{4}[PD])[a-z]{1,2}$/', $desig, $matches)) {
+        if (preg_match('/^(\d{4}[PDI])[a-z]{1,2}$/', $desig, $matches)) {
             return $matches[1];
         }
 

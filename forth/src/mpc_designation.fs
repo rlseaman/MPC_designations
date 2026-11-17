@@ -41,6 +41,8 @@ create work-buf MAX-LEN allot
 : is-half-month? ( c -- f ) dup [char] A [char] Y 1+ within swap [char] I <> and ;
 \ Asteroid century code: I-L only (1800-2199)
 : is-ast-century? ( c -- f ) [char] I [char] L 1+ within ;
+\ Numbered comet type letter: P (periodic), D (defunct), I (interstellar)
+: num-comet-type? ( c -- f ) dup [char] P = over [char] D = or swap [char] I = or ;
 
 : s= ( a1 l1 a2 l2 -- f ) compare 0= ;
 
@@ -558,7 +560,7 @@ variable ext-outlen
 : is-comet-numbered-packed? ( addr len -- f )
   \ Check for 5-7 char format: 0001P, 0073Pa, 0073Paa
   dup 5 < over 7 > or if 2drop false exit then
-  over 4 + c@ dup [char] P = swap [char] D = or 0= if 2drop false exit then
+  over 4 + c@ num-comet-type? 0= if 2drop false exit then
   over 4 all-digit? 0= if 2drop false exit then
   \ Check fragment suffix if present (must be lowercase)
   dup 5 > if
@@ -573,7 +575,7 @@ variable comet-dash-pos
 variable comet-check-addr
 variable comet-check-len
 
-: is-comet-numbered-unpacked? ( addr len -- f )
+: (is-comet-numbered-unpacked?) ( addr len -- f )
   dup 2 < if 2drop false exit then
   comet-check-len ! comet-check-addr !
   \ Find dash position if any
@@ -582,18 +584,18 @@ variable comet-check-len
     i c@ [char] - = if i comet-dash-pos ! leave then
   loop
   comet-dash-pos @ if
-    \ Has dash - check format: digits + P/D + dash + letters
+    \ Has dash - check format: digits + P/D/I + dash + letters
     comet-dash-pos @ comet-check-addr @ -  \ dash offset from addr
     dup 2 < if drop false exit then        \ need at least 2 chars before dash (e.g. "1P")
-    \ Check char before dash is P or D
-    comet-dash-pos @ 1- c@ dup [char] P = swap [char] D = or 0= if
+    \ Check char before dash is P, D, or I
+    comet-dash-pos @ 1- c@ num-comet-type? 0= if
       drop false exit then
-    \ Check all chars before P/D are digits
+    \ Check all chars before P/D/I are digits
     comet-check-addr @ swap 1- all-digit?
   else
-    \ No dash - simple format: digits + P/D
+    \ No dash - simple format: digits + P/D/I
     comet-check-addr @ comet-check-len @ + 1- c@
-    dup [char] P = swap [char] D = or 0= if false exit then
+    num-comet-type? 0= if false exit then
     \ Check all chars before type letter are digits
     comet-check-addr @ comet-check-len @ 1- all-digit?
   then ;
@@ -608,7 +610,7 @@ variable comet-frag-len
   dup comet-num-len !              \ save length
   out-buf swap move                \ copy number string to out-buf
   \ Stack: addr len
-  over 4 + c@                      \ get type letter (P or D)
+  over 4 + c@                      \ get type letter (P, D, or I)
   out-buf comet-num-len @ + c!     \ append to out-buf
   comet-num-len @ 1+ comet-num-len ! \ update length
   \ Check for fragment (6 or 7 chars)
@@ -632,7 +634,7 @@ variable pcn-dash-addr
 variable pcn-type-char
 variable pcn-number
 
-: pack-comet-numbered ( addr len -- addr' len' )
+: (pack-comet-numbered) ( addr len -- addr' len' )
   \ Format: 1P -> 0001P, 73P-A -> 0073Pa, 73P-AA -> 0073Paa
   \ Find dash for fragment
   0 pcn-dash-addr !
@@ -670,6 +672,53 @@ variable pcn-number
     pcn-type-char @ out-buf 4 + c!
     out-buf 5
   then ;
+
+variable ncn-i
+
+: ncn-skip-digits ( addr len -- addr len )
+  \ Advance ncn-i past leading digits
+  0 ncn-i !
+  begin
+    ncn-i @ over < if over ncn-i @ + c@ is-digit else false then
+  while
+    1 ncn-i +!
+  repeat ;
+
+: ncn-cut ( addr len -- addr len' )
+  \ Drop an informational name suffix from a numbered comet:
+  \ "1P/Halley" -> "1P", "3I/ATLAS" -> "3I", "73P-B/Name" -> "73P-B".
+  \ Applies only when the input matches ^[0-9]+[PDI](-[A-Z]{1,2})?/[A-Za-z];
+  \ otherwise the string is returned unchanged.
+  ncn-skip-digits
+  ncn-i @ 0= if exit then
+  ncn-i @ over < 0= if exit then
+  over ncn-i @ + c@ num-comet-type? 0= if exit then
+  1 ncn-i +!
+  ncn-i @ over < 0= if exit then
+  over ncn-i @ + c@ [char] - = if
+    1 ncn-i +!
+    ncn-i @ over < 0= if exit then
+    over ncn-i @ + c@ is-upper 0= if exit then
+    1 ncn-i +!
+    ncn-i @ over < if over ncn-i @ + c@ is-upper if 1 ncn-i +! then then
+  then
+  ncn-i @ 1+ over < 0= if exit then
+  over ncn-i @ + c@ [char] / <> if exit then
+  over ncn-i @ + 1+ c@ is-alpha 0= if exit then
+  drop ncn-i @ ;
+
+: ncn-range-ok? ( addr len -- f )
+  \ Leading comet number must be 1-9999
+  ncn-skip-digits
+  ncn-i @ 0= ncn-i @ 9 > or if 2drop false exit then
+  drop ncn-i @ str>num dup 1 >= swap 9999 <= and ;
+
+: is-comet-numbered-unpacked? ( addr len -- f )
+  \ "1P", "73P-A", "3I", "1P/Halley"; number must be 1-9999
+  ncn-cut 2dup (is-comet-numbered-unpacked?) if ncn-range-ok? else 2drop false then ;
+
+: pack-comet-numbered ( addr len -- addr' len' )
+  ncn-cut (pack-comet-numbered) ;
 
 \ ============================================================================
 \ Comet provisional designations (1995 O1, 1995 O1-B)
@@ -1361,7 +1410,7 @@ variable trf-len
   trf-len ! trf-addr !
   report-buf 12 bl fill
   trf-len @ 5 >= trf-len @ 7 <= and if
-    trf-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+    trf-addr @ 4 + c@ num-comet-type? if
       trf-addr @ 4 all-digit? if
         \ Numbered comet: 0001P -> "0001P       "
         \ Or with fragment: 0073Pa -> "0073P      a"
@@ -1392,7 +1441,7 @@ variable frf-start
   frf-len ! frf-addr !
   frf-len @ 12 <> if frf-addr @ frf-len @ exit then  \ return as-is if not 12 chars
   \ Check for numbered comet format
-  frf-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+  frf-addr @ 4 + c@ num-comet-type? if
     frf-addr @ 4 all-digit? if
       \ Numbered comet - check for fragment in columns 10-11 (positions 10, 11)
       frf-addr @ report-buf 5 move           \ copy first 5 chars
@@ -1441,7 +1490,7 @@ variable has-frag-result
     i c@ [char] - = if drop i leave then
   loop
   dup if
-    dup 1- c@ dup [char] P = swap [char] D = or if
+    dup 1- c@ num-comet-type? if
       true has-frag-result !
     then
   then
@@ -1450,7 +1499,7 @@ variable has-frag-result
   has-frag-result @ 0= if
     2dup
     dup 6 >= over 7 <= and if
-      over 4 + c@ dup [char] P = swap [char] D = or if
+      over 4 + c@ num-comet-type? if
         over 4 all-digit? if
           over 5 + c@ is-lower if
             true has-frag-result !
@@ -1515,7 +1564,7 @@ variable frag-len
     i c@ [char] - = if drop i leave then
   loop
   dup if
-    dup 1- c@ dup [char] P = swap [char] D = or if
+    dup 1- c@ num-comet-type? if
       1+                                    \ addr after dash
       2 pick 2 pick + over -                \ fragment length
       dup frag-len !
@@ -1528,7 +1577,7 @@ variable frag-len
   \ Packed numbered comet: 0073Pa or 0073Paa
   2dup
   dup 6 >= over 7 <= and if
-    over 4 + c@ dup [char] P = swap [char] D = or if
+    over 4 + c@ num-comet-type? if
       over 4 all-digit? if
         over 5 + c@ is-lower if
           over 5 + c@ [char] a - [char] A + frag-buf c!
@@ -1607,7 +1656,7 @@ variable gp-dash
     i c@ [char] - = if i gp-dash ! leave then
   loop
   gp-dash @ if
-    gp-dash @ 1- c@ dup [char] P = swap [char] D = or if
+    gp-dash @ 1- c@ num-comet-type? if
       gp-dash @ gp-addr @ - parent-len !
       gp-addr @ parent-buf parent-len @ move
       parent-buf parent-len @ exit
@@ -1616,7 +1665,7 @@ variable gp-dash
 
   \ Packed numbered comet: 0073Pa -> 0073P
   gp-len @ 6 >= gp-len @ 7 <= and if
-    gp-addr @ 4 + c@ dup [char] P = swap [char] D = or if
+    gp-addr @ 4 + c@ num-comet-type? if
       gp-addr @ 4 all-digit? if
         gp-addr @ 5 + c@ is-lower if
           gp-addr @ parent-buf 5 move

@@ -517,7 +517,7 @@ function s = mpc_unpack_comet_numbered(packed)
   len = length(packed);
 
   % Match numbered comet with optional fragment: 0073P, 0073Pa, 0073Paa
-  [tokens, ~] = regexp(packed, '^(\d{4})([PD])([a-z]{0,2})$', 'tokens', 'match');
+  [tokens, ~] = regexp(packed, '^(\d{4})([PDI])([a-z]{0,2})$', 'tokens', 'match');
   if isempty(tokens) || len < 5 || len > 7
     error('MPCDesignationError:InvalidFormat', 'Invalid packed numbered comet designation');
   end
@@ -539,7 +539,7 @@ function s = mpc_pack_comet_numbered(unpacked)
   unpacked = strtrim(unpacked);
 
   % Match "1P", "73P-A", "73P-AA", or "1P/Halley" (with optional fragment and name)
-  [tokens, ~] = regexp(unpacked, '^(\d+)([PD])(-([A-Z]{1,2}))?(/[A-Za-z].*)?$', 'tokens', 'match');
+  [tokens, ~] = regexp(unpacked, '^(\d+)([PDI])(-([A-Z]{1,2}))?(/[A-Za-z].*)?$', 'tokens', 'match');
   if isempty(tokens)
     error('MPCDesignationError:InvalidFormat', 'Invalid unpacked numbered comet designation');
   end
@@ -981,7 +981,7 @@ function info = mpc_detect_format(designation)
     end
 
     % Check for packed numbered comet (no fragment)
-    if ~isempty(regexp(des, '^[0-9]{4}[PD]$', 'once'))
+    if ~isempty(regexp(des, '^[0-9]{4}[PDI]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_numbered';
       info.subtype = 'comet numbered';
@@ -990,7 +990,7 @@ function info = mpc_detect_format(designation)
   end
 
   % Check for packed numbered comet with single-letter fragment (6 chars)
-  if length(des) == 6 && ~isempty(regexp(des, '^[0-9]{4}[PD][a-z]$', 'once'))
+  if length(des) == 6 && ~isempty(regexp(des, '^[0-9]{4}[PDI][a-z]$', 'once'))
     info.format = 'packed';
     info.type = 'comet_numbered';
     info.subtype = 'comet numbered with fragment';
@@ -998,7 +998,7 @@ function info = mpc_detect_format(designation)
   end
 
   % Check for packed numbered comet with two-letter fragment (7 chars)
-  if length(des) == 7 && ~isempty(regexp(des, '^[0-9]{4}[PD][a-z]{2}$', 'once'))
+  if length(des) == 7 && ~isempty(regexp(des, '^[0-9]{4}[PDI][a-z]{2}$', 'once'))
     info.format = 'packed';
     info.type = 'comet_numbered';
     info.subtype = 'comet numbered with fragment';
@@ -1103,7 +1103,7 @@ function info = mpc_detect_format(designation)
   end
 
   % Check for unpacked numbered periodic comet (with optional fragment)
-  if ~isempty(regexp(des, '^\d+[PD](-[A-Z]{1,2})?(/[A-Za-z].*)?$', 'once'))
+  if ~isempty(regexp(des, '^\d+[PDI](-[A-Z]{1,2})?(/[A-Za-z].*)?$', 'once'))
     info.format = 'unpacked';
     info.type = 'comet_numbered';
     if ~isempty(regexp(des, '-[A-Z]{1,2}', 'once'))
@@ -1284,7 +1284,7 @@ function s = mpc_from_report_format(report)
   middle = report(6:10);
   last2 = report(11:12);
 
-  if ~isempty(regexp(first5, '^[0-9]{4}[PD]$', 'once')) && isempty(strtrim(middle))
+  if ~isempty(regexp(first5, '^[0-9]{4}[PDI]$', 'once')) && isempty(strtrim(middle))
     frag1 = report(11);
     frag2 = report(12);
 
@@ -1337,7 +1337,7 @@ function result = mpc_has_fragment(desig)
   else
     % Packed format
     if strcmp(dtype, 'comet_numbered')
-      % Check for lowercase after P/D (position 6+)
+      % Check for lowercase after P/D/I (position 6+)
       if len > 5 && desig(6) >= 'a' && desig(6) <= 'z'
         result = true;
       end
@@ -1392,7 +1392,7 @@ function s = mpc_get_fragment(desig)
   else
     % Packed format
     if strcmp(dtype, 'comet_numbered')
-      % Fragment is lowercase after P/D
+      % Fragment is lowercase after P/D/I
       if len == 6
         s = upper(desig(6));
       elseif len == 7
@@ -1452,7 +1452,7 @@ function s = mpc_get_parent(desig)
   else
     % Packed format
     if strcmp(dtype, 'comet_numbered')
-      % Remove lowercase fragment letters after P/D
+      % Remove lowercase fragment letters after P/D/I
       if len > 5 && desig(6) >= 'a' && desig(6) <= 'z'
         s = desig(1:5);
       else

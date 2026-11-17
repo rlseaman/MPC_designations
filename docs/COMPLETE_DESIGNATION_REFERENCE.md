@@ -7,7 +7,7 @@ implementations (Python, TCL, C, Go, Java, Rust), and 2M+ test cases.
 ## Sources
 
 1. **MPC Official**: https://www.minorplanetcenter.net/iau/info/PackedDes.html
-2. **Repository test data**: 2,110,813 provisional + 899,365 numbered designation pairs + 124 error cases
+2. **Repository test data**: 2,110,817 provisional + 899,365 numbered designation pairs + 124 error cases
 3. **Language implementations**: Python, TCL, C, Go, Java, Rust (all produce identical results)
 4. **MPC Help Desk**: Direct clarifications received (see Part 11)
 
@@ -540,7 +540,7 @@ versions. The test data focuses on provisional satellites.
 
 ### 6.1 Cross-Language Consistency
 
-All 25 implementations produce **identical results** for all 2,110,813
+All 25 implementations produce **identical results** for all 2,110,817
 provisional and 899,365 numbered test pairs, in both directions.
 
 ### 6.2 Known Limitations
@@ -798,4 +798,4 @@ validated by ~3 million test pairs with zero discrepancies.
 2. [MPC Old-Style Designations](https://www.minorplanetcenter.net/iau/info/DesDoc.html)
 3. [MPC Provisional Designation Definition](https://www.minorplanetcenter.net/mpcops/documentation/provisional-designation-definition/)
 4. [PDS Small Bodies Node - Target Names](https://pds-smallbodies.astro.umd.edu/howto/sbn_target_names.shtml)
-5. Repository test data: 2,110,813 provisional + 899,365 numbered designation pairs + 124 error cases
+5. Repository test data: 2,110,817 provisional + 899,365 numbered designation pairs + 124 error cases

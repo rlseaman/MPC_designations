@@ -60,7 +60,7 @@ help:
 	@echo "  build         Build the project"
 	@echo "  test          Run error, helper, and CSV tests"
 	@echo "  test-all      Run all tests including roundtrip"
-	@echo "  test-errors   Run error handling tests (94 cases)"
+	@echo "  test-errors   Run error handling tests (130 cases)"
 	@echo "  test-helpers  Run helper function tests (77 cases)"
 	@echo "  test-csv      Run CSV conversion tests (2M+ entries)"
 	@echo "  test-roundtrip Run roundtrip tests"

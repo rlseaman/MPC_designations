@@ -199,7 +199,6 @@ variable skip-hit?
   s" format"      s" old_style_invalid_prefix" s" no old-style prefix validation" ?skip
   s" format"      s" old_style_wrong_length" s" no old-style length validation" ?skip
   s" format"      s" old_style_lowercase"    s" no old-style case validation" ?skip
-  s" format"      s" numbered_comet_zero"    s" no numbered-comet number-zero check" ?skip
   s" edge_case"   s" very_long_string"       s" over-long input truncated, not rejected" ?skip
   s" edge_case"   s" sql_injection"          s" junk parsed loosely, not rejected" ?skip
 

@@ -217,7 +217,7 @@ Raised for invalid designations. Inherits from `StandardError`.
 make test-all
 
 # Run specific tests
-make test-errors    # Error handling tests (94 cases)
+make test-errors    # Error handling tests (130 cases)
 make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ cases)
 make test-roundtrip # Roundtrip verification

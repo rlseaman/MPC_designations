@@ -574,7 +574,7 @@ std::string MPCDesignation::packCometNumbered(const std::string& unpacked) {
     std::string u = trim(unpacked);
 
     // Match numbered comet with optional fragment: "73P", "73P-A", "73P-AA"
-    std::regex numberedRe(R"(^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
+    std::regex numberedRe(R"(^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
     std::smatch match;
     if (!std::regex_match(u, match, numberedRe)) {
         throw MPCDesignationError("Invalid unpacked numbered comet designation");
@@ -612,7 +612,7 @@ std::string MPCDesignation::unpackCometNumbered(const std::string& packed) {
     }
 
     // Match with optional fragment: "0073P", "0073Pa", "0073Paa"
-    std::regex numberedRe(R"(^(\d{4})([PD])([a-z]{0,2})$)");
+    std::regex numberedRe(R"(^(\d{4})([PDI])([a-z]{0,2})$)");
     std::smatch match;
     if (!std::regex_match(p, match, numberedRe)) {
         throw MPCDesignationError("Invalid packed numbered comet designation");
@@ -1052,7 +1052,7 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
 
         // Check for packed numbered comet
         if (std::isdigit(des[0]) && std::isdigit(des[1]) && std::isdigit(des[2]) &&
-            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D')) {
+            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D' || des[4] == 'I')) {
             info.format = Format::Packed;
             info.type = Type::CometNumbered;
             info.subtype = "comet numbered " + getCometTypeName(des[4]);
@@ -1063,7 +1063,7 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     // Check for packed numbered comet with single-letter fragment (6 chars)
     if (len == 6 && des.find(' ') == std::string::npos) {
         if (std::isdigit(des[0]) && std::isdigit(des[1]) && std::isdigit(des[2]) &&
-            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D') && std::islower(des[5])) {
+            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D' || des[4] == 'I') && std::islower(des[5])) {
             info.format = Format::Packed;
             info.type = Type::CometNumbered;
             info.subtype = "comet numbered with fragment " + getCometTypeName(des[4]);
@@ -1074,7 +1074,7 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     // Check for packed numbered comet with two-letter fragment (7 chars) - before provisional check
     if (len == 7 && des.find(' ') == std::string::npos) {
         if (std::isdigit(des[0]) && std::isdigit(des[1]) && std::isdigit(des[2]) &&
-            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D') &&
+            std::isdigit(des[3]) && (des[4] == 'P' || des[4] == 'D' || des[4] == 'I') &&
             std::islower(des[5]) && std::islower(des[6])) {
             info.format = Format::Packed;
             info.type = Type::CometNumbered;
@@ -1211,7 +1211,7 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     }
 
     // Check for unpacked numbered comet (with optional fragment)
-    std::regex numberedRe(R"(^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
+    std::regex numberedRe(R"(^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$)");
     std::smatch numberedMatch;
     if (std::regex_match(des, numberedMatch, numberedRe)) {
         char cometType = numberedMatch[2].str()[0];
@@ -1336,7 +1336,7 @@ std::string MPCDesignation::toReportFormat(const std::string& minimal) {
 
     // Check for numbered comet with fragment: 0073Pa (6 chars) or 0073Paa (7 chars)
     if ((len == 6 || len == 7) && std::isdigit(m[0]) && std::isdigit(m[1]) &&
-        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D') &&
+        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D' || m[4] == 'I') &&
         std::islower(m[5])) {
         // Numbered comet with fragment
         std::string base = m.substr(0, 5);  // "0073P"
@@ -1348,7 +1348,7 @@ std::string MPCDesignation::toReportFormat(const std::string& minimal) {
 
     // Check for numbered comet without fragment: 0073P (5 chars)
     if (len == 5 && std::isdigit(m[0]) && std::isdigit(m[1]) &&
-        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D')) {
+        std::isdigit(m[2]) && std::isdigit(m[3]) && (m[4] == 'P' || m[4] == 'D' || m[4] == 'I')) {
         return m + std::string(7, ' ');  // "0073P       "
     }
 
@@ -1365,7 +1365,7 @@ std::string MPCDesignation::fromReportFormat(const std::string& report) {
     // Check for numbered comet format: "0073P      a" or "0073P     aa"
     if (std::isdigit(report[0]) && std::isdigit(report[1]) &&
         std::isdigit(report[2]) && std::isdigit(report[3]) &&
-        (report[4] == 'P' || report[4] == 'D')) {
+        (report[4] == 'P' || report[4] == 'D' || report[4] == 'I')) {
         std::string base = report.substr(0, 5);
         std::string rest = report.substr(5);
         // Find fragment letters at the end (skip spaces)
@@ -1422,7 +1422,7 @@ bool MPCDesignation::hasFragment(const std::string& designation) {
     size_t len = d.length();
     if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
         if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
-            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D' || d[4] == 'I') && std::islower(d[5])) {
             return true;
         }
     }
@@ -1465,7 +1465,7 @@ std::string MPCDesignation::getFragment(const std::string& designation) {
     size_t len = d.length();
     if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
         if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
-            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D' || d[4] == 'I') && std::islower(d[5])) {
             std::string frag;
             for (size_t i = 5; i < len; i++) {
                 frag += static_cast<char>(std::toupper(d[i]));
@@ -1519,7 +1519,7 @@ std::string MPCDesignation::getParent(const std::string& designation) {
     size_t len = d.length();
     if ((len == 6 || len == 7) && d.find(' ') == std::string::npos) {
         if (std::isdigit(d[0]) && std::isdigit(d[1]) && std::isdigit(d[2]) &&
-            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D') && std::islower(d[5])) {
+            std::isdigit(d[3]) && (d[4] == 'P' || d[4] == 'D' || d[4] == 'I') && std::islower(d[5])) {
             return d.substr(0, 5);
         }
     }

@@ -30,7 +30,8 @@ Or simply copy `src/mpc_designation/` to your project.
 
 ## CLI Usage
 
-Installing the package provides an `mpc-designation` command:
+Installing the package provides an `mpc-designation` command (since 1.1.3,
+`python -m mpc_designation` works too):
 
 ```bash
 # Single conversion
@@ -320,7 +321,7 @@ convert_simple('1700 AA')    # Error - year before 1800 for asteroids
 ## Testing
 
 ```bash
-# Run error handling tests (94 test cases)
+# Run error handling tests (130 test cases)
 python test/test_errors.py ../test-data/error_test_cases.csv
 
 # Run fragment handling tests

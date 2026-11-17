@@ -715,7 +715,7 @@ func UnpackCometNumbered(packed string) (string, error) {
 	}
 
 	cometType := p[4]
-	if cometType != 'P' && cometType != 'D' {
+	if cometType != 'P' && cometType != 'D' && cometType != 'I' {
 		return "", fmt.Errorf("%w: invalid comet type: %c", ErrInvalidFormat, cometType)
 	}
 
@@ -765,7 +765,7 @@ func PackCometNumbered(unpacked string) (string, error) {
 	}
 
 	cometType := u[numEnd]
-	if cometType != 'P' && cometType != 'D' {
+	if cometType != 'P' && cometType != 'D' && cometType != 'I' {
 		return "", fmt.Errorf("%w: invalid comet type: %c", ErrInvalidFormat, cometType)
 	}
 
@@ -1470,7 +1470,7 @@ func DetectFormat(designation string) (Info, error) {
 		info.Type = "comet_numbered"
 		// Find the comet type letter
 		for i := 0; i < len(des); i++ {
-			if des[i] == 'P' || des[i] == 'D' {
+			if des[i] == 'P' || des[i] == 'D' || des[i] == 'I' {
 				typeDesc := cometTypeDescriptions[des[i]]
 				info.Subtype = fmt.Sprintf("comet numbered %s", typeDesc)
 				break
@@ -1748,7 +1748,7 @@ func isPackedCometNumbered(s string) bool {
 			return false
 		}
 	}
-	if s[4] != 'P' && s[4] != 'D' {
+	if s[4] != 'P' && s[4] != 'D' && s[4] != 'I' {
 		return false
 	}
 	// Check for optional fragment (lowercase letters)
@@ -1913,7 +1913,7 @@ func isUnpackedCometNumbered(s string) bool {
 	}
 
 	c := s[numEnd]
-	if c != 'P' && c != 'D' {
+	if c != 'P' && c != 'D' && c != 'I' {
 		return false
 	}
 
@@ -2175,7 +2175,7 @@ func FromReportFormat(report string) (string, error) {
 		first5[1] >= '0' && first5[1] <= '9' &&
 		first5[2] >= '0' && first5[2] <= '9' &&
 		first5[3] >= '0' && first5[3] <= '9' &&
-		(first5[4] == 'P' || first5[4] == 'D') &&
+		(first5[4] == 'P' || first5[4] == 'D' || first5[4] == 'I') &&
 		strings.TrimSpace(middle) == "" {
 
 		result := first5

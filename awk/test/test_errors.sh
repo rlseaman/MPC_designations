@@ -101,10 +101,6 @@ skip_reason() {
         format/old_style_invalid_prefix)
             echo "AWK converter does not validate old-style prefix (C instead of A/B)" ;;
 
-        # Numbered comet zero is encoded as 0000P instead of being rejected.
-        format/numbered_comet_zero)
-            echo "AWK converter does not reject numbered comet number zero" ;;
-
         *)
             : ;;  # not a skip
     esac

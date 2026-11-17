@@ -563,7 +563,7 @@ object MPCDesignation {
         val p = packed.trim()
 
         // Match numbered comet with optional fragment: "0073P", "0073Pa", "0073Paa"
-        val pattern = Regex("""^(\d{4})([PD])([a-z]{1,2})?$""")
+        val pattern = Regex("""^(\d{4})([PDI])([a-z]{1,2})?$""")
         val match = pattern.matchEntire(p)
             ?: throw MPCDesignationException("Invalid packed numbered comet designation")
 
@@ -582,7 +582,7 @@ object MPCDesignation {
         val u = unpacked.trim()
 
         // Match "1P", "73P-A", "73P-AA", "1P/Halley" (with optional fragment and/or name)
-        val pattern = Regex("""^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
+        val pattern = Regex("""^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
         val match = pattern.matchEntire(u)
             ?: throw MPCDesignationException("Invalid unpacked numbered comet designation")
 
@@ -993,7 +993,7 @@ object MPCDesignation {
             }
 
             // Check for packed numbered comet (5 chars ending in P or D)
-            val cometPattern = Regex("""^[0-9]{4}[PD]$""")
+            val cometPattern = Regex("""^[0-9]{4}[PDI]$""")
             if (cometPattern.matches(des)) {
                 val cometType = des[4]
                 val typeDesc = cometTypeDescriptions[cometType] ?: cometType.toString()
@@ -1003,7 +1003,7 @@ object MPCDesignation {
 
         // Check for packed numbered comet with fragment (6-7 chars: nnnnPf or nnnnPff)
         if (des.length == 6 || des.length == 7) {
-            val fragPattern = Regex("""^(\d{4})([PD])([a-z]{1,2})$""")
+            val fragPattern = Regex("""^(\d{4})([PDI])([a-z]{1,2})$""")
             fragPattern.matchEntire(des)?.let { match ->
                 val cometType = match.groupValues[2][0]
                 val typeDesc = cometTypeDescriptions[cometType] ?: cometType.toString()
@@ -1115,7 +1115,7 @@ object MPCDesignation {
         }
 
         // Check for unpacked numbered periodic comet with optional fragment
-        val numberedCometPattern = Regex("""^(\d+)([PD])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
+        val numberedCometPattern = Regex("""^(\d+)([PDI])(?:-([A-Z]{1,2}))?(?:/[A-Za-z].*)?$""")
         numberedCometPattern.matchEntire(des)?.let { match ->
             val cometType = match.groupValues[2][0]
             val typeDesc = cometTypeDescriptions[cometType] ?: cometType.toString()
@@ -1233,7 +1233,7 @@ object MPCDesignation {
         val len = m.length
 
         // Numbered comet with possible fragment: "0073P", "0073Pa", "0073Paa"
-        val numberedCometPattern = Regex("""^(\d{4}[PD])([a-z]{1,2})?$""")
+        val numberedCometPattern = Regex("""^(\d{4}[PDI])([a-z]{1,2})?$""")
         numberedCometPattern.matchEntire(m)?.let { match ->
             val base = match.groupValues[1]  // "0073P"
             val fragment = match.groupValues[2].takeIf { it.isNotEmpty() }
@@ -1260,7 +1260,7 @@ object MPCDesignation {
         }
 
         // Check for numbered comet format: "0073P       " or "0073P      a" or "0073P     aa"
-        val cometPattern = Regex("""^(\d{4}[PD])(\s*)([a-z]{0,2})$""")
+        val cometPattern = Regex("""^(\d{4}[PDI])(\s*)([a-z]{0,2})$""")
         cometPattern.matchEntire(report)?.let { match ->
             val base = match.groupValues[1]  // "0073P"
             val fragment = match.groupValues[3].takeIf { it.isNotEmpty() }
@@ -1283,7 +1283,7 @@ object MPCDesignation {
         val d = designation.trim()
 
         // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
-        if (Regex("""^\d+[PD]-[A-Z]{1,2}(?:/.*)?$""").containsMatchIn(d)) {
+        if (Regex("""^\d+[PDI]-[A-Z]{1,2}(?:/.*)?$""").containsMatchIn(d)) {
             return true
         }
 
@@ -1293,7 +1293,7 @@ object MPCDesignation {
         }
 
         // Packed numbered comet with fragment: "0073Pa", "0073Paa"
-        if (Regex("""^\d{4}[PD][a-z]{1,2}$""").matches(d)) {
+        if (Regex("""^\d{4}[PDI][a-z]{1,2}$""").matches(d)) {
             return true
         }
 
@@ -1314,7 +1314,7 @@ object MPCDesignation {
         val d = designation.trim()
 
         // Unpacked numbered comet with fragment: "73P-A", "73P-AA"
-        Regex("""^\d+[PD]-([A-Z]{1,2})(?:/.*)?$""").find(d)?.let {
+        Regex("""^\d+[PDI]-([A-Z]{1,2})(?:/.*)?$""").find(d)?.let {
             return it.groupValues[1]
         }
 
@@ -1324,7 +1324,7 @@ object MPCDesignation {
         }
 
         // Packed numbered comet with fragment: "0073Pa", "0073Paa"
-        Regex("""^\d{4}[PD]([a-z]{1,2})$""").find(d)?.let {
+        Regex("""^\d{4}[PDI]([a-z]{1,2})$""").find(d)?.let {
             return it.groupValues[1].uppercase()
         }
 
@@ -1344,7 +1344,7 @@ object MPCDesignation {
         val d = designation.trim()
 
         // Unpacked numbered comet with fragment: "73P-A" -> "73P"
-        Regex("""^(\d+[PD])-[A-Z]{1,2}((?:/.*)?)$""").find(d)?.let {
+        Regex("""^(\d+[PDI])-[A-Z]{1,2}((?:/.*)?)$""").find(d)?.let {
             return it.groupValues[1] + it.groupValues[2]
         }
 
@@ -1354,7 +1354,7 @@ object MPCDesignation {
         }
 
         // Packed numbered comet with fragment: "0073Pa" -> "0073P"
-        Regex("""^(\d{4}[PD])[a-z]{1,2}$""").find(d)?.let {
+        Regex("""^(\d{4}[PDI])[a-z]{1,2}$""").find(d)?.let {
             return it.groupValues[1]
         }
 

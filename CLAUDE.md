@@ -23,7 +23,7 @@ Historical change rationale and the per-language feature checklist live in
   `category,subcategory,input,expected_error,description`, expected
   `valid|format|range`). Harnesses for awk, bash, nim, forth, haskell, C carry
   documented expected-skips.
-- `test-data/prov_unpack_to_pack.csv.gz` (2,110,813 pairs) and
+- `test-data/prov_unpack_to_pack.csv.gz` (2,110,817 pairs) and
   `test-data/numbered_pack.csv.gz` (899,365 pairs) — `unpacked,packed` with one
   header row. Harnesses test the pack direction; to test unpack, swap columns.
   Some harnesses (C, Haskell, Octave, R) call `pack()` only, so an unpack run
