@@ -52,7 +52,7 @@ All code is released under CC0 1.0 Universal (Public Domain). You may:
 
 All implementations must:
 
-1. Pass all 2,021,090+ conversion test cases
+1. Pass every conversion pair in `test-data/prov_unpack_to_pack.csv.gz` (2,110,813) and `test-data/numbered_pack.csv.gz` (899,365), in both directions
 2. Pass all error handling test cases
 3. Provide consistent APIs across languages where idiomatic
 4. Include CLI tools for command-line use

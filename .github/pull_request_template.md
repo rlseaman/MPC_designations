@@ -24,7 +24,7 @@ per-language checklist from CLAUDE_NOTES.md.
 
 - [ ] `make test-all` passes locally (or the relevant per-language subset)
 - [ ] No regression in error-case test suite
-- [ ] No regression in CSV conversion test (2,022,404 entries)
+- [ ] No regression in CSV conversion test (`prov_unpack_to_pack` 2,110,813 and `numbered_pack` 899,365 entries)
 - [ ] No regression in helper-function test suite
 - [ ] New tests added (if behavior changed)
 

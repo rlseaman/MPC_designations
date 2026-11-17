@@ -2,7 +2,7 @@
 
 This repository is unusual. It contains the **same library, implemented 25
 times**, in 25 different programming languages, each passing the same
-2,022,404-entry conversion corpus and the same 94-case error suite. That is
+~3.0-million-pair conversion corpus and the same 124-case error suite. That is
 deliberate. This document explains why.
 
 ## This is a corpus, not a product
@@ -16,7 +16,7 @@ already be using.
 
 The deliverable is not "install this dependency." The deliverable is:
 
-1. A **specification by example**. The 2,022,404-entry test corpus is the
+1. A **specification by example**. The conversion corpus (refreshed from the MPC catalog) is the
    ground truth. Any reading of the MPC spec that produces different output is
    wrong.
 2. A **per-language reference implementation** a user can read, copy, fork, or

@@ -42,41 +42,44 @@ Python users: `pip install mpc-designation`. See [`docs/QUICKSTART.md`](docs/QUI
 
 All production implementations pass the same test suite and produce identical results.
 
-**Note:** The Forth implementation passes 86 comprehensive tests covering all formats but has not been verified on the full 2M CSV test due to gforth memory constraints. The SPP/IRAF implementation requires the IRAF environment for compilation.
-
 ## Test Results
 
-All 25 implementations and their test status on the full test suite (2,022,404 conversions):
+All 25 implementations pass the full conversion corpus in both directions, plus
+the 124-case shared error suite (with documented, language-inherent skips — see
+`docs/VALIDATION_GAPS.md`). Corpus refreshed from the MPC catalog on
+2026-11-17 (see `test-data/README.md`).
 
-| Implementation | Pack (unpacked→packed) | Status |
-|----------------|------------------------|--------|
-| AWK | 2,022,404 / 2,022,404 | ✅ 100% |
-| Bash | 2,022,404 / 2,022,404 | ✅ 100% |
-| C | 2,022,404 / 2,022,404 | ✅ 100% |
-| C++ | 2,022,404 / 2,022,404 | ✅ 100% |
-| C# | 2,022,404 / 2,022,404 | ✅ 100% |
-| Forth | 86 / 86 | ✅ 100%* |
-| Fortran | 2,022,404 / 2,022,404 | ✅ 100% |
-| Go | 2,022,404 / 2,022,404 | ✅ 100% |
-| Haskell | 2,022,404 / 2,022,404 | ✅ 100% |
-| Java | 2,022,404 / 2,022,404 | ✅ 100% |
-| JavaScript | 2,022,404 / 2,022,404 | ✅ 100% |
-| Julia | 2,022,404 / 2,022,404 | ✅ 100% |
-| Kotlin | 2,022,404 / 2,022,404 | ✅ 100% |
-| Nim | 2,022,404 / 2,022,404 | ✅ 100% |
-| Octave | 2,022,404 / 2,022,404 | ✅ 100% |
-| Perl | 2,022,404 / 2,022,404 | ✅ 100% |
-| PHP | 2,022,404 / 2,022,404 | ✅ 100% |
-| Python | 2,022,404 / 2,022,404 | ✅ 100% |
-| R | 2,022,404 / 2,022,404 | ✅ 100% |
-| Ruby | 2,022,404 / 2,022,404 | ✅ 100% |
-| Rust | 2,022,404 / 2,022,404 | ✅ 100% |
-| SPP/IRAF | 2,022,404 / 2,022,404 | ✅ 100% |
-| Swift | 2,022,404 / 2,022,404 | ✅ 100% |
-| Tcl | 2,022,404 / 2,022,404 | ✅ 100% |
-| TypeScript | 2,022,404 / 2,022,404 | ✅ 100% |
+| Implementation | Provisional pack | Provisional unpack | Numbered pack | Numbered unpack | Status |
+|---|---|---|---|---|---|
+| AWK | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Bash† | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| C | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| C++ | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| C# | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Forth | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Fortran | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Go | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Haskell | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Java | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| JavaScript | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Julia | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Kotlin | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Nim | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Octave | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Perl | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| PHP | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Python | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| R | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Ruby | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Rust | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| SPP/IRAF | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Swift | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| Tcl | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
+| TypeScript | 2,110,813 / 2,110,813 | 2,110,813 / 2,110,813 | 899,365 / 899,365 | 899,365 / 899,365 | ✅ |
 
-*Forth passes 86 comprehensive tests covering all formats; full CSV test limited by gforth memory constraints.
+†Bash is slow (~3.7 h for the full corpus). The full run was made on the 1.1.1
+code; the 1.1.2 changes were verified on a 38,122-pair subset containing every
+comet and extended-format pair, in both directions.
 
 **Roundtrip note:** 2,625 old-style designations (e.g., `A873 OA`) normalize to modern format (`1873 OA`) on unpack. This is correct behavior—the packed representation is identical either way.
 

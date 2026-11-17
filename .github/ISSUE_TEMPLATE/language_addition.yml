@@ -44,7 +44,7 @@ body:
         - label: Pre-1925 A-prefix unpacking (`J08C00J` → `A908 CJ`)
         - label: Century code validation (asteroid I–L, comet A–L)
         - label: Error-case test suite (94 cases)
-        - label: CSV conversion test (2,022,404 entries)
+        - label: CSV conversion test (2,110,813 provisional + 899,365 numbered entries)
         - label: Helper-function test (77 cases)
         - label: Roundtrip test (81 cases)
         - label: Per-language `README.md` with API and test instructions

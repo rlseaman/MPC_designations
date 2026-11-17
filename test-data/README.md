@@ -6,9 +6,13 @@ This directory contains shared test data used by all language implementations.
 
 ### prov_unpack_to_pack.csv.gz
 
-Compressed CSV file containing 2,021,090 known-good designation conversion pairs.
+Compressed CSV file containing 2,110,813 known-good provisional designation
+conversion pairs: asteroid provisionals (standard, extended `_YHbbbb`,
+pre-1925 A-prefix), survey designations, and comet provisionals (modern,
+ancient, BCE, fragments, and asteroid-style including the extended form, e.g.
+`P/2025 OZ695,P_PO00Ud`).
 
-Format: `unpacked,packed`
+Format: `unpacked,packed` (one header row)
 
 Example:
 ```
@@ -20,6 +24,29 @@ To decompress:
 ```bash
 gunzip -k prov_unpack_to_pack.csv.gz
 ```
+
+### numbered_pack.csv.gz
+
+Compressed CSV file containing 899,365 numbered-asteroid pairs: every numbered
+minor planet in the MPC catalog at the time of the refresh (1-895,910) plus
+synthetic boundary cases across all three encoding tiers up to the maximum
+15,396,335 (`~zzzz`). Same `unpacked,packed` format.
+
+### Provenance and refresh
+
+Both corpora were refreshed on 2026-11-17 from a replica of the MPC
+PostgreSQL database (`mpc_sbn`), using the `primary_objects`,
+`current_identifications`, `numbered_identifications`, and `comet_names`
+tables. The provisional file is the union of the new export and the previous
+(2026-02-04) corpus; 237 older pairs no longer present in the MPC tables were
+retained. Every pair was verified against the Python reference in both
+directions before inclusion.
+
+The source extracts (`primary_objects.csv`, `secondary_designations.csv`,
+`comet_names.csv`) are kept locally and are git-ignored.
+
+Test harnesses run the pack direction (unpacked to packed). To exercise the
+unpack direction, swap the two columns.
 
 ### error_test_cases.csv
 

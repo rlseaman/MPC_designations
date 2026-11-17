@@ -51,6 +51,12 @@ jobs:
           cd python
           python test/test_csv.py ../test-data/prov_unpack_to_pack.csv
 
+      - name: Run Python numbered-asteroid tests
+        run: |
+          gunzip -k test-data/numbered_pack.csv.gz
+          cd python
+          python test/test_csv.py ../test-data/numbered_pack.csv
+
   test-tcl:
     runs-on: ubuntu-latest
     steps:
@@ -69,6 +75,12 @@ jobs:
           gunzip -k test-data/prov_unpack_to_pack.csv.gz
           cd tcl
           tclsh test/test_csv.tcl ../test-data/prov_unpack_to_pack.csv
+
+      - name: Run TCL numbered-asteroid tests
+        run: |
+          gunzip -k test-data/numbered_pack.csv.gz
+          cd tcl
+          tclsh test/test_csv.tcl ../test-data/numbered_pack.csv
 
   cross-language-validation:
     runs-on: ubuntu-latest
