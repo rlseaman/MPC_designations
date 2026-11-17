@@ -119,6 +119,7 @@ function unpack_permanent(packed,    first, v1, v2, v3, v4, prefix_val, suffix) 
         suffix = int(substr(packed, 2, 4))
         return prefix_val * 10000 + suffix
     } else {
+        if (int(packed) < 1) return "ERROR: Invalid asteroid number: 0"
         return int(packed)
     }
 }
@@ -263,6 +264,7 @@ function unpack_numbered_comet(packed,    num, type, fragment, len) {
     len = length(packed)
     num = int(substr(packed, 1, 4))
     type = substr(packed, 5, 1)
+    if (num < 1) return "ERROR: Comet number out of range (1-9999): 0"
 
     # Check for fragment (6 or 7 chars total)
     if (len > 5) {
@@ -510,6 +512,7 @@ function unpack_extended_comet(packed,    r) {
 
 # 12-char numbered comet with provisional: 0001PJ82U010 -> 1P/1982 U1
 function unpack_full_comet(packed,    r) {
+    if (substr(packed, 1, 4) + 0 < 1) return "ERROR: Comet number out of range (1-9999): 0"
     r = convert_simple(substr(packed, 5))
     if (r ~ /^ERROR/) return r
     return (substr(packed, 1, 4) + 0) r

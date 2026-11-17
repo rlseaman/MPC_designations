@@ -248,7 +248,8 @@ unpackPermanent packed
     -- Simple numeric format (< 100,000)
     | length packed == 5 && all isDigit packed =
         case readMaybe packed of
-            Just n  -> Right n
+            Just n | n < 1     -> Left $ MPCError $ "Invalid asteroid number: " ++ show n
+                   | otherwise -> Right n
             Nothing -> Left $ MPCError $ "Invalid packed permanent: " ++ packed
     -- Letter prefix format (100,000 - 619,999)
     | length packed == 5 && isAlpha (head packed) && all isDigit (tail packed) = do
@@ -485,7 +486,9 @@ unpackCometNumbered packed
             ctype = packed !! 4
             fragment = drop 5 packed
             num = read numStr :: Int
-        in if null fragment
+        in if num < 1
+           then Left $ MPCError $ "Comet number out of range (1-9999): " ++ show num
+           else if null fragment
            then Right $ show num ++ [ctype]
            else Right $ show num ++ [ctype] ++ "-" ++ map toUpper fragment
     | otherwise = Left $ MPCError $ "Invalid packed numbered comet: " ++ packed
@@ -550,7 +553,8 @@ unpackCometFull packed
         if null numPart
             then return $ ctype : '/' : prov
             else case readMaybe numPart :: Maybe Int of
-                Just n  -> return $ show n ++ ctype : '/' : prov
+                Just n | n < 1     -> Left $ MPCError $ "Comet number out of range (1-9999): " ++ show n
+                       | otherwise -> return $ show n ++ ctype : '/' : prov
                 Nothing -> Left $ MPCError $ "Invalid comet number: " ++ numPart
     | otherwise = Left $ MPCError $ "Invalid packed full comet: " ++ packed
   where

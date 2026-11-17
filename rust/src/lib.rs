@@ -218,9 +218,13 @@ fn unpack_permanent(packed: &str) -> Result<u32> {
     let rest: String = chars[1..5].iter().collect();
 
     if first.is_ascii_digit() {
-        packed.parse::<u32>().map_err(|_| {
+        let number = packed.parse::<u32>().map_err(|_| {
             MPCDesignationError::new(format!("Invalid packed permanent designation: {}", packed))
-        })
+        })?;
+        if number < 1 {
+            return Err(MPCDesignationError::new(format!("Invalid asteroid number: {}", number)));
+        }
+        Ok(number)
     } else if first >= 'A' && first <= 'Z' {
         let val = (first as u32) - 55; // A=10, B=11, etc.
         let rest_num: u32 = rest.parse().map_err(|_| {
@@ -653,6 +657,10 @@ fn unpack_comet_numbered(packed: &str) -> Result<String> {
         let comet_type = &caps[2];
         let fragment = caps.get(3).map(|m| m.as_str()).unwrap_or("");
 
+        if number < 1 {
+            return Err(MPCDesignationError::new(format!("Comet number out of range (1-9999): {}", number)));
+        }
+
         let mut result = format!("{}{}", number, comet_type);
         if !fragment.is_empty() {
             result.push('-');
@@ -918,6 +926,9 @@ fn unpack_comet_full(packed: &str) -> Result<String> {
         let number: u32 = num_str.parse().map_err(|_| {
             MPCDesignationError::new(format!("Invalid comet number: {}", num_str))
         })?;
+        if number < 1 {
+            return Err(MPCDesignationError::new(format!("Comet number out of range (1-9999): {}", number)));
+        }
         Ok(format!("{}{}/{}", number, comet_type, provisional))
     }
 }

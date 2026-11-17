@@ -321,7 +321,7 @@ convert_simple('1700 AA')    # Error - year before 1800 for asteroids
 ## Testing
 
 ```bash
-# Run error handling tests (130 test cases)
+# Run error handling tests (134 test cases)
 python test/test_errors.py ../test-data/error_test_cases.csv
 
 # Run fragment handling tests

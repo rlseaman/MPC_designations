@@ -276,7 +276,11 @@ unpack_permanent <- function(packed) {
 
   # Simple numeric format (< 100,000)
   if (grepl("^[0-9]$", first)) {
-    return(as.integer(p))
+    n <- as.integer(p)
+    if (isTRUE(n < 1)) {
+      mpc_error(sprintf("Invalid asteroid number: %d", n))
+    }
+    return(n)
   }
 
   # Extended format with uppercase letter (100,000 - 359,999)
@@ -627,6 +631,10 @@ unpack_comet_numbered <- function(packed) {
   comet_type <- substr(p, 5, 5)
   fragment <- if (len > 5) substr(p, 6, len) else ""
 
+  if (number < 1) {
+    mpc_error(sprintf("Comet number out of range (1-9999): %d", number))
+  }
+
   result <- sprintf("%d%s", number, comet_type)
   if (nchar(fragment) > 0) {
     result <- sprintf("%s-%s", result, toupper(fragment))
@@ -925,6 +933,9 @@ unpack_comet_full <- function(packed) {
     }
 
     num <- as.integer(num_part)
+    if (isTRUE(num < 1)) {
+      mpc_error(sprintf("Comet number out of range (1-9999): %d", num))
+    }
     return(sprintf("%d%s/%s", num, comet_type, provisional))
   }
 

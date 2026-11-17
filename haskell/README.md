@@ -142,7 +142,7 @@ data FormatInfo = FormatInfo
 
 ```bash
 make test-all       # Run all tests
-make test-errors    # Run error handling tests (130 cases)
+make test-errors    # Run error handling tests (134 cases)
 make test-helpers   # Run helper function tests (77 cases)
 make test-csv       # Run CSV conversion tests (2M+ cases)
 make test-roundtrip # Run round-trip verification

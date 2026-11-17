@@ -319,7 +319,12 @@ namespace MPC
 
             if (first >= '0' && first <= '9')
             {
-                return long.Parse(p);
+                long number = long.Parse(p);
+                if (number < 1)
+                {
+                    throw new MPCDesignationException($"Invalid asteroid number: {number}");
+                }
+                return number;
             }
 
             if (first >= 'A' && first <= 'Z')
@@ -688,6 +693,11 @@ namespace MPC
             char cometType = match.Groups[2].Value[0];
             string fragment = match.Groups[3].Success ? match.Groups[3].Value : "";
 
+            if (number < 1)
+            {
+                throw new MPCDesignationException($"Comet number out of range (1-9999): {number}");
+            }
+
             if (!string.IsNullOrEmpty(fragment))
             {
                 return $"{number}{cometType}-{fragment.ToUpper()}";
@@ -990,6 +1000,10 @@ namespace MPC
                 if (!string.IsNullOrEmpty(trimmedNum))
                 {
                     number = int.Parse(trimmedNum);
+                    if (number < 1)
+                    {
+                        throw new MPCDesignationException($"Comet number out of range (1-9999): {number}");
+                    }
                 }
             }
             else

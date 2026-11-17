@@ -182,7 +182,7 @@ print(df)
 ## Testing
 
 ```bash
-# Error handling tests (130 cases)
+# Error handling tests (134 cases)
 make test-errors
 
 # Helper function tests (77 cases)

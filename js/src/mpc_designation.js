@@ -191,7 +191,11 @@ function unpackPermanent(packed) {
     const rest = packed.substring(1, 5);
 
     if (/^\d$/.test(first)) {
-        return parseInt(packed, 10);
+        const number = parseInt(packed, 10);
+        if (number < 1) {
+            throw new MPCDesignationError(`Invalid asteroid number: ${number}`);
+        }
+        return number;
     } else if (first >= 'A' && first <= 'Z') {
         const val = first.charCodeAt(0) - 55; // A=10, B=11, etc.
         return val * 10000 + parseInt(rest, 10);
@@ -650,6 +654,10 @@ function unpackCometNumbered(packed) {
     const cometType = match[2];
     const fragment = match[3] || '';
 
+    if (number < 1) {
+        throw new MPCDesignationError(`Comet number out of range (1-9999): ${number}`);
+    }
+
     let result = `${number}${cometType}`;
     if (fragment) {
         result += `-${fragment.toUpperCase()}`;
@@ -944,6 +952,9 @@ function unpackCometFull(packed) {
         return `${cometType}/${provisional}`;
     } else {
         const number = parseInt(numStr, 10);
+        if (number < 1) {
+            throw new MPCDesignationError(`Comet number out of range (1-9999): ${number}`);
+        }
         return `${number}${cometType}/${provisional}`;
     }
 }

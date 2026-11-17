@@ -290,7 +290,9 @@ int mpc_unpack_permanent(const char *packed, long *number) {
 
     if (first >= '0' && first <= '9') {
         /* Simple numeric format (< 100,000) */
-        *number = atol(buf);
+        long n = atol(buf);
+        if (n < 1) return MPC_ERR_RANGE;
+        *number = n;
         return MPC_OK;
     } else if (first >= 'A' && first <= 'Z') {
         /* Extended format with uppercase (100,000 - 359,999) */
@@ -797,6 +799,7 @@ static int unpack_comet_numbered(const char *packed, char *output, size_t outlen
 
     char num_str[5] = {buf[0], buf[1], buf[2], buf[3], '\0'};
     int number = atoi(num_str);
+    if (number < 1) return MPC_ERR_RANGE;
 
     if (len == 5) {
         /* No fragment */
@@ -1150,7 +1153,10 @@ static int unpack_comet_full(const char *packed, char *output, size_t outlen) {
         /* Parse number, trimming spaces */
         char *p = num_part;
         while (*p == ' ') p++;
-        if (*p) number = atoi(p);
+        if (*p) {
+            number = atoi(p);
+            if (number < 1) return MPC_ERR_RANGE;
+        }
     } else {
         return MPC_ERR_FORMAT;
     }

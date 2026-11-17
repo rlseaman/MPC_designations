@@ -40,7 +40,7 @@ spp/
 │   └── README.md            # CL interface documentation
 ├── test/
 │   ├── test_mpc.x           # Unit test suite (32 tests)
-│   ├── test_errors.x        # Error handling tests (130 tests)
+│   ├── test_errors.x        # Error handling tests (134 tests)
 │   ├── test_helpers.x       # Helper function tests (77 tests)
 │   └── test_csv.x           # CSV benchmark tests (2M+ tests)
 ├── build/                   # Build directory (generated)
@@ -299,7 +299,7 @@ Unit tests (32 tests):
 ./test_mpc.e test_mpc
 ```
 
-Error handling tests (130 tests, paths are hardcoded relative to build/):
+Error handling tests (134 tests, paths are hardcoded relative to build/):
 ```bash
 ./test_errors.e test_errors
 ```

@@ -239,7 +239,11 @@ class MPCDesignation {
 
         // Simple numeric format (< 100,000)
         if ($first >= '0' && $first <= '9') {
-            return (int)$p;
+            $number = (int)$p;
+            if ($number < 1) {
+                throw new MPCDesignationException("Invalid asteroid number: $number");
+            }
+            return $number;
         }
 
         // Extended format with uppercase letter (100,000 - 359,999)
@@ -566,6 +570,10 @@ class MPCDesignation {
         $cometType = $matches[2];
         $fragment = $matches[3] ?? '';
 
+        if ($number < 1) {
+            throw new MPCDesignationException("Comet number out of range (1-9999): $number");
+        }
+
         if ($fragment !== '') {
             return "$number$cometType-" . strtoupper($fragment);
         }
@@ -831,6 +839,9 @@ class MPCDesignation {
             }
 
             $num = (int)$numPart;
+            if ($num < 1) {
+                throw new MPCDesignationException("Comet number out of range (1-9999): $num");
+            }
             return "$num$cometType/$provisional";
         }
 

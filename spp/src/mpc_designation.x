@@ -489,6 +489,11 @@ begin
 	if (IS_DIGIT(first)) {
 	    number = (packed[1]-'0')*10000 + (packed[2]-'0')*1000 +
 		     (packed[3]-'0')*100 + (packed[4]-'0')*10 + (packed[5]-'0')
+	    # Reject asteroid number zero
+	    if (number < 1) {
+		unpacked[1] = EOS
+		return
+	    }
 	    call sprintf (unpacked, maxch, "%d")
 		call pargi (number)
 	    return
@@ -960,6 +965,12 @@ begin
 	num = (packed[1]-'0')*1000 + (packed[2]-'0')*100 +
 	      (packed[3]-'0')*10 + (packed[4]-'0')
 
+	# Reject comet number zero
+	if (num < 1) {
+	    unpacked[1] = EOS
+	    return
+	}
+
 	# Check for fragment (6 or 7 chars)
 	if (len >= 6 && IS_LOWER(packed[6])) {
 	    frag1 = packed[6] - 32  # Convert to uppercase
@@ -1119,6 +1130,7 @@ char	packed[ARB], unpacked[ARB]
 int	maxch
 
 int	len, year, order, bcecode, cnum, i, mpc_deccyc(), strlen()
+bool	hasnum
 char	ctype, bceprefix, halfmo, frag, frag2, ufrag, ufrag2, provpk[10], provup[30]
 
 begin
@@ -1127,12 +1139,20 @@ begin
 
 	# Numbered comet with provisional (12 chars): NNNNT + 7-char provisional
 	cnum = 0
+	hasnum = false
 	if (len == 12) {
 	    do i = 1, 4 {
-		if (IS_DIGIT(packed[i]))
+		if (IS_DIGIT(packed[i])) {
 		    cnum = cnum * 10 + (packed[i] - '0')
+		    hasnum = true
+		}
 	    }
 	    ctype = packed[5]
+	    # Reject comet number zero (e.g. 0000PJ82U010)
+	    if (hasnum && cnum < 1) {
+		unpacked[1] = EOS
+		return
+	    }
 	}
 
 	# Check for BCE comet (prefix is /, ., or -)

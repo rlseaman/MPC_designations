@@ -172,7 +172,10 @@ module MPCDesignation
       rest = packed[1, 4]
 
       if first =~ /\d/
-        packed.to_i
+        number = packed.to_i
+        raise Error, "Invalid asteroid number: #{number}" if number < 1
+
+        number
       elsif first =~ /[A-Z]/
         val = first.ord - 55 # A=10, B=11, etc.
         val * 10_000 + rest.to_i
@@ -511,6 +514,8 @@ module MPCDesignation
       comet_type = match[2]
       fragment = match[3] || ''
 
+      raise Error, "Comet number out of range (1-9999): #{number}" if number < 1
+
       result = "#{number}#{comet_type}"
       result += "-#{fragment.upcase}" unless fragment.empty?
       result
@@ -725,6 +730,8 @@ module MPCDesignation
         "#{comet_type}/#{provisional}"
       else
         number = num_str.to_i
+        raise Error, "Comet number out of range (1-9999): #{number}" if number < 1
+
         "#{number}#{comet_type}/#{provisional}"
       end
     end

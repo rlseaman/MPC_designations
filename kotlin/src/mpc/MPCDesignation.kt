@@ -238,7 +238,11 @@ object MPCDesignation {
 
         // Simple numeric format (< 100,000)
         if (first in '0'..'9') {
-            return p.toIntOrNull() ?: throw MPCDesignationException("Invalid packed permanent designation")
+            val number = p.toIntOrNull() ?: throw MPCDesignationException("Invalid packed permanent designation")
+            if (number < 1) {
+                throw MPCDesignationException("Invalid asteroid number: $number")
+            }
+            return number
         }
 
         // Extended format with uppercase letter (100,000 - 359,999)
@@ -571,6 +575,10 @@ object MPCDesignation {
         val cometType = match.groupValues[2]
         val fragment = match.groupValues[3].takeIf { it.isNotEmpty() }
 
+        if (number < 1) {
+            throw MPCDesignationException("Comet number out of range (1-9999): $number")
+        }
+
         return if (fragment != null) {
             "$number$cometType-${fragment.uppercase()}"
         } else {
@@ -846,6 +854,9 @@ object MPCDesignation {
                 "$cometType/$provisional"
             } else {
                 val num = numPart.toInt()
+                if (num < 1) {
+                    throw MPCDesignationException("Comet number out of range (1-9999): $num")
+                }
                 "$num$cometType/$provisional"
             }
         }

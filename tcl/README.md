@@ -240,7 +240,7 @@ if {[catch {set result [MPCDesignation::convertSimple $input]} err]} {
 ## Testing
 
 ```bash
-# Run error handling tests (130 test cases)
+# Run error handling tests (134 test cases)
 tclsh test/test_errors.tcl ../test-data/error_test_cases.csv
 
 # Run fragment handling tests

@@ -42,7 +42,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  make test-quick   - Run quick validation tests"
-	@echo "  make test-errors  - Run error handling tests (130 cases)"
+	@echo "  make test-errors  - Run error handling tests (134 cases)"
 	@echo "  make test-helpers - Run helper function tests (77 cases)"
 	@echo "  make test-csv     - Run full CSV test suite (2M+ tests)"
 	@echo "  make test-roundtrip - Run round-trip tests"

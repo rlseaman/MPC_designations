@@ -285,6 +285,9 @@ func UnpackPermanent(packed string) (int, error) {
 		if err != nil {
 			return 0, fmt.Errorf("%w: invalid packed permanent designation", ErrInvalidFormat)
 		}
+		if num < 1 {
+			return 0, fmt.Errorf("%w: invalid asteroid number: %d", ErrOutOfRange, num)
+		}
 		return num, nil
 	}
 
@@ -724,6 +727,10 @@ func UnpackCometNumbered(packed string) (string, error) {
 		return "", fmt.Errorf("%w: invalid packed numbered comet designation", ErrInvalidFormat)
 	}
 
+	if num < 1 {
+		return "", fmt.Errorf("%w: comet number out of range (1-9999): %d", ErrOutOfRange, num)
+	}
+
 	result := fmt.Sprintf("%d%c", num, cometType)
 
 	// Check for fragment (lowercase letters after comet type)
@@ -981,6 +988,9 @@ func UnpackCometFull(packed string) (string, error) {
 		num, err := strconv.Atoi(numPart)
 		if err != nil {
 			return "", fmt.Errorf("%w: invalid comet number", ErrInvalidFormat)
+		}
+		if num < 1 {
+			return "", fmt.Errorf("%w: comet number out of range (1-9999): %d", ErrOutOfRange, num)
 		}
 
 		return fmt.Sprintf("%d%c/%s", num, cometType, provisional), nil

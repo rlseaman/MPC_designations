@@ -23,13 +23,13 @@ check and removing the skip.
 
 | Implementation | error suite |
 |---|---|
-| Python, Tcl | 130 / 130, **0 skips** — the validation reference |
+| Python, Tcl | 134 / 134, **0 skips** — the validation reference |
 | C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C and R skip 2 inherent null-byte cases; SPP reports them as failures) |
-| **nim** | 120 pass / **10 skip** |
-| **haskell** | 113 pass / **17 skip** |
-| **bash** | 110 pass / **20 skip** |
-| **awk** | 108 pass / **22 skip** |
-| **forth** | 102 pass / **28 skip** (most permissive; no error channel) |
+| **nim** | 124 pass / **10 skip** |
+| **haskell** | 117 pass / **17 skip** |
+| **bash** | 114 pass / **20 skip** |
+| **awk** | 112 pass / **22 skip** |
+| **forth** | 106 pass / **28 skip** (most permissive; no error channel) |
 
 ## Gaps by theme
 

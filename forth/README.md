@@ -136,7 +136,7 @@ designations-equal ( addr1 len1 addr2 len2 -- f )
 ## Testing
 
 ```bash
-# Run error handling tests (shared 124-case suite)
+# Run error handling tests (shared 134-case suite)
 make test-errors
 
 # Run helper function tests (77 cases)
@@ -156,7 +156,7 @@ make test-all
 
 - `src/mpc_designation.fs` - Main library
 - `src/mpc_designation_cli.fs` - Command-line interface
-- `test/test_errors.fs` - Error handling tests (shared 124-case suite)
+- `test/test_errors.fs` - Error handling tests (shared 134-case suite)
 - `test/test_helpers.fs` - Helper function tests (77 cases)
 - `test/test_csv.fs` - CSV test suite
 

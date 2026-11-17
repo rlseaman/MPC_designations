@@ -305,11 +305,16 @@ public class MPCDesignation {
 
         // Simple numeric format (< 100,000)
         if (first >= '0' && first <= '9') {
+            int number;
             try {
-                return Integer.parseInt(p);
+                number = Integer.parseInt(p);
             } catch (NumberFormatException e) {
                 throw new MPCDesignationException("Invalid packed permanent designation");
             }
+            if (number < 1) {
+                throw new MPCDesignationException("Invalid asteroid number: " + number);
+            }
+            return number;
         }
 
         // Extended format with uppercase letter (100,000 - 359,999)
@@ -687,6 +692,10 @@ public class MPCDesignation {
         String cometType = matcher.group(2);
         String fragment = matcher.group(3);
 
+        if (number < 1) {
+            throw new MPCDesignationException("Comet number out of range (1-9999): " + number);
+        }
+
         String result = number + cometType;
         if (fragment != null && !fragment.isEmpty()) {
             result += "-" + fragment.toUpperCase();
@@ -978,6 +987,9 @@ public class MPCDesignation {
             }
 
             int num = Integer.parseInt(numPart);
+            if (num < 1) {
+                throw new MPCDesignationException("Comet number out of range (1-9999): " + num);
+            }
             return num + "" + cometType + "/" + provisional;
         }
 

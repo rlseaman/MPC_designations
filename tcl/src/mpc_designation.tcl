@@ -218,7 +218,11 @@ namespace eval MPCDesignation {
 
         if {[string is digit $first]} {
             # Simple numeric format (< 100,000)
-            return [scan $packed %d]
+            set number [scan $packed %d]
+            if {$number < 1} {
+                error "Invalid asteroid number: $number"
+            }
+            return $number
         } elseif {[string match {[A-Z]} $first]} {
             # Extended format with uppercase letter (100,000 - 359,999)
             set val [expr {[scan $first %c] - 55}]  ;# A=10, B=11, etc.
@@ -718,6 +722,9 @@ namespace eval MPCDesignation {
         }
 
         set number [scan $numStr %d]
+        if {$number < 1} {
+            error "Comet number out of range (1-9999): $number"
+        }
         set result "$number$cometType"
         if {$fragment ne ""} {
             append result "-" [string toupper $fragment]
@@ -1021,6 +1028,9 @@ namespace eval MPCDesignation {
         } else {
             # Has periodic number
             set number [scan $numStr %d]
+            if {$number < 1} {
+                error "Comet number out of range (1-9999): $number"
+            }
             return "$number$cometType/$provisional"
         }
     }

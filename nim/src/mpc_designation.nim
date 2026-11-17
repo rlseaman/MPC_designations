@@ -152,7 +152,10 @@ proc unpackPermanent*(packed: string): string =
     let suffix = parseInt(packed[1..4])
     result = $(prefixVal * 10000 + suffix)
   else:
-    result = $parseInt(packed)
+    let num = parseInt(packed)
+    if num < 1:
+      return "ERROR: Invalid asteroid number: " & $num
+    result = $num
 
 #==============================================================================
 # Provisional designation encoding/decoding
@@ -309,6 +312,8 @@ proc packNumberedComet*(desig: string): string =
 
 proc unpackNumberedComet*(packed: string): string =
   let num = parseInt(packed[0..3])
+  if num < 1:
+    return "ERROR: Comet number out of range (1-9999): " & $num
   let cometType = packed[4]
   result = $num & cometType
 
@@ -427,7 +432,10 @@ proc unpackProvisionalComet*(packed: string): string =
     let prov = unpackProvisionalComet(packed[4..11])
     if numPart.len == 0:
       return prov
-    return $parseInt(numPart) & prov
+    let num = parseInt(numPart)
+    if num < 1:
+      return "ERROR: Comet number out of range (1-9999): " & $num
+    return $num & prov
 
   let cometType = packed[0]
   # Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud -> P/2025 OZ695

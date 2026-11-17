@@ -154,3 +154,8 @@ interstellar,with_name,3I/ATLAS,valid,Interstellar number with name
 interstellar,with_provisional,1I/2017 U1,valid,Interstellar number with provisional
 interstellar,number_zero,0I,range,Interstellar number zero
 interstellar,number_too_large,10000I,range,Interstellar number above 9999
+# Packed forms with an all-zero number must not unpack to a "0" designation
+zero_number,packed_comet_zero,0000P,range,Packed numbered comet zero
+zero_number,packed_comet_zero_fragment,0000Ia,range,Packed numbered comet zero with fragment
+zero_number,packed_full_comet_zero,0000PJ82U010,range,12-char packed numbered comet zero with provisional
+zero_number,packed_asteroid_zero,00000,range,Packed numbered asteroid zero

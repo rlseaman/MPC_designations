@@ -245,6 +245,9 @@ func unpackPermanent(_ packed: String) throws -> Int {
         guard let num = Int(p) else {
             throw MPCDesignationError.invalidFormat("Invalid packed permanent designation: \(packed)")
         }
+        if num < 1 {
+            throw MPCDesignationError.outOfRange("Invalid asteroid number: \(num)")
+        }
         return num
     } else if first >= "A" && first <= "Z" {
         // Extended format with uppercase letter (100,000 - 359,999)
@@ -706,6 +709,10 @@ func unpackCometNumbered(_ packed: String) throws -> String {
     let number = Int(String(p[Range(match.range(at: 1), in: p)!]))!
     let cometType = String(p[Range(match.range(at: 2), in: p)!])
 
+    if number < 1 {
+        throw MPCDesignationError.outOfRange("Comet number out of range (1-9999): \(number)")
+    }
+
     // Check for fragment
     if match.range(at: 3).location != NSNotFound,
        let fragmentRange = Range(match.range(at: 3), in: p) {
@@ -999,6 +1006,9 @@ func unpackCometFull(_ packed: String) throws -> String {
             return "\(cometType)/\(provisional)"
         } else {
             let number = Int(numStr)!
+            if number < 1 {
+                throw MPCDesignationError.outOfRange("Comet number out of range (1-9999): \(number)")
+            }
             return "\(number)\(cometType)/\(provisional)"
         }
     } else {

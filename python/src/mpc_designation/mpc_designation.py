@@ -299,7 +299,10 @@ def unpack_permanent(packed: str) -> int:
 
     if first.isdigit():
         # Simple numeric format (< 100,000)
-        return int(packed)
+        number = int(packed)
+        if number < 1:
+            raise MPCDesignationError(f"Invalid asteroid number: {number}")
+        return number
     elif 'A' <= first <= 'Z':
         # Extended format with uppercase letter (100,000 - 359,999)
         val = ord(first) - 55  # A=10, B=11, etc.
@@ -769,6 +772,9 @@ def unpack_comet_numbered(packed: str) -> str:
     comet_type = match.group(2)
     fragment = match.group(3)
 
+    if number < 1:
+        raise MPCDesignationError(f"Comet number out of range (1-9999): {number}")
+
     result = f"{number}{comet_type}"
     if fragment:
         result += f"-{fragment.upper()}"
@@ -1059,6 +1065,8 @@ def unpack_comet_full(packed: str) -> str:
         return f"{comet_type}/{provisional}"
     else:
         number = int(num_str)
+        if number < 1:
+            raise MPCDesignationError(f"Comet number out of range (1-9999): {number}")
         return f"{number}{comet_type}/{provisional}"
 
 

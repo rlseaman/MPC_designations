@@ -29,7 +29,7 @@ Examples:
 make test-all
 
 # Run specific tests
-make test-errors    # Error handling tests (130 cases)
+make test-errors    # Error handling tests (134 cases)
 make test-helpers   # Helper function tests (77 cases)
 make test-csv CSV=../test-data/prov_unpack_to_pack.csv    # Conversion tests (2M+ entries)
 make test-roundtrip CSV=../test-data/prov_unpack_to_pack.csv  # Roundtrip verification

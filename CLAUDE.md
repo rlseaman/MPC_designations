@@ -19,7 +19,7 @@ Historical change rationale and the per-language feature checklist live in
 
 - `<lang>/` — one directory per implementation, each with `src/`, `test/`,
   `Makefile`, `README.md`.
-- `test-data/error_test_cases.csv` — shared error suite (124 cases;
+- `test-data/error_test_cases.csv` — shared error suite (134 cases;
   `category,subcategory,input,expected_error,description`, expected
   `valid|format|range`). Harnesses for awk, bash, nim, forth, haskell, C carry
   documented expected-skips.

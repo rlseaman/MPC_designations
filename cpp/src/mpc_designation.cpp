@@ -257,7 +257,11 @@ long MPCDesignation::unpackPermanent(const std::string& packed) {
 
     // Simple numeric format (< 100,000)
     if (first >= '0' && first <= '9') {
-        return std::stol(p);
+        long number = std::stol(p);
+        if (number < 1) {
+            throw MPCDesignationError("Invalid asteroid number: " + std::to_string(number));
+        }
+        return number;
     }
 
     // Extended format with uppercase letter (100,000 - 359,999)
@@ -622,6 +626,10 @@ std::string MPCDesignation::unpackCometNumbered(const std::string& packed) {
     char cometType = match[2].str()[0];
     std::string fragment = match[3].str();
 
+    if (number < 1) {
+        throw MPCDesignationError("Comet number out of range (1-9999): " + std::to_string(number));
+    }
+
     std::stringstream ss;
     ss << number << cometType;
     if (!fragment.empty()) {
@@ -901,6 +909,9 @@ std::string MPCDesignation::unpackCometFull(const std::string& packed) {
         size_t start = numPart.find_first_not_of(' ');
         if (start != std::string::npos) {
             number = std::stoi(numPart.substr(start));
+            if (number < 1) {
+                throw MPCDesignationError("Comet number out of range (1-9999): " + std::to_string(number));
+            }
         }
     } else {
         throw MPCDesignationError("Invalid packed full comet designation length");

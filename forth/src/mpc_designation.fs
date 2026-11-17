@@ -225,7 +225,9 @@ variable bce-code
     nip nip
     s>d <# #s #> out-buf swap 2dup 2>r move 2r>
   else
-    drop str>num
+    \ Number 0 (00000) is invalid: reject, returning input unchanged
+    drop 2dup str>num dup 1 < if drop tuck out-buf swap move out-buf swap exit then
+    nip nip
     s>d <# #s #> out-buf swap 2dup 2>r move 2r>
   then then ;
 
@@ -606,6 +608,8 @@ variable comet-frag-len
 : unpack-comet-numbered ( addr len -- addr' len' )
   \ Format: 0001P -> 1P, 0073Pa -> 73P-A, 0073Paa -> 73P-AA
   over 4 str>num                   \ addr len number
+  \ Comet number 0 (0000P) is invalid: reject, returning input unchanged
+  dup 1 < if drop tuck out-buf swap move out-buf swap exit then
   s>d <# #s #>                     \ addr len num-str-addr num-str-len
   dup comet-num-len !              \ save length
   out-buf swap move                \ copy number string to out-buf
@@ -1183,6 +1187,8 @@ variable comet-num
     \ Long format: 4-digit number + type + 7-char provisional.
     \ Unpack the trailing 8-char type+provisional, then prefix the number.
     over 4 str>num comet-num !
+    \ Comet number 0 (0000PJ82U010) is invalid: reject, returning input unchanged
+    comet-num @ 1 < if tuck out-buf swap move out-buf swap exit then
     drop 4 + 8 recurse                   ( out-buf len )
     dup comet-full-len !
     work-buf swap move

@@ -252,7 +252,9 @@ function unpack_permanent(packed::AbstractString)
 
     # Simple numeric format (< 100,000)
     if '0' <= first <= '9'
-        return parse(Int, p)
+        number = parse(Int, p)
+        number < 1 && throw(MPCDesignationError("Invalid asteroid number: $number"))
+        return number
     end
 
     # Extended format with uppercase letter (100,000 - 359,999)
@@ -561,6 +563,7 @@ function unpack_comet_numbered(packed::AbstractString)
 
     number = parse(Int, m.captures[1])
     comet_type = m.captures[2]
+    number < 1 && throw(MPCDesignationError("Comet number out of range (1-9999): $number"))
 
     # Check for fragment
     if m.captures[3] !== nothing
@@ -822,6 +825,7 @@ function unpack_comet_full(packed::AbstractString)
         end
 
         num = parse(Int, num_part)
+        num < 1 && throw(MPCDesignationError("Comet number out of range (1-9999): $num"))
         return "$num$comet_type/$provisional"
     end
 

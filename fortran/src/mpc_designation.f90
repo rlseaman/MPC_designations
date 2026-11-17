@@ -402,6 +402,9 @@ contains
             if (ios /= 0) then
                 call set_error('Invalid packed permanent designation')
                 unpack_permanent = -1
+            else if (unpack_permanent < 1) then
+                call set_error('Invalid asteroid number')
+                unpack_permanent = -1
             end if
             return
         end if
@@ -706,6 +709,11 @@ contains
         read(p(1:4), '(I4)', iostat=ios) num
         if (ios /= 0) then
             call set_error('Invalid packed numbered comet designation')
+            unpacked = ''
+            return
+        end if
+        if (num < 1) then
+            call set_error('Comet number out of range (1-9999)')
             unpacked = ''
             return
         end if

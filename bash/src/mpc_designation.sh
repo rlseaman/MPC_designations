@@ -212,6 +212,10 @@ unpack_permanent() {
         echo $((prefix_val * 10000 + suffix))
     else
         # Pure numeric
+        if [ "$((10#$packed))" -lt 1 ]; then
+            echo "ERROR: Invalid asteroid number: 0" >&2
+            return 1
+        fi
         strip_leading_zeros "$packed"
     fi
 }
@@ -482,6 +486,10 @@ unpack_numbered_comet() {
     local type="${packed:4:1}"
     local num_val
     num_val=$(strip_leading_zeros "$num")
+    if [ "$((10#$num))" -lt 1 ]; then
+        echo "ERROR: Comet number out of range (1-9999): 0" >&2
+        return 1
+    fi
 
     # Check for fragment suffix (6 or 7 chars)
     if [ "$len" -eq 6 ]; then
@@ -686,6 +694,10 @@ unpack_extended_comet() {
 # 12-char numbered comet with provisional: 0001PJ82U010 -> 1P/1982 U1
 unpack_full_comet() {
     local r
+    if [ "$((10#${1:0:4}))" -lt 1 ]; then
+        echo "ERROR: Comet number out of range (1-9999): 0" >&2
+        return 1
+    fi
     r=$(convert_simple "${1:4}") || return 1
     echo "$((10#${1:0:4}))$r"
 }

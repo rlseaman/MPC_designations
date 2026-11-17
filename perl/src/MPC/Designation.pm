@@ -236,7 +236,9 @@ sub unpack_permanent {
     my $rest = substr($packed, 1, 4);
 
     if ($first =~ /\d/) {
-        return int($packed);
+        my $number = int($packed);
+        die "Invalid asteroid number: $number\n" if $number < 1;
+        return $number;
     } elsif ($first =~ /[A-Z]/) {
         my $val = ord($first) - 55;
         return $val * 10000 + int($rest);
@@ -492,6 +494,8 @@ sub unpack_comet_numbered {
         my $comet_type = $2;
         my $fragment = $3 // '';
 
+        die "Comet number out of range (1-9999): $number\n" if $number < 1;
+
         my $result = "$number$comet_type";
         $result .= "-" . uc($fragment) if $fragment ne '';
         return $result;
@@ -708,6 +712,7 @@ sub unpack_comet_full {
         return "$comet_type/$provisional";
     } else {
         my $number = int($num_str);
+        die "Comet number out of range (1-9999): $number\n" if $number < 1;
         return "$number$comet_type/$provisional";
     }
 }

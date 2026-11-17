@@ -182,6 +182,9 @@ function n = mpc_unpack_permanent(packed)
   % Simple numeric format (< 100,000)
   if first >= '0' && first <= '9'
     n = str2double(packed);
+    if n < 1
+      error('MPCDesignationError:OutOfRange', 'Invalid asteroid number: %d', n);
+    end
     return;
   end
 
@@ -529,6 +532,10 @@ function s = mpc_unpack_comet_numbered(packed)
     fragment = tokens{1}{3};
   end
 
+  if number < 1
+    error('MPCDesignationError:OutOfRange', 'Comet number out of range (1-9999): %d', number);
+  end
+
   s = sprintf('%d%s', number, comet_type);
   if ~isempty(fragment)
     s = sprintf('%s-%s', s, upper(fragment));
@@ -791,6 +798,9 @@ function s = mpc_unpack_comet_full(packed)
       s = sprintf('%s/%s', comet_type, provisional);
     else
       num = str2double(num_part);
+      if num < 1
+        error('MPCDesignationError:OutOfRange', 'Comet number out of range (1-9999): %d', num);
+      end
       s = sprintf('%d%s/%s', num, comet_type, provisional);
     end
     return;

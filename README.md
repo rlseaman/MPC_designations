@@ -45,7 +45,7 @@ All production implementations pass the same test suite and produce identical re
 ## Test Results
 
 All 25 implementations pass the full conversion corpus in both directions, plus
-the 124-case shared error suite (with documented, language-inherent skips — see
+the 134-case shared error suite (with documented, language-inherent skips — see
 `docs/VALIDATION_GAPS.md`). Corpus refreshed from the MPC catalog on
 2026-11-17 (see `test-data/README.md`).
 
@@ -498,7 +498,7 @@ MPC_designations/
 
 ## Testing
 
-Each implementation includes tests against ~3 million known-good conversions (2,110,817 provisional + 899,365 numbered, both directions) and 124 error-handling tests.
+Each implementation includes tests against ~3 million known-good conversions (2,110,817 provisional + 899,365 numbered, both directions) and 134 error-handling tests.
 
 ```bash
 # Run all tests for all languages
