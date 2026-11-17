@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-11-17
+
 ### Fixed
 - Bash: implemented the extended provisional format (`_YHbbbb`, cycle ≥ 620)
   in both directions. Previously `2015 BE631` silently packed to the garbage
@@ -35,6 +37,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   path (they previously exited with a usage error, so the Bash corpus run was
   never actually exercised by `make`).
 - `rust/Cargo.lock` updated to the 1.1.0 package version (was stale at 1.0.0).
+- Python `__version__` fallback (used when package metadata is unavailable)
+  was hard-coded to `1.0.0`; it now tracks the release version.
+- `CITATION.cff` version, release date, and contact email were stale.
+
+### Added
+- `docs/PYTHON_37_SUPPORT_ASSESSMENT.md` — decision memo on supporting
+  Python 3.7 (recommends keeping the `>=3.9` floor).
 
 ## [1.1.0] — 2026-05-27
 
@@ -173,7 +182,8 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/rlseaman/MPC_designations/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/rlseaman/MPC_designations/releases/tag/v1.0.0
