@@ -57,18 +57,6 @@ skip_reason() {
         out_of_bounds/packed_above_max)
             echo "AWK converter does not range-check packed tilde upper bound" ;;
 
-        # No range validation on provisional cycle counts.
-        out_of_bounds/cycle_huge)
-            echo "AWK converter does not range-check provisional cycle count" ;;
-        out_of_bounds/cycle_overflow)
-            echo "AWK converter does not range-check provisional cycle count" ;;
-
-        # No range/format validation on comet order numbers.
-        out_of_bounds/comet_order_huge)
-            echo "AWK converter does not range-check comet order number" ;;
-        out_of_bounds/comet_order_zero)
-            echo "AWK converter does not reject comet order number zero" ;;
-
         # No validation of these year / provisional / satellite / survey forms.
         out_of_bounds/year_future)
             echo "AWK converter does not range-check provisional year upper bound" ;;

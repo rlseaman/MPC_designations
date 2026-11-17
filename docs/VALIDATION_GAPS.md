@@ -27,8 +27,8 @@ check and removing the skip.
 | C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C skips 2 inherent null-byte cases) |
 | **nim** | 87 pass / **11 skip** |
 | **haskell** | 81 pass / **17 skip** |
-| **bash** | 74 pass / **24 skip** |
-| **awk** | 71 pass / **27 skip** |
+| **bash** | 78 pass / **20 skip** |
+| **awk** | 75 pass / **23 skip** |
 | **forth** | 67 pass / **31 skip** (most permissive; no error channel) |
 
 ## Gaps by theme
@@ -38,8 +38,10 @@ No validation of numeric magnitudes. Affects: **awk, bash, nim, forth** (and
 `comet_order_zero` in **haskell**).
 - Asteroid number: `asteroid_zero` (0), `asteroid_max_plus_one` (>15,396,335),
   `asteroid_huge`, `asteroid_overflow`, `packed_above_max` (`~{000`).
-- Provisional cycle count: `cycle_huge`, `cycle_overflow`.
-- Comet order number: `comet_order_zero`, `comet_order_huge`.
+- Provisional cycle count: `cycle_huge`, `cycle_overflow` (closed in awk and
+  bash in 1.1.1 by the extended-format range checks).
+- Comet order number: `comet_order_zero`, `comet_order_huge` (closed in awk
+  and bash in 1.1.1).
 - Survey number: `survey_zero`, `survey_negative`.
 - Satellite number: `satellite_zero_number`, `satellite_negative`,
   `satellite_missing_number`.

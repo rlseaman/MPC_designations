@@ -1,5 +1,8 @@
 # Makefile for MPC Designation Converter (Bash)
 
+TEST_DATA = ../test-data
+CSV_FILE = $(TEST_DATA)/prov_unpack_to_pack.csv
+
 .PHONY: all clean test test-errors test-helpers test-csv test-roundtrip test-all run help
 
 all:
@@ -19,12 +22,14 @@ test-helpers:
 # Run CSV test suite
 test-csv:
 	@echo "Running CSV test suite..."
-	./test/test_csv.sh
+	@if [ ! -f $(CSV_FILE) ]; then gunzip -k $(CSV_FILE).gz; fi
+	./test/test_csv.sh $(CSV_FILE)
 
 # Run round-trip tests
 test-roundtrip:
 	@echo "Running round-trip tests..."
-	./test/test_roundtrip.sh
+	@if [ ! -f $(CSV_FILE) ]; then gunzip -k $(CSV_FILE).gz; fi
+	./test/test_roundtrip.sh $(CSV_FILE)
 
 # Run all tests
 test-all: test-errors test-helpers test-csv

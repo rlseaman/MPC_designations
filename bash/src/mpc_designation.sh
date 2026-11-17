@@ -275,6 +275,36 @@ pack_provisional() {
         cycle="${cycle:-0}"
     fi
 
+    # Max cycle is 591673 (6 digits); guard before integer comparison
+    if [ "${#cycle}" -gt 6 ]; then
+        echo "ERROR: Cycle count too large: $desig" >&2
+        return 1
+    fi
+
+    # Extended format for cycle >= 620: _YHbbbb
+    # Y = year - 2000 as one base-62 char (2000-2061); bbbb = 4-char base-62
+    # sequence (cycle - 620) * 25 + letter position (max 62^4 - 1).
+    if [ "$cycle" -ge 620 ]; then
+        if [ "$year" -lt 2000 ] || [ "$year" -gt 2061 ]; then
+            echo "ERROR: Extended provisional format requires year 2000-2061: $desig" >&2
+            return 1
+        fi
+        local letters="ABCDEFGHJKLMNOPQRSTUVWXYZ"
+        local before="${letters%%$second*}"
+        local seq=$(( (cycle - 620) * 25 + ${#before} ))
+        if [ "$seq" -ge 14776336 ]; then
+            echo "ERROR: Cycle count too large for extended provisional format: $desig" >&2
+            return 1
+        fi
+        local enc="" i
+        for i in 1 2 3 4; do
+            enc="${BASE62:$((seq % 62)):1}${enc}"
+            seq=$((seq / 62))
+        done
+        echo "_${BASE62:$((year - 2000)):1}${half}${enc}"
+        return
+    fi
+
     # Century code
     local century=$((year / 100))
     local century_char
@@ -294,6 +324,19 @@ pack_provisional() {
     cycle_encoded=$(encode_cycle "$cycle")
 
     echo "${century_char}${yy_str}${half}${cycle_encoded}${second}"
+}
+
+# Unpack extended provisional: "_FB004V" -> "2015 BE631" (cycle >= 620)
+unpack_extended_provisional() {
+    local packed="$1"
+    local letters="ABCDEFGHJKLMNOPQRSTUVWXYZ"
+    local year=$((2000 + $(base62_value "${packed:1:1}")))
+    local half="${packed:2:1}"
+    local seq=0 i
+    for i in 3 4 5 6; do
+        seq=$((seq * 62 + $(base62_value "${packed:$i:1}")))
+    done
+    echo "${year} ${half}${letters:$((seq % 25)):1}$((620 + seq / 25))"
 }
 
 # Unpack provisional: "J95X00A" -> "1995 XA", "J08C00J" -> "A908 CJ" (pre-1925)
@@ -451,73 +494,132 @@ unpack_numbered_comet() {
 pack_provisional_comet() {
     local desig="$1"
 
-    # Handle fragment suffix (single or double letter, upper or lower case)
-    local fragment=""
-    local base_desig="$desig"
-    if [[ "$desig" =~ -([A-Za-z]{1,2})$ ]]; then
-        fragment="${BASH_REMATCH[1]}"
-        base_desig="${desig:0:$((${#desig}-${#fragment}-1))}"
-        # Convert fragment to lowercase
-        fragment=$(echo "$fragment" | tr 'A-Z' 'a-z')
+    # T/YEAR PROV where PROV is comet-style (O1, O1-B, J1-AA) or
+    # asteroid-style (SV, PE20). Year may be ancient (1-999) or BCE (-1..-299).
+    if ! [[ "$desig" =~ ^([PDCXAI])/(-?[0-9]+)\ ([A-Z])(.*)$ ]]; then
+        echo "ERROR: Invalid comet designation: $desig" >&2
+        return 1
+    fi
+    local type="${BASH_REMATCH[1]}"
+    local year="${BASH_REMATCH[2]}"
+    local half="${BASH_REMATCH[3]}"
+    local rest="${BASH_REMATCH[4]}"
+
+    if ! is_valid_half_month "$half"; then
+        echo "ERROR: Invalid half-month letter: $half" >&2
+        return 1
     fi
 
-    local type="${base_desig:0:1}"
-    local year="${base_desig:2:4}"
-    local half="${base_desig:7:1}"
-    local order="${base_desig:8}"
-    order="${order:-0}"
+    # Asteroid-style provisional on a comet (e.g. P/2016 SV, P/2021 PE20)
+    if [[ "$rest" =~ ^[A-HJ-Z][0-9]*$ ]]; then
+        local yr=$((10#${year#-}))
+        if [ "${year:0:1}" = "-" ] || [ "$yr" -lt 1000 ]; then
+            echo "ERROR: Invalid comet designation: $desig" >&2
+            return 1
+        fi
+        local prov
+        prov=$(pack_provisional "$yr $half$rest") || return 1
+        echo "${type}${prov}"
+        return
+    fi
 
-    local century=$((year / 100))
-    local century_char
-    century_char=$(num_to_comet_century "$century")
-    local yy=$((year % 100))
-
+    # Comet-style: order number plus optional 1-2 letter fragment
+    if ! [[ "$rest" =~ ^([0-9]+)(-([A-Z]{1,2}))?$ ]]; then
+        echo "ERROR: Invalid comet designation: $desig" >&2
+        return 1
+    fi
+    local order_str="${BASH_REMATCH[1]}"
+    local fragment="${BASH_REMATCH[3]}"
+    if [ "${#order_str}" -gt 3 ] || [ "$((10#$order_str))" -lt 1 ] || [ "$((10#$order_str))" -gt 619 ]; then
+        echo "ERROR: Comet order number out of range: $desig" >&2
+        return 1
+    fi
+    local order_enc
+    order_enc=$(encode_cycle "$((10#$order_str))")
+    local frag_code="0"
     if [ -n "$fragment" ]; then
-        printf "%s%s%02d%s%02d%s\n" "$type" "$century_char" "$yy" "$half" "$order" "$fragment"
-    else
-        printf "%s%s%02d%s%02d0\n" "$type" "$century_char" "$yy" "$half" "$order"
+        frag_code=$(echo "$fragment" | tr 'A-Z' 'a-z')
     fi
+
+    local abs_year="${year#-}"
+    abs_year=$((10#$abs_year))
+    if [ "${year:0:1}" = "-" ]; then
+        # BCE: prefix / . - for 0-99, 100-199, 200-299; complement code
+        local prefix
+        if [ "$abs_year" -lt 100 ]; then prefix="/"
+        elif [ "$abs_year" -lt 200 ]; then prefix="."
+        elif [ "$abs_year" -lt 300 ]; then prefix="-"
+        else
+            echo "ERROR: BCE year out of supported range: $desig" >&2
+            return 1
+        fi
+        if [ "${#fragment}" -gt 1 ]; then
+            echo "ERROR: Invalid ancient comet fragment: $desig" >&2
+            return 1
+        fi
+        printf "%s%s%02d%s%s%s\n" "$type" "$prefix" "$((99 - abs_year % 100))" "$half" "$order_enc" "$frag_code"
+        return
+    fi
+    if [ "$abs_year" -lt 1000 ]; then
+        if [ "$abs_year" -lt 1 ] || [ "${#fragment}" -gt 1 ]; then
+            echo "ERROR: Invalid ancient comet designation: $desig" >&2
+            return 1
+        fi
+        printf "%s%03d%s%s%s\n" "$type" "$abs_year" "$half" "$order_enc" "$frag_code"
+        return
+    fi
+
+    local century_char
+    century_char=$(num_to_comet_century "$((abs_year / 100))")
+    if [ -z "$century_char" ]; then
+        echo "ERROR: Invalid century for comet provisional: $desig" >&2
+        return 1
+    fi
+    printf "%s%s%02d%s%s%s\n" "$type" "$century_char" "$((abs_year % 100))" "$half" "$order_enc" "$frag_code"
 }
 
-# Unpack provisional comet: "CJ95O010" -> "C/1995 O1", "PJ30J01aa" -> "P/1930 J1-AA"
+# Unpack provisional comet: "CJ95O010" -> "C/1995 O1", "PJ30J01aa" -> "P/1930 J1-AA",
+# "PK16S00V" -> "P/2016 SV" (asteroid-style), "C390Q010" -> "C/390 Q1",
+# "C.53P010" -> "C/-146 P1" (BCE)
 unpack_provisional_comet() {
     local packed="$1"
     local len="${#packed}"
-
     local type="${packed:0:1}"
-    local century_char="${packed:1:1}"
-    local yy="${packed:2:2}"
-    local half="${packed:4:1}"
-    local order="${packed:5:2}"
+    local c2="${packed:1:1}"
+    local year half order_enc fragment
 
-    # Handle fragment (single or double letter)
-    local fragment=""
-    if [ "$len" -eq 9 ]; then
-        # Two-letter fragment
-        fragment="${packed:7:2}"
-    elif [ "$len" -eq 8 ]; then
-        fragment="${packed:7:1}"
+    # Asteroid-style provisional on a comet: last char uppercase, 8 chars
+    if [ "$len" -eq 8 ] && [[ "${packed:7:1}" =~ ^[A-Z]$ ]] && [[ "$c2" =~ ^[A-L]$ ]]; then
+        local prov
+        prov=$(unpack_provisional "${packed:1:7}") || return 1
+        echo "${type}/${prov}"
+        return
     fi
 
-    local century
-    century=$(comet_century_to_num "$century_char")
-    local yy_val
-    yy_val=$(strip_leading_zeros "$yy")
-    local year=$((century * 100 + yy_val))
-    local order_num
-    order_num=$(strip_leading_zeros "$order")
+    case "$c2" in
+        [/.-])
+            local base=0
+            [ "$c2" = "." ] && base=100
+            [ "$c2" = "-" ] && base=200
+            year=$(( -(base + 99 - 10#${packed:2:2}) ))
+            ;;
+        [0-9])
+            year=$((10#${packed:1:3}))
+            ;;
+        *)
+            local century
+            century=$(comet_century_to_num "$c2")
+            year=$((century * 100 + 10#${packed:2:2}))
+            ;;
+    esac
+    half="${packed:4:1}"
+    order_enc="${packed:5:2}"
+    fragment="${packed:7}"
 
-    local result="$type/$year $half"
-    if [ "$order_num" -gt 0 ]; then
-        result="${result}${order_num}"
-    fi
-
+    local result="$type/$year $half$(decode_cycle "$order_enc")"
     if [ "$fragment" != "0" ] && [ -n "$fragment" ]; then
-        # Convert fragment to uppercase
-        fragment=$(echo "$fragment" | tr 'a-z' 'A-Z')
-        result="${result}-${fragment}"
+        result="${result}-$(echo "$fragment" | tr 'a-z' 'A-Z')"
     fi
-
     echo "$result"
 }
 
@@ -620,6 +722,11 @@ detect_format() {
         if [[ "$desig" =~ ^[IJKL][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$ ]]; then
             echo "packed_provisional"; return
         fi
+        # Packed extended provisional (_YHbbbb): year 2000-2061 as base-62,
+        # half-month A-Y skipping I, 4-char base-62 sequence
+        if [[ "$desig" =~ ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$ ]]; then
+            echo "packed_extended"; return
+        fi
         # Packed survey (7 chars starting with PLS, T1S, T2S, T3S)
         local prefix="${desig:0:3}"
         case "$prefix" in
@@ -636,14 +743,14 @@ detect_format() {
     if [ "$len" -eq 8 ] || [ "$len" -eq 9 ]; then
         local second="${desig:1:1}"
         case "$first" in
-            [PDCXA])
-                case "$second" in
-                    [A-L])
-                        if is_valid_half_month "${desig:4:1}"; then
-                            echo "packed_provisional_comet"; return
-                        fi
-                        ;;
-                esac
+            [PDCXAI])
+                if [[ "$desig" =~ ^.[A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9]([0-9A-Za-z]|[a-z][a-z])$ ]]; then
+                    echo "packed_provisional_comet"; return
+                fi
+                # Ancient (3-digit year) or BCE (/ . - prefix) comet, 8 chars
+                if [[ "$desig" =~ ^.([0-9][0-9][0-9]|[-/.][0-9][0-9])[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$ ]]; then
+                    echo "packed_provisional_comet"; return
+                fi
                 ;;
             S)
                 if [ "$len" -eq 8 ]; then
@@ -690,8 +797,8 @@ detect_format() {
     # The fragment (after the order digits) legitimately includes I and is
     # not checked here.
     case "$desig" in
-        [PDCXA]/*)
-            if [[ "$desig" =~ ^[PDCXA]/-?[0-9]+\ ([A-Za-z]) ]]; then
+        [PDCXAI]/*)
+            if [[ "$desig" =~ ^[PDCXAI]/-?[0-9]+\ ([A-Za-z]) ]]; then
                 if is_valid_half_month "${BASH_REMATCH[1]}"; then
                     echo "unpacked_provisional_comet"
                     return
@@ -747,6 +854,9 @@ convert_simple() {
             ;;
         packed_provisional)
             unpack_provisional "$desig"
+            ;;
+        packed_extended)
+            unpack_extended_provisional "$desig"
             ;;
         unpacked_provisional)
             pack_provisional "$desig"

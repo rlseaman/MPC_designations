@@ -62,18 +62,6 @@ skip_reason() {
         out_of_bounds/packed_above_max)
             echo "Bash converter does not range-check packed tilde upper bound" ;;
 
-        # No range validation on provisional cycle counts.
-        out_of_bounds/cycle_huge)
-            echo "Bash converter does not range-check provisional cycle count" ;;
-        out_of_bounds/cycle_overflow)
-            echo "Bash converter does not range-check provisional cycle count" ;;
-
-        # No range/format validation on comet order numbers.
-        out_of_bounds/comet_order_huge)
-            echo "Bash converter does not range-check comet order number" ;;
-        out_of_bounds/comet_order_zero)
-            echo "Bash converter does not reject comet order number zero" ;;
-
         # No validation of these provisional / satellite / survey sub-forms.
         format/three_letters)
             echo "Bash converter does not reject 3-letter provisional (truncates to 2)" ;;

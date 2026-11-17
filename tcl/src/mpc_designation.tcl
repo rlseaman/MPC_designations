@@ -393,30 +393,13 @@ namespace eval MPCDesignation {
             error "Extended format only supports years 2000-2099: $year"
         }
 
-        set yearShort [string range $year 2 3]
-        # Encode last 2 digits as letter: 00=A, 01=B, ..., 25=P, 26=Q, etc.
-        # Actually it's: 10=A, 11=B, etc. No wait...
-        # Looking at examples: Q=26 for year 2026, so yearShort 26 -> Q
-        # The encoding is: A + (yearShort - 10) when yearShort >= 10
-        # But for 00-09, we need different handling
-        set ys [scan $yearShort %d]
-        if {$ys < 10} {
-            # Years 2000-2009: encode as digits? No, the spec says letters.
-            # Let's use A=00, B=01, ..., J=09, K=10, ..., Z=25, a=26, etc.
-            # Actually from the examples, year 2026 -> Q, so 26-10=16, A+16=Q
-            # For year 2025 -> P, 25-10=15, A+15=P
-            # So the formula is: letter = chr(ord('A') + yearShort - 10) for yearShort >= 10
-            # For yearShort < 10, we might need 0-9? Or special handling?
-            # The doc says the underscore indicates "first 2 digits of year are 20"
-            # and char 2 is "Capital letter representing last two digits"
-            # Let me assume: 00=A... no, that conflicts with century codes
-            # Actually, looking at _QC0000 for 2026, Q must be 26
-            # If A=10, B=11, ..., P=25, Q=26, this works for years 2010-2035+
-            # For years 2000-2009, maybe 0-9 are used as digits?
-            set yearCode $ys
-        } else {
-            set yearCode [format %c [expr {65 + $ys - 10}]]
+        # Year code is the last two digits as a single base-62 character:
+        # 0-9 = 2000-2009, A-Z = 2010-2035, a-z = 2036-2061.
+        set ys [scan [string range $year 2 3] %d]
+        if {$ys > 61} {
+            error "Extended format only supports years 2000-2061: $year"
         }
+        set yearCode [numToBase62 $ys]
 
         set sequence [cycleLetterToSequence $cycle $secondLetter]
         set offset [expr {$sequence - 15501}]
@@ -437,13 +420,8 @@ namespace eval MPCDesignation {
         set halfMonth [string index $packed 2]
         set base62Part [string range $packed 3 6]
 
-        # Decode year: digit means 200X, letter means 20XX where XX = ord(letter) - ord('A') + 10
-        if {[string is digit $yearCode]} {
-            set year "200$yearCode"
-        } else {
-            set ys [expr {[scan $yearCode %c] - 65 + 10}]
-            set year [format "20%02d" $ys]
-        }
+        # Decode year: base-62 character (0-9 = 2000-2009, A-Z = 2010-2035, a-z = 2036-2061)
+        set year [format "20%02d" [base62ToNum $yearCode]]
 
         set offset [base62StringToNum $base62Part]
         set sequence [expr {15501 + $offset}]

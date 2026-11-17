@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Bash: implemented the extended provisional format (`_YHbbbb`, cycle ≥ 620)
+  in both directions. Previously `2015 BE631` silently packed to the garbage
+  `K15B1E` and `_FB0008` was rejected (#1, #2).
+- Bash: rewrote comet provisional pack/unpack to reach parity with the
+  references — comet orders ≥ 100 (`PJ30JA1a` ↔ `P/1930 J101-A`),
+  asteroid-style comet provisionals (`P/2016 SV` ↔ `PK16S00V`), comet centuries
+  A–H (1000–1799), and ancient/BCE comets (`C/390 Q1`, `C/-146 P1`) were all
+  missing or wrong.
+- AWK: implemented extended provisional unpacking (`_FB0008` → `2015 BJ620`);
+  packing already worked.
+- AWK: comet unpack fixed for two-letter fragments (9-char), fragment case
+  (`CK19Y04a` → `C/2019 Y4-A`, was `-a`), centuries A–H, orders ≥ 100, and
+  ancient/BCE comets (previously unsupported). Comet pack now encodes orders
+  ≥ 100 correctly (`PJ30JA1a`, was `PJ30J101a`) and keeps fragments on
+  ancient/BCE comets. Asteroid-style comet provisionals now route through the
+  asteroid packer, so extended cycles pack correctly
+  (`P/2025 OZ695` → `P_PO00Ud`, was the garbage `PK25O5Z`).
+- Tcl: extended provisional year code was wrong for 2036–2061 (base-62 `a`–`z`):
+  `2036 AA620` packed to `_[A0000` and `_aA0000` unpacked as 2042.
+- AWK and Bash now reject extended-format inputs that cannot be encoded
+  (year outside 2000–2061, sequence beyond 62⁴−1) and out-of-range comet order
+  numbers, closing the `cycle_huge`, `cycle_overflow`, `comet_order_zero`, and
+  `comet_order_huge` expected-skips in their error harnesses.
+- `bash/Makefile` `test-csv` and `test-roundtrip` targets now pass the corpus
+  path (they previously exited with a usage error, so the Bash corpus run was
+  never actually exercised by `make`).
+- `rust/Cargo.lock` updated to the 1.1.0 package version (was stale at 1.0.0).
+
 ## [1.1.0] — 2026-05-27
 
 ### Fixed

@@ -21,10 +21,7 @@ fi
 PASSED=0
 FAILED=0
 
-# Get start time in milliseconds
-START_MS=$(($(date +%s) * 1000 + $(date +%N 2>/dev/null | cut -c1-3 || echo 0)))
-
-# Use a more portable approach for milliseconds on macOS
+# Get start time in milliseconds (portable across GNU and BSD date)
 if command -v gdate >/dev/null 2>&1; then
     START_MS=$(gdate +%s%3N)
 elif command -v python3 >/dev/null 2>&1; then
