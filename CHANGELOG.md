@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-11-17
+
+### Fixed
+- All 25 implementations: comets with an extended asteroid-style provisional
+  designation — new in MPC data in 2025 — are now supported in both directions:
+  `P/2025 OZ695` ↔ `P_PO00Ud`, and the 12-char numbered form
+  `1P/2025 OZ695` ↔ `0001P_PO00Ud`. Previously every implementation, including
+  the Python and Tcl references, failed to unpack `P_PO00Ud`; Nim crashed
+  packing it (`IndexDefect`).
+- All 25 implementations: extended provisional (`_YHbbbb`) input validation.
+  - Packing now rejects years outside 2000–2061. Several implementations used
+    `year % 100`, which silently packed `1925 AA620` as 2025.
+  - Packing now rejects sequences beyond 62⁴−1 (`2000 AL591673` is the
+    largest); they previously wrapped silently in 19 implementations,
+    including Python.
+  - Packed input must match `_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}`. A half-month
+    of `I`, `Z`, or lowercase, and non-base-62 characters, were accepted by up
+    to 20 implementations.
+  - Oversized cycle strings are rejected before the arithmetic. They
+    overflowed silently in Haskell (`_FA0000`) and Fortran (packed as cycle 0),
+    and could overflow integers in Rust, Swift, and C#.
+- Forth: fixed an "Invalid memory address" crash unpacking BCE comets
+  (`C.53P010` → `C/-146 P1`), a stack leak in extended unpacking, and packing
+  of numbered comets with a provisional (`1P/1982 U1`), which crashed or
+  produced corrupt output.
+- R: unpacking numbered asteroids printed round numbers in scientific notation
+  (`A0000` → `1e+05`; now `100000`).
+- Haskell: lowercase half-months were accepted (`C/1995 o1` → `CJ95o010`), and
+  unpacking 12-char numbered comets kept leading zeros (`0001P/1995 O1`).
+- SPP/IRAF:
+  - Two-letter fragments on modern comets unpacked wrongly
+    (`PJ30J01aa` → `-A`; now `P/1930 J1-AA`).
+  - Extended packing wrongly rejected cycles 591536–591673.
+  - Comet packing could return garbage instead of an error.
+- Nim, Fortran, AWK, Bash, and SPP: added support for numbered comets with a
+  provisional designation in both directions (`1P/1982 U1` ↔ `0001PJ82U010`),
+  previously missing or broken.
+- C: the error-test harness used a packed-size output buffer, so unpacking
+  valid packed comets failed with "Buffer too small".
+
+### Changed
+- **Test corpus refreshed** from the MPC catalog (2026-11-17).
+  - `test-data/prov_unpack_to_pack.csv.gz` grows from 2,022,404 to 2,110,813
+    pairs. It now has 6,564 extended-format asteroid designations (previously
+    634, all from 2014–2015; it now includes the 3,079 from 2025), the first
+    comet with one (`P/2025 OZ695`), and all provisionals issued through
+    November 2026.
+  - New `test-data/numbered_pack.csv.gz` has 899,365 numbered-asteroid pairs:
+    every numbered object (1–895,910) plus encoding-tier boundaries up to
+    15,396,335.
+  - Every implementation was verified on both files in both directions.
+  - CI now also runs the numbered corpus for Python and Tcl.
+- Shared error suite expanded from 98 to 124 cases: extended-format
+  year/sequence/half-month bounds, and comet extended provisionals. The Forth
+  `cycle_huge` and `cycle_overflow` expected-skips are closed.
+
 ## [1.1.1] — 2026-11-17
 
 ### Fixed
@@ -182,7 +238,8 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/rlseaman/MPC_designations/compare/v1.0.1...v1.1.0
 [1.0.1]: https://github.com/rlseaman/MPC_designations/compare/v1.0.0...v1.0.1
