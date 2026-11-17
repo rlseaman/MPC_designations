@@ -430,6 +430,8 @@ variable prov-outlen
   over 6 + c@ out-buf 6 + c!
   \ Cycle count (if any)
   dup 7 > if
+    \ Reject over-long cycle strings before arithmetic (max valid 591673)
+    dup 7 - 9 > if tuck out-buf swap move out-buf swap exit then
     over 7 + over 7 - str>num
   else
     0
@@ -438,8 +440,15 @@ variable prov-outlen
   dup 620 >= if
     \ Extended format: _YHbbbb
     \ Stack: addr len cycle
-    \ Year code (base-62 of year % 100)
-    2 pick 4 str>num 100 mod b62>char
+    \ Year code is one base-62 char: only years 2000-2061 are encodable,
+    \ and the sequence must fit in 4 base-62 digits (<= 62^4-1 = 14776335).
+    \ Otherwise reject: return input unchanged.
+    2 pick 4 str>num 2000 2062 within 0=
+    over 620 - 25 * 4 pick 6 + c@ letter>pos + 1- 14776335 > or if
+      drop tuck out-buf swap move out-buf swap exit
+    then
+    \ Year code (base-62 of year - 2000)
+    2 pick 4 str>num 2000 - b62>char
     [char] _ out-buf c!
     out-buf 1+ c!
     \ Stack: addr len cycle
@@ -504,8 +513,16 @@ variable prov-outlen
 \ ============================================================================
 
 : is-extended-packed? ( addr len -- f )
+  \ ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$
   dup 7 <> if 2drop false exit then
-  drop c@ [char] _ = ;
+  drop
+  dup c@ [char] _ <> if drop false exit then
+  dup 1+ c@ is-alnum 0= if drop false exit then
+  dup 2 + c@ is-half-month? 0= if drop false exit then
+  dup 3 + c@ is-alnum
+  over 4 + c@ is-alnum and
+  over 5 + c@ is-alnum and
+  swap 6 + c@ is-alnum and ;
 
 variable ext-year
 variable ext-cycle
@@ -531,7 +548,7 @@ variable ext-outlen
   ext-cycle @ s>d <# #s #>
   out-buf 7 + swap dup ext-outlen ! move
   ext-outlen @ 7 +
-  2swap 2drop
+  nip nip
   out-buf swap ;
 
 \ ============================================================================
@@ -760,8 +777,8 @@ variable bce-order-len
   \ Position 3: half-month
   \ Position 4-5: order (cycle encoded)
   \ Position 6: fragment or 0
-  over c@ swap                       \ prefix on stack
-  over 1+ 2 str>num                  \ code
+  over c@                            \ addr len prefix
+  2 pick 1+ 2 str>num                \ addr len prefix code
   decode-bce-year bce-year !         \ decode to negative year
   \ Format year
   bce-year @ negate
@@ -967,6 +984,19 @@ variable pcp-year-len
   2dup is-comet-ancient-packed? if 2drop true exit then
   \ Exclude unpacked format (has slash at position 1 that's not BCE)
   over 1+ c@ [char] / = if 2drop false exit then
+  \ 12-char: 4-digit number + type + 7-char provisional
+  \ (0001PJ82U010, or extended 0001P_PO00Ud)
+  dup 12 = if
+    over 4 all-digit? 0= if 2drop false exit then
+    over 4 + c@ is-comet-type? 0= if 2drop false exit then
+    over 5 + c@ [char] _ = if drop 5 + 7 is-extended-packed? exit then
+    drop 8 + c@ is-half-month? exit
+  then
+  \ 8-char with extended asteroid-style provisional: P_PO00Ud
+  dup 8 = if over 1+ c@ [char] _ = if
+    over c@ is-comet-type? 0= if 2drop false exit then
+    swap 1+ swap 1- is-extended-packed? exit
+  then then
   dup 8 = if
     \ 8-char: type + 7-char provisional.
     \ Asteroid-style (uppercase order at last position) keeps its own
@@ -1009,6 +1039,7 @@ variable pcp-year-len
 
 variable comet-full-len
 variable comet-full-type
+variable comet-num
 
 \ Detect asteroid-style unpacked provisional: "1995 XA" or "2013 AL76"
 \ Second character after space is uppercase letter (not digit)
@@ -1065,6 +1096,19 @@ variable comet-full-type
       out-buf comet-full-len @ 2 +
       exit
     then
+    \ Extended asteroid-style provisional (cycle >= 620): P_PO00Ud.
+    \ Its last char is base-62 and may be lowercase, so test this first.
+    over 1+ c@ [char] _ = if
+      over 1+ over 1- unpack-extended
+      dup comet-full-len !
+      out-buf tmp-buf comet-full-len @ move
+      comet-full-type @ out-buf c!
+      [char] / out-buf 1+ c!
+      tmp-buf out-buf 2 + comet-full-len @ move
+      2drop 2drop
+      out-buf comet-full-len @ 2 +
+      exit
+    then
     \ Check for asteroid-style (7-char provisional ends with uppercase)
     over 1+ over 1- is-asteroid-style-packed? if
       over 1+ over 1- unpack-prov
@@ -1086,12 +1130,29 @@ variable comet-full-type
     tmp-buf out-buf 2 + comet-full-len @ move
     2drop 2drop
     out-buf comet-full-len @ 2 +
+  else dup 12 = if
+    \ Long format: 4-digit number + type + 7-char provisional.
+    \ Unpack the trailing 8-char type+provisional, then prefix the number.
+    over 4 str>num comet-num !
+    drop 4 + 8 recurse                   ( out-buf len )
+    dup comet-full-len !
+    work-buf swap move
+    comet-num @ s>d <# #s #>             ( num-addr num-len )
+    dup comet-num-len !
+    out-buf swap move
+    work-buf out-buf comet-num-len @ + comet-full-len @ move
+    out-buf comet-num-len @ comet-full-len @ +
   else
-    \ Long format: number + type + provisional (not common)
-    out-buf 0
-  then ;
+    \ Unsupported length
+    out-buf 0 2swap 2drop
+  then then ;
 
 variable comet-type-char
+variable pcf-in-addr
+variable pcf-in-len
+variable pcf-slash
+variable pcf-sub-addr
+variable pcf-sub-len
 
 variable pcf-prov-addr
 variable pcf-prov-len
@@ -1121,43 +1182,44 @@ variable pcf-space-pos
   pcf-prov-addr @ pcf-prov-len @ pack-comet-prov ;
 
 : pack-comet-full ( addr len -- addr' len' )
+  \ C/1995 O1 -> CJ95O010, 1P/1982 U1 -> 0001PJ82U010,
+  \ P/2025 OZ695 -> P_PO00Ud, 1P/2025 OZ695 -> 0001P_PO00Ud
+  pcf-in-len ! pcf-in-addr !
   \ Find the slash
-  2dup
-  0 -rot bounds ?do
+  0 pcf-in-addr @ pcf-in-len @ bounds ?do
     i c@ [char] / = if drop i leave then
   loop
-  \ Stack: addr len slash-addr
-  dup 0= if drop out-buf 0 2swap 2drop exit then
-  2 pick -                      \ offset to slash = slash-addr - addr
-  dup 1 = if
-    \ Simple format: X/yyyy prov -> XJ95O010
-    drop
-    over c@ comet-type-char !   \ save type character
-    over 2 + over 2 - pack-comet-full-prov
-    \ Stack: addr len out-buf prov-len
-    \ Copy result to tmp-buf
-    over tmp-buf 2 pick move    \ move(out-buf, tmp-buf, prov-len)
-    \ Put type at position 0
+  dup 0= if drop out-buf 0 exit then
+  pcf-in-addr @ - pcf-slash !
+  pcf-in-addr @ pcf-slash @ + 1- c@ comet-type-char !
+  \ Pack the provisional part after the slash
+  pcf-in-addr @ pcf-slash @ + 1+  pcf-in-len @ pcf-slash @ - 1-
+  2dup pcf-sub-len ! pcf-sub-addr !
+  pack-comet-full-prov                  ( out-buf plen )
+  \ A sub-packer that rejects returns its input unchanged (or empty):
+  \ reject the whole designation the same way.
+  dup 0= >r 2dup pcf-sub-addr @ pcf-sub-len @ s= r> or if
+    2drop pcf-in-addr @ out-buf pcf-in-len @ move out-buf pcf-in-len @ exit
+  then
+  pcf-slash @ 1 = if
+    \ Simple format: type + packed provisional
+    out-buf out-buf 1+ 2 pick move
     comet-type-char @ out-buf c!
-    \ Copy from tmp-buf back to out-buf+1
-    tmp-buf out-buf 1+ 2 pick move
-    \ Stack: addr len out-buf prov-len
-    \ Return out-buf with length = prov-len + 1
-    1+ >r                       \ save prov-len+1 to return stack
-    2drop drop                  \ drop out-buf, len, addr
-    out-buf r>
+    nip out-buf swap 1+
   else
-    \ Numbered format: nnnX/yyyy prov
-    2 pick over 1- str>num      \ comet number
-    s>d <# # # # # #> tmp-buf swap move
-    2 pick over + 1- c@ comet-type-char ! \ save type
-    2 pick over + 1+ 2 pick over - 1- pack-comet-full-prov
-    \ Now build result: 4-digit number + type + prov result
-    tmp-buf out-buf 4 move      \ copy number
-    comet-type-char @ out-buf 4 + c! \ type at position 4
-    out-buf 5 + over move       \ copy prov result
-    out-buf swap 5 +            \ return with length
-    2swap 2drop
+    \ Numbered format: 4-digit number (1-9999) + type + packed provisional
+    pcf-in-addr @ pcf-slash @ 1- 2dup all-digit? >r
+    dup 4 <= r> and 0= if
+      2drop 2drop pcf-in-addr @ out-buf pcf-in-len @ move out-buf pcf-in-len @ exit
+    then
+    str>num dup 1 < if
+      drop 2drop pcf-in-addr @ out-buf pcf-in-len @ move out-buf pcf-in-len @ exit
+    then
+    >r                                  ( out-buf plen ) ( R: num )
+    out-buf out-buf 5 + 2 pick move
+    r> s>d <# # # # # #> out-buf swap move
+    comet-type-char @ out-buf 4 + c!
+    nip out-buf swap 5 +
   then ;
 
 \ ============================================================================
@@ -1240,7 +1302,7 @@ variable sat-num-len
 
 : packed-prov? ( addr len -- f )
   dup 7 <> if 2drop false exit then
-  over c@ [char] _ = if 2drop true exit then  \ extended format
+  over c@ [char] _ = if is-extended-packed? exit then  \ extended format
   \ Exclude old-style unpacked format (has space at position 4)
   2dup has-space? if 2drop false exit then
   drop  ( addr )

@@ -447,11 +447,19 @@ def pack_extended_provisional(year: int, half_month: str, second_letter: str, cy
     Used when cycle count >= 620.
     Format: _YHbbbb where Y=base-62 encoded 2-digit year, H=half-month, bbbb=4-char base-62 sequence
     """
-    year_short = year % 100  # 2-digit year, encoded as base-62 character
+    # The year code is a single base-62 character (0-9, A-Z, a-z), so only
+    # years 2000-2061 are encodable.
+    if year < 2000 or year > 2061:
+        raise MPCDesignationError(
+            f"Extended provisional format requires year 2000-2061: {year}")
+    year_short = year - 2000
 
     # Calculate the sequence number within the extended range
     # Cycle 620 letter A = sequence 0, cycle 620 letter B = sequence 1, etc.
     base_sequence = (cycle - 620) * 25 + letter_to_position(second_letter) - 1
+    if base_sequence >= 62 ** 4:
+        raise MPCDesignationError(
+            f"Cycle count too large for extended provisional format: {cycle}")
 
     # Encode as 4-character base-62
     seq_encoded = num_to_base62_string(base_sequence, 4)
@@ -466,7 +474,7 @@ def unpack_extended_provisional(packed: str) -> str:
     Output: unpacked format like "2024 AA620"
     """
     packed = packed.strip()
-    if len(packed) != 7 or packed[0] != '_':
+    if not re.match(r'^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$', packed):
         raise MPCDesignationError(f"Invalid extended packed provisional: {packed}")
 
     year_digit = packed[1]
@@ -1029,8 +1037,12 @@ def unpack_comet_full(packed: str) -> str:
     if comet_type not in COMET_TYPES:
         raise MPCDesignationError(f"Invalid comet type: {comet_type}")
 
-    # Determine if this uses asteroid-style or comet-style provisional
-    if is_asteroid_style_packed(provisional_part):
+    # Determine if this uses asteroid-style or comet-style provisional.
+    # An extended asteroid-style provisional (cycle >= 620) such as
+    # P/2025 OZ695 -> P_PO00Ud carries the underscore form.
+    if provisional_part.startswith('_'):
+        provisional = unpack_extended_provisional(provisional_part)
+    elif is_asteroid_style_packed(provisional_part):
         provisional = unpack_provisional(provisional_part)
     else:
         provisional = unpack_comet_provisional(provisional_part)
@@ -1112,7 +1124,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if len(designation) == 12:
-        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
+        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (12-char)'
@@ -1120,7 +1132,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed comet designation (8 chars: type + 7 char provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$', designation):
+        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (8-char)'
@@ -1193,7 +1205,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
         # Extended format with underscore
         # Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
         if des[0] == '_':
-            if re.match(r'^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$', des):
+            if re.match(r'^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$', des):
                 result['format'] = 'packed'
                 result['type'] = 'provisional_extended'
                 result['subtype'] = 'provisional (extended format, cycle >=620)'

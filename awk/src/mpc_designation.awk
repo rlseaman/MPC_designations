@@ -498,6 +498,31 @@ function pack_bce_comet(desig,    frag, type, space_pos, year, desig_part, half,
 # Format detection
 #==============================================================================
 
+# Comet with an extended asteroid-style provisional: P_PO00Ud -> P/2025 OZ695
+function unpack_extended_comet(packed,    r) {
+    r = unpack_extended_provisional(substr(packed, 2))
+    if (r ~ /^ERROR/) return r
+    return substr(packed, 1, 1) "/" r
+}
+
+# 12-char numbered comet with provisional: 0001PJ82U010 -> 1P/1982 U1
+function unpack_full_comet(packed,    r) {
+    r = convert_simple(substr(packed, 5))
+    if (r ~ /^ERROR/) return r
+    return (substr(packed, 1, 4) + 0) r
+}
+
+# 1P/1982 U1 -> 0001PJ82U010
+function pack_full_comet(desig,    num, r) {
+    match(desig, /^[0-9]+/)
+    num = substr(desig, 1, RLENGTH)
+    if (RLENGTH > 4 || num + 0 < 1) return "ERROR: Comet number out of range (1-9999): " desig
+    r = convert_simple(substr(desig, RLENGTH + 1))
+    if (r ~ /^ERROR/) return r
+    if (length(r) != 8) return "ERROR: Invalid comet provisional for numbered comet: " desig
+    return sprintf("%04d", num + 0) r
+}
+
 function detect_format(desig,    len, first, prefix, last) {
     len = length(desig)
     first = substr(desig, 1, 1)
@@ -544,6 +569,10 @@ function detect_format(desig,    len, first, prefix, last) {
     # asteroid-style (e.g. PK13A76L) provisionals, so validate it here.
     if (len == 8) {
         second = substr(desig, 2, 1)
+        # Comet with an extended asteroid-style provisional (P_PO00Ud)
+        if (desig ~ /^[PDCXAI]_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]$/) {
+            return "packed_extended_comet"
+        }
         if (desig ~ /^[PDCXAI][A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$/) {
             return "packed_provisional_comet"
         }
@@ -559,6 +588,18 @@ function detect_format(desig,    len, first, prefix, last) {
     # Packed provisional comet with two-letter fragment (9 chars)
     if (len == 9 && desig ~ /^[PDCXAI][A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][a-z][a-z]$/) {
         return "packed_provisional_comet"
+    }
+
+    # Packed numbered comet with provisional designation (12 chars:
+    # 4-digit number + type + 7-char provisional, e.g. 0001PJ82U010)
+    if (len == 12 && desig ~ /^[0-9][0-9][0-9][0-9][PDCXAI]/ && \
+        detect_format(substr(desig, 5)) ~ /^packed_(provisional|extended)_comet$/) {
+        return "packed_full_comet"
+    }
+
+    # Unpacked numbered comet with provisional designation (1P/1982 U1)
+    if (desig ~ /^[0-9]+[PDCXAI]\/-?[0-9]+ /) {
+        return "unpacked_full_comet"
     }
 
     # Unpacked numbered asteroid (all digits)
@@ -627,6 +668,9 @@ function convert_simple(desig,    fmt) {
     if (fmt == "unpacked_numbered_comet") return pack_numbered_comet(desig)
     if (fmt == "packed_provisional_comet") return unpack_provisional_comet(desig)
     if (fmt == "packed_ancient_comet") return unpack_ancient_comet(desig)
+    if (fmt == "packed_extended_comet") return unpack_extended_comet(desig)
+    if (fmt == "packed_full_comet") return unpack_full_comet(desig)
+    if (fmt == "unpacked_full_comet") return pack_full_comet(desig)
     if (fmt == "unpacked_provisional_comet") return pack_provisional_comet(desig)
     if (fmt == "packed_satellite") return unpack_satellite(desig)
     if (fmt == "unpacked_satellite") return pack_satellite(desig)

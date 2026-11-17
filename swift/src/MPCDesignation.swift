@@ -106,8 +106,8 @@ struct Patterns {
     static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
 
     // Detect format patterns - packed
-    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
-    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$"#)
+    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
+    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
     static let packedCometFull9 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$"#)
     static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
     static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
@@ -115,7 +115,7 @@ struct Patterns {
     static let packedTilde = try! NSRegularExpression(pattern: #"^~[0-9A-Za-z]{4}$"#)
     static let packedLetterPrefix = try! NSRegularExpression(pattern: #"^[A-Za-z][0-9]{4}$"#)
     // Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
-    static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$"#)
+    static let packedExtended = try! NSRegularExpression(pattern: #"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$"#)
     static let packedProvisional = try! NSRegularExpression(pattern: #"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
     static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PD][a-z]{0,2}$"#)
@@ -390,10 +390,22 @@ func needsExtendedFormat(_ cycle: Int) -> Bool {
 
 /// Pack a provisional designation using extended format (underscore prefix)
 func packExtendedProvisional(year: Int, halfMonth: Character, secondLetter: Character, cycle: Int) throws -> String {
-    let yearShort = year % 100
+    // The year code is a single base-62 character, so only 2000-2061 are encodable.
+    guard year >= 2000 && year <= 2061 else {
+        throw MPCDesignationError.outOfRange("Extended provisional format requires year 2000-2061: \(year)")
+    }
+    let yearShort = year - 2000
 
-    // Calculate the sequence number within the extended range
+    // Calculate the sequence number within the extended range.
+    // Check the cycle first so the arithmetic below cannot overflow.
+    let maxSequence = 62 * 62 * 62 * 62
+    guard cycle - 620 < maxSequence else {
+        throw MPCDesignationError.outOfRange("Cycle count too large for extended provisional format: \(cycle)")
+    }
     let baseSequence = (cycle - 620) * 25 + (try letterToPosition(secondLetter)) - 1
+    guard baseSequence < maxSequence else {
+        throw MPCDesignationError.outOfRange("Cycle count too large for extended provisional format: \(cycle)")
+    }
 
     // Encode as 4-character base-62
     let seqEncoded = try numToBase62String(baseSequence, width: 4)
@@ -406,7 +418,7 @@ func unpackExtendedProvisional(_ packed: String) throws -> String {
     let p = packed.trimmingCharacters(in: .whitespaces)
     let chars = Array(p)
 
-    guard chars.count == 7 && chars[0] == "_" else {
+    guard Patterns.packedExtended.firstMatch(in: p, range: NSRange(p.startIndex..., in: p)) != nil else {
         throw MPCDesignationError.invalidFormat("Invalid extended packed provisional: \(packed)")
     }
 
@@ -423,7 +435,7 @@ func unpackExtendedProvisional(_ packed: String) throws -> String {
     let secondLetter = try positionToLetter(letterPos)
 
     // Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
-    // Extended format is for years 2000-2099, year code is year % 100
+    // Extended format is for years 2000-2061
     let year = 2000 + (try base62ToNum(yearDigit))
 
     return "\(year) \(halfMonth)\(secondLetter)\(cycle)"
@@ -938,7 +950,10 @@ func unpackCometFull(_ packed: String) throws -> String {
         }
 
         let provisional: String
-        if isAsteroidStylePacked(provisionalPart) {
+        if provisionalPart.first == "_" {
+            // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+            provisional = try unpackExtendedProvisional(provisionalPart)
+        } else if isAsteroidStylePacked(provisionalPart) {
             provisional = try unpackProvisional(provisionalPart)
         } else {
             provisional = try unpackCometProvisional(provisionalPart)
@@ -971,7 +986,10 @@ func unpackCometFull(_ packed: String) throws -> String {
         }
 
         let provisional: String
-        if isAsteroidStylePacked(provisionalPart) {
+        if provisionalPart.first == "_" {
+            // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+            provisional = try unpackExtendedProvisional(provisionalPart)
+        } else if isAsteroidStylePacked(provisionalPart) {
             provisional = try unpackProvisional(provisionalPart)
         } else {
             provisional = try unpackCometProvisional(provisionalPart)

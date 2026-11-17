@@ -224,6 +224,19 @@ static int is_valid_half_month(char c) {
     return (c >= 'A' && c <= 'Y' && c != 'I');
 }
 
+/*
+ * Check for a structurally valid extended packed provisional:
+ * ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$
+ */
+static int is_valid_extended_packed(const char *s) {
+    if (strlen(s) != 7 || s[0] != '_') return 0;
+    if (base62_to_num(s[1]) < 0 || !is_valid_half_month(s[2])) return 0;
+    for (int i = 3; i < 7; i++) {
+        if (base62_to_num(s[i]) < 0) return 0;
+    }
+    return 1;
+}
+
 /* ========================================================================= */
 /* Permanent (numbered) asteroid designations                                */
 /* ========================================================================= */
@@ -401,7 +414,11 @@ int mpc_pack_provisional(const char *unpacked, char *output, size_t outlen) {
 
     /* Check if we need extended format (cycle >= 620) */
     if (order_num >= 620) {
-        int year_digit = year % 100;  /* Two-digit year encoded as base-62 */
+        /* Year code is a single base-62 character: only 2000-2061 encodable */
+        if (year < 2000 || year > 2061) {
+            return MPC_ERR_RANGE;
+        }
+        int year_digit = year - 2000;
         long base_sequence = (order_num - 620) * 25 + letter_to_position(second_letter) - 1;
         /* Maximum 4-digit base-62 value is 62^4 - 1 = 14776335 */
         if (base_sequence > 14776335L) {
@@ -459,6 +476,7 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
 
     /* Extended format with underscore */
     if (len == 7 && buf[0] == '_') {
+        if (!is_valid_extended_packed(buf)) return MPC_ERR_FORMAT;
         int year_digit = base62_to_num(buf[1]);
         char half_month = buf[2];
         long base_sequence = base62_string_to_num(buf + 3, 4);
@@ -467,7 +485,7 @@ int mpc_unpack_provisional(const char *packed, char *output, size_t outlen) {
         int letter_pos = (base_sequence % 25) + 1;
         char second_letter = position_to_letter(letter_pos);
 
-        /* Extended format is for years 2000-2099, year code is year % 100 */
+        /* Extended format is for years 2000-2061, year code is year - 2000 */
         int year = 2000 + year_digit;
 
         snprintf(output, outlen, "%d %c%c%d", year, half_month, second_letter, cycle);
@@ -1117,7 +1135,10 @@ static int unpack_comet_full(const char *packed, char *output, size_t outlen) {
     /* Unpack provisional */
     char provisional[32];
     int err;
-    if (is_asteroid_style_packed(provisional_part)) {
+    if (provisional_part[0] == '_') {
+        /* Extended asteroid-style provisional (cycle >= 620): P_PO00Ud */
+        err = mpc_unpack_provisional(provisional_part, provisional, sizeof(provisional));
+    } else if (is_asteroid_style_packed(provisional_part)) {
         err = mpc_unpack_provisional(provisional_part, provisional, sizeof(provisional));
     } else {
         err = unpack_comet_provisional(provisional_part, provisional, sizeof(provisional));
@@ -1157,7 +1178,8 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     /* Half-month (input[8]) is a calendar code A-Y excluding I, object-type independent */
     if (orig_len == 12) {
         char c4 = input[4];
-        if (is_comet_type(c4) && is_valid_half_month(input[8])) {
+        if (is_comet_type(c4) &&
+            (is_valid_half_month(input[8]) || is_valid_extended_packed(input + 5))) {
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_COMET_FULL;
             strcpy(info->subtype, "comet with provisional (12-char)");
@@ -1173,6 +1195,15 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
         info->format = MPC_FORMAT_PACKED;
         info->type = MPC_TYPE_COMET_FULL;
         strcpy(info->subtype, "comet with provisional (8-char)");
+        return MPC_OK;
+    }
+
+    /* Check for packed 8-char comet with extended provisional: P_PO00Ud */
+    if (orig_len == 8 && is_comet_type(input[0]) &&
+        is_valid_extended_packed(input + 1)) {
+        info->format = MPC_FORMAT_PACKED;
+        info->type = MPC_TYPE_COMET_FULL;
+        strcpy(info->subtype, "comet with extended provisional (8-char)");
         return MPC_OK;
     }
 
@@ -1290,6 +1321,7 @@ int mpc_detect_format(const char *input, mpc_info_t *info) {
     /* Check for packed provisional (7 chars) */
     if (len == 7) {
         if (buf[0] == '_') {
+            if (!is_valid_extended_packed(buf)) return MPC_ERR_FORMAT;
             info->format = MPC_FORMAT_PACKED;
             info->type = MPC_TYPE_PROVISIONAL_EXTENDED;
             strcpy(info->subtype, "provisional (extended, cycle >=620)");

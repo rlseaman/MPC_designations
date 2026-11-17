@@ -439,18 +439,25 @@ object MPCDesignation {
     // =========================================================================
 
     private fun packExtendedProvisional(year: Int, halfMonth: Char, secondLetter: Char, cycle: Int): String {
-        val yearShort = year % 100
+        // The year code is a single base-62 character, so only 2000-2061 are encodable.
+        if (year < 2000 || year > 2061) {
+            throw MPCDesignationException("Extended provisional format requires year 2000-2061: $year")
+        }
+        val yearShort = year - 2000
         val letterPos = letterToPosition(secondLetter)
-        val baseSequence = (cycle - 620) * 25 + letterPos - 1
-        val seqEncoded = numToBase62String(baseSequence, 4)
+        val baseSequence = (cycle.toLong() - 620) * 25 + letterPos - 1
+        if (baseSequence >= 62L * 62 * 62 * 62) {
+            throw MPCDesignationException("Cycle count too large for extended provisional format: $cycle")
+        }
+        val seqEncoded = numToBase62String(baseSequence.toInt(), 4)
         val yearChar = numToBase62(yearShort)
         return "_$yearChar$halfMonth$seqEncoded"
     }
 
     fun unpackExtendedProvisional(packed: String): String {
         val p = packed.trim()
-        if (p.length != 7 || p[0] != '_') {
-            throw MPCDesignationException("Invalid extended packed provisional")
+        if (!Regex("""^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$""").matches(p)) {
+            throw MPCDesignationException("Invalid extended packed provisional: $p")
         }
 
         val yearDigit = p[1]
@@ -787,7 +794,10 @@ object MPCDesignation {
                 throw MPCDesignationException("Invalid comet type: $cometType")
             }
 
-            val provisional = if (isAsteroidStylePacked(provisionalPart)) {
+            // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+            val provisional = if (provisionalPart[0] == '_') {
+                unpackExtendedProvisional(provisionalPart)
+            } else if (isAsteroidStylePacked(provisionalPart)) {
                 unpackProvisional(provisionalPart)
             } else {
                 unpackCometProvisional(provisionalPart)
@@ -823,7 +833,10 @@ object MPCDesignation {
                 throw MPCDesignationException("Invalid comet type: $cometType")
             }
 
-            val provisional = if (isAsteroidStylePacked(provisionalPart)) {
+            // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+            val provisional = if (provisionalPart[0] == '_') {
+                unpackExtendedProvisional(provisionalPart)
+            } else if (isAsteroidStylePacked(provisionalPart)) {
                 unpackProvisional(provisionalPart)
             } else {
                 unpackCometProvisional(provisionalPart)
@@ -905,7 +918,7 @@ object MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length == 12) {
-            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
+            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (12-char)")
             }
@@ -913,7 +926,7 @@ object MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$""")
+            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (8-char)")
             }
@@ -1002,7 +1015,7 @@ object MPCDesignation {
         if (des.length == 7) {
             // Extended format with underscore
             if (des[0] == '_') {
-                val pattern = Regex("""^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$""")
+                val pattern = Regex("""^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$""")
                 if (pattern.matches(des)) {
                     return Info(FormatType.PACKED, "provisional_extended", "provisional (extended format, cycle >=620)")
                 }

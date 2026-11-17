@@ -75,14 +75,33 @@ proc base62StringToNum(s: string): int =
 # Extended provisional format (underscore prefix for cycle >= 620)
 #==============================================================================
 
+const MAX_EXTENDED_SEQUENCE = 62 * 62 * 62 * 62 - 1
+
+# Packed extended provisional: _ + base-62 year + half-month (A-Y, no I) + 4 base-62
+proc isExtendedProvisionalPacked(s: string): bool =
+  s.len == 7 and s[0] == '_' and s[1] in {'0'..'9', 'A'..'Z', 'a'..'z'} and
+    isValidHalfMonth(s[2]) and
+    s[3] in {'0'..'9', 'A'..'Z', 'a'..'z'} and s[4] in {'0'..'9', 'A'..'Z', 'a'..'z'} and
+    s[5] in {'0'..'9', 'A'..'Z', 'a'..'z'} and s[6] in {'0'..'9', 'A'..'Z', 'a'..'z'}
+
 proc packExtendedProvisional(year: int, halfMonth: char, secondLetter: char, cycle: int): string =
-  let yearShort = year mod 100
+  # The year code is a single base-62 character, so only 2000-2061 are encodable.
+  if year < 2000 or year > 2061:
+    raise newException(ValueError, "Extended provisional format requires year 2000-2061: " & $year)
+  # Reject huge cycles before arithmetic to avoid overflow
+  if cycle - 620 > MAX_EXTENDED_SEQUENCE div 25:
+    raise newException(ValueError, "Cycle count too large for extended provisional format: " & $cycle)
   # Cycle 620 letter A = sequence 0, cycle 620 letter B = sequence 1, etc.
   let baseSequence = (cycle - 620) * 25 + letterToPosition(secondLetter) - 1
+  if baseSequence > MAX_EXTENDED_SEQUENCE:
+    raise newException(ValueError, "Cycle count too large for extended provisional format: " & $cycle)
+  let yearShort = year - 2000
   let seqEncoded = numToBase62String(baseSequence)
   result = "_" & base62Char(yearShort) & halfMonth & seqEncoded
 
 proc unpackExtendedProvisional(packed: string): string =
+  if not isExtendedProvisionalPacked(packed):
+    raise newException(ValueError, "Invalid extended packed provisional: " & packed)
   let yearDigit = packed[1]
   let halfMonth = packed[2]
   let seqEncoded = packed[3..6]
@@ -275,6 +294,17 @@ proc unpackNumberedComet*(packed: string): string =
     result &= "-" & toUpperAscii(fragment)
 
 proc packProvisionalComet*(desig: string): string =
+  # Numbered comet with provisional designation: "1P/2025 OZ695" -> "0001P_PO00Ud" (12 chars)
+  let slashIdx = desig.find('/')
+  if slashIdx >= 2 and desig[0..slashIdx-2].isAllDigits:
+    let num = parseInt(desig[0..slashIdx-2])
+    if num < 1 or num > 9999:
+      return "ERROR: Comet number out of range (1-9999): " & $num
+    let packedProv = packProvisionalComet(desig[slashIdx-1..^1])
+    if packedProv.startsWith("ERROR"):
+      return packedProv
+    return align($num, 4, '0') & packedProv
+
   var fragment = ""
   var baseDesig = desig
 
@@ -348,6 +378,9 @@ proc packProvisionalComet*(desig: string): string =
     # Extended format - same as provisional asteroids
     let second = designPart[1]
     let cycle = if designPart.len > 2: parseInt(designPart[2..^1]) else: 0
+    # Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+    if cycle >= 620:
+      return $cometType & packExtendedProvisional(year, half, second, cycle)
     let cycleStr = if cycle < 100:
       align($cycle, 2, '0')
     else:
@@ -364,7 +397,18 @@ proc packProvisionalComet*(desig: string): string =
     result = $cometType & centuryChar & align($yy, 2, '0') & half & orderStr & frag
 
 proc unpackProvisionalComet*(packed: string): string =
+  # 12-char form: 4-char number (or spaces) + type + 7-char provisional
+  if packed.len == 12:
+    let numPart = packed[0..3].strip()
+    let prov = unpackProvisionalComet(packed[4..11])
+    if numPart.len == 0:
+      return prov
+    return $parseInt(numPart) & prov
+
   let cometType = packed[0]
+  # Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud -> P/2025 OZ695
+  if packed.len == 8 and packed[1] == '_':
+    return $cometType & "/" & unpackExtendedProvisional(packed[1..7])
   let centuryChar = packed[1]
   let yy = try: parseInt(packed[2..3]) except ValueError: 0
   let half = packed[4]
@@ -542,11 +586,18 @@ proc detectFormat*(desig: string): DesignationFormat =
 
   # Extended provisional format (7 chars starting with underscore)
   if len == 7 and first == '_':
-    return fmtPackedExtendedProvisional
+    if isExtendedProvisionalPacked(desig):
+      return fmtPackedExtendedProvisional
+    return fmtUnknown
 
   # Packed provisional comet, ancient comet, BCE comet, or satellite (8 chars)
   if len == 8:
     let second = desig[1]
+    # Comet with extended asteroid-style provisional: type + _YHbbbb
+    if first in COMET_TYPES and second == '_':
+      if isExtendedProvisionalPacked(desig[1..7]):
+        return fmtPackedProvisionalComet
+      return fmtUnknown
     # Standard provisional comet: type + century[A-L] + YY + half-month + cycle + order
     # Half-month at index 4 is a calendar code (A-Y skipping I).
     if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'} and
@@ -571,6 +622,23 @@ proc detectFormat*(desig: string): DesignationFormat =
     if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'} and
        isValidHalfMonth(desig[4]):
       return fmtPackedProvisionalComet
+
+  # Packed comet with provisional designation (12 chars: number or spaces + type + provisional)
+  if len == 12 and desig[4] in COMET_TYPES:
+    var numOk = true
+    for c in desig[0..3]:
+      if c notin {' ', '0'..'9'}:
+        numOk = false
+        break
+    let prov = desig[5..11]
+    if numOk:
+      if prov[0] == '_':
+        if isExtendedProvisionalPacked(prov):
+          return fmtPackedProvisionalComet
+      elif prov[0] in {'I', 'J', 'K', 'L'} and prov[1] in {'0'..'9'} and prov[2] in {'0'..'9'} and
+           isValidHalfMonth(prov[3]) and prov[4] in {'0'..'9', 'A'..'Z', 'a'..'z'} and
+           prov[5] in {'0'..'9'} and prov[6] in {'0'..'9', 'a'..'z'}:
+        return fmtPackedProvisionalComet
 
   # Unpacked numbered asteroid (all digits)
   if desig.isAllDigits:
@@ -604,7 +672,11 @@ proc detectFormat*(desig: string): DesignationFormat =
 
   # Unpacked provisional comet (must have space for year separation)
   # Half-month (first char after the space) is a calendar code (A-Y skipping I).
-  if len >= 2 and first in {'P', 'D', 'C', 'X', 'A'} and desig[1] == '/' and ' ' in desig:
+  # Optional leading comet number: "1P/2025 OZ695".
+  var typeIdx = 0
+  while typeIdx < len and desig[typeIdx] in {'0'..'9'}:
+    inc typeIdx
+  if len >= typeIdx + 2 and desig[typeIdx] in {'P', 'D', 'C', 'X', 'A'} and desig[typeIdx + 1] == '/' and ' ' in desig:
     let spaceIdx = desig.find(' ')
     if spaceIdx >= 0 and spaceIdx + 1 < desig.len and isValidHalfMonth(desig[spaceIdx + 1]):
       return fmtUnpackedProvisionalComet

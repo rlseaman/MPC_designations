@@ -520,13 +520,25 @@ func PackProvisional(unpacked string) (string, error) {
 
 // packExtendedProvisional packs a provisional with cycle >= 620
 func packExtendedProvisional(year int, halfMonth, secondLetter byte, cycle int) (string, error) {
-	yearShort := year % 100
+	// The year code is a single base-62 character, so only 2000-2061 are encodable.
+	if year < 2000 || year > 2061 {
+		return "", fmt.Errorf("%w: extended provisional format requires year 2000-2061: %d", ErrOutOfRange, year)
+	}
+	yearShort := year - 2000
 
 	letterPos, err := letterToPosition(secondLetter)
 	if err != nil {
 		return "", err
 	}
+	// Check the cycle first so the arithmetic below cannot overflow.
+	const maxSequence = 62 * 62 * 62 * 62
+	if cycle-620 >= maxSequence {
+		return "", fmt.Errorf("%w: cycle count too large for extended provisional format: %d", ErrOutOfRange, cycle)
+	}
 	baseSequence := (cycle-620)*25 + letterPos - 1
+	if baseSequence >= maxSequence {
+		return "", fmt.Errorf("%w: cycle count too large for extended provisional format: %d", ErrOutOfRange, cycle)
+	}
 
 	seqEncoded, err := numToBase62String(baseSequence, 4)
 	if err != nil {
@@ -544,8 +556,8 @@ func packExtendedProvisional(year int, halfMonth, secondLetter byte, cycle int) 
 // UnpackExtendedProvisional unpacks an extended provisional (underscore format)
 func UnpackExtendedProvisional(packed string) (string, error) {
 	p := strings.TrimSpace(packed)
-	if len(p) != 7 || p[0] != '_' {
-		return "", fmt.Errorf("%w: invalid extended packed provisional", ErrInvalidFormat)
+	if !isPackedExtended(p) {
+		return "", fmt.Errorf("%w: invalid extended packed provisional: %s", ErrInvalidFormat, p)
 	}
 
 	yearDigit := p[1]
@@ -569,7 +581,7 @@ func UnpackExtendedProvisional(packed string) (string, error) {
 		return "", err
 	}
 
-	// Extended format is for years 2000-2099, year code is year % 100
+	// Extended format is for years 2000-2061
 	year := 2000 + yearVal
 
 	return fmt.Sprintf("%d %c%c%d", year, halfMonth, secondLetter, cycle), nil
@@ -902,7 +914,10 @@ func UnpackCometFull(packed string) (string, error) {
 
 		var provisional string
 		var err error
-		if isAsteroidStylePacked(provisionalPart) {
+		if provisionalPart[0] == '_' {
+			// Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+			provisional, err = UnpackExtendedProvisional(provisionalPart)
+		} else if isAsteroidStylePacked(provisionalPart) {
 			provisional, err = UnpackProvisional(provisionalPart)
 		} else {
 			provisional, err = UnpackCometProvisional(provisionalPart)
@@ -947,7 +962,10 @@ func UnpackCometFull(packed string) (string, error) {
 
 		var provisional string
 		var err error
-		if isAsteroidStylePacked(provisionalPart) {
+		if provisionalPart[0] == '_' {
+			// Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+			provisional, err = UnpackExtendedProvisional(provisionalPart)
+		} else if isAsteroidStylePacked(provisionalPart) {
 			provisional, err = UnpackProvisional(provisionalPart)
 		} else {
 			provisional, err = UnpackCometProvisional(provisionalPart)
@@ -1488,6 +1506,9 @@ func isPackedCometFull12(s string) bool {
 	if !cometTypes[s[4]] {
 		return false
 	}
+	if isPackedExtended(s[5:]) {
+		return true
+	}
 	// Check provisional part
 	if s[5] < 'I' || s[5] > 'L' {
 		return false
@@ -1511,6 +1532,9 @@ func isPackedCometFull12(s string) bool {
 func isPackedCometFull8(s string) bool {
 	if len(s) != 8 || !cometTypes[s[0]] {
 		return false
+	}
+	if isPackedExtended(s[1:]) {
+		return true
 	}
 	if s[1] < 'A' || s[1] > 'L' {
 		return false
@@ -1652,7 +1676,8 @@ func isPackedExtended(s string) bool {
 	if !((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
 		return false
 	}
-	if s[2] < 'A' || s[2] > 'Z' {
+	// Half-month is A-Y skipping I
+	if !isValidHalfMonth(s[2]) {
 		return false
 	}
 	for i := 3; i < 7; i++ {

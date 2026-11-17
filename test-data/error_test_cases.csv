@@ -119,3 +119,31 @@ detection,survey_collision_century,C03UYWZ,format,Catalina survey temp ID centur
 detection,packed_cycle_units_letter,K03UYWZ,format,Letter W in cycle-units position must be a digit
 detection,packed_half_month_I,K95I00A,format,Half-month letter I in packed provisional is a skipped letter
 detection,packed_order_letter_I,1995 XI,format,Order letter I is skipped in provisional designations
+# Extended provisional format (_YHbbbb, cycle >= 620): year 2000-2061, sequence <= 62^4-1
+extended,year_before_2000,1999 AA620,range,Extended format needs year >= 2000
+extended,year_1925,1925 AA620,range,Extended format needs year >= 2000
+extended,year_after_2061,2062 AA620,range,Extended format year > 2061 not encodable
+extended,year_2099,2099 AA620,range,Extended format year > 2061 not encodable
+extended,seq_overflow_letter,2000 AM591673,range,Sequence exceeds 62^4-1
+extended,seq_overflow_cycle,2000 AA591674,range,Sequence exceeds 62^4-1
+extended,seq_overflow_huge,2015 AA9999999,range,Sequence exceeds 62^4-1
+extended,packed_half_I,_0I0000,format,Half-month I is never used
+extended,packed_half_Z,_0Z0000,format,Half-month Z is never used
+extended,packed_half_lower,_0a0000,format,Half-month must be uppercase
+extended,packed_short,_0A000,format,Too short
+extended,packed_long,_0A00000,format,Too long
+extended,packed_bad_char,_0A00-0,format,Non-base62 char
+extended,packed_bad_year,_!A0000,format,Non-base62 year
+extended,unpacked_half_I,2015 IA620,format,Half-month I
+extended,unpacked_letter_I,2015 AI620,format,Second letter I
+extended,valid_min,2000 AA620,valid,Smallest extended
+extended,valid_max,2000 AL591673,valid,Largest extended
+extended,valid_2061,2061 YZ620,valid,Last encodable year
+extended,valid_packed_max,_zYzzzz,valid,Max packed
+extended,valid_boundary_619,2015 AZ619,valid,Last standard cycle
+# Comets with an extended asteroid-style provisional (MPC: P/2025 OZ695 = P_PO00Ud)
+comet_extended,valid_unpacked,P/2025 OZ695,valid,Comet with extended asteroid-style provisional
+comet_extended,valid_packed,P_PO00Ud,valid,Packed comet with extended provisional
+comet_extended,valid_numbered_packed,0001P_PO00Ud,valid,12-char packed numbered comet with extended provisional
+comet_extended,packed_half_I,P_PI00Ud,format,Half-month I in packed comet extended provisional
+comet_extended,year_before_2000,C/1999 AA620,range,Comet extended provisional needs year >= 2000

@@ -107,8 +107,8 @@ namespace eval MPCDesignation {
     variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
     variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
     variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
-    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
-    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$}
+    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
+    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
     variable pat_packed_comet_9_frag {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$}
     variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
     variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
@@ -117,7 +117,7 @@ namespace eval MPCDesignation {
     variable pat_packed_5digit {^[0-9]{5}$}
     variable pat_unpacked_number {^(\d+)$}
     variable pat_packed_provisional {^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$}
-    variable pat_packed_extended {^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$}
+    variable pat_packed_extended {^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$}
     variable pat_packed_survey_pls {^(PLS)[0-9]{4}$}
     variable pat_packed_survey_t {^T([123])S[0-9]{4}$}
     variable pat_unpacked_survey_pl {^(\d+) P-L$}
@@ -403,6 +403,10 @@ namespace eval MPCDesignation {
 
         set sequence [cycleLetterToSequence $cycle $secondLetter]
         set offset [expr {$sequence - 15501}]
+        # Sequence must fit in 4 base-62 digits (no silent wrap)
+        if {$offset > 14776335} {
+            error "Cycle count too large for extended provisional format: $cycle"
+        }
         set base62Part [numToBase62String $offset 4]
 
         return "_$yearCode$halfMonth$base62Part"
@@ -412,8 +416,9 @@ namespace eval MPCDesignation {
     # Unpack an extended provisional designation (underscore prefix)
     #
     proc unpackExtendedProvisional {packed} {
-        if {[string index $packed 0] ne "_"} {
-            error "Not an extended format designation: $packed"
+        variable pat_packed_extended
+        if {![regexp $pat_packed_extended $packed]} {
+            error "Invalid extended packed provisional: $packed"
         }
 
         set yearCode [string index $packed 1]
@@ -998,8 +1003,12 @@ namespace eval MPCDesignation {
             error "Invalid comet type: $cometType"
         }
 
-        # Determine if this uses asteroid-style or comet-style provisional
-        if {[isAsteroidStylePacked $provisionalPart]} {
+        # Determine if this uses asteroid-style or comet-style provisional.
+        # An extended asteroid-style provisional (cycle >= 620) such as
+        # P/2025 OZ695 -> P_PO00Ud carries the underscore form.
+        if {[string index $provisionalPart 0] eq "_"} {
+            set provisional [unpackExtendedProvisional $provisionalPart]
+        } elseif {[isAsteroidStylePacked $provisionalPart]} {
             set provisional [unpackProvisional $provisionalPart]
         } else {
             set provisional [unpackCometProvisional $provisionalPart]

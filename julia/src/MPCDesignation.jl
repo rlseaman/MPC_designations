@@ -436,9 +436,14 @@ end
 # =============================================================================
 
 function pack_extended_provisional(year::Integer, half_month::Char, second_letter::Char, cycle::Integer)
-    year_short = year % 100
+    # The year code is a single base-62 character, so only 2000-2061 are encodable.
+    (year < 2000 || year > 2061) && throw(MPCDesignationError("Extended provisional format requires year 2000-2061: $year"))
+    year_short = year - 2000
+    # Reject huge cycles before arithmetic to avoid overflow
+    (cycle - 620 > 62^4 ÷ 25) && throw(MPCDesignationError("Cycle count too large for extended provisional format: $cycle"))
     letter_pos = letter_to_position(second_letter)
     base_sequence = (cycle - 620) * 25 + letter_pos - 1
+    base_sequence >= 62^4 && throw(MPCDesignationError("Cycle count too large for extended provisional format: $cycle"))
     seq_encoded = num_to_base62_string(base_sequence, 4)
     year_char = num_to_base62(year_short)
     return "_$year_char$half_month$seq_encoded"
@@ -451,7 +456,7 @@ Unpack an extended provisional designation (underscore format).
 """
 function unpack_extended_provisional(packed::AbstractString)
     p = strip(packed)
-    (length(p) != 7 || p[1] != '_') && throw(MPCDesignationError("Invalid extended packed provisional"))
+    match(r"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", p) === nothing && throw(MPCDesignationError("Invalid extended packed provisional: $p"))
 
     year_digit = p[2]
     half_month = p[3]
@@ -770,7 +775,10 @@ function unpack_comet_full(packed::AbstractString)
 
         !(comet_type in COMET_TYPES) && throw(MPCDesignationError("Invalid comet type: $comet_type"))
 
-        provisional = if is_asteroid_style_packed(provisional_part)
+        # Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+        provisional = if startswith(provisional_part, '_')
+            unpack_extended_provisional(provisional_part)
+        elseif is_asteroid_style_packed(provisional_part)
             unpack_provisional(provisional_part)
         else
             unpack_comet_provisional(provisional_part)
@@ -800,7 +808,10 @@ function unpack_comet_full(packed::AbstractString)
 
         !(comet_type in COMET_TYPES) && throw(MPCDesignationError("Invalid comet type: $comet_type"))
 
-        provisional = if is_asteroid_style_packed(provisional_part)
+        # Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+        provisional = if startswith(provisional_part, '_')
+            unpack_extended_provisional(provisional_part)
+        elseif is_asteroid_style_packed(provisional_part)
             unpack_provisional(provisional_part)
         else
             unpack_comet_provisional(provisional_part)
@@ -885,14 +896,14 @@ function detect_format(designation::AbstractString)
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if length(designation) == 12
-        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
+        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (12-char)")
         end
     end
 
     # Check for packed comet designation (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (8-char)")
         end
     end
@@ -969,7 +980,7 @@ function detect_format(designation::AbstractString)
     # Check for packed provisional asteroid (7 chars)
     if length(des) == 7
         if des[1] == '_'
-            if match(r"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$", des) !== nothing
+            if match(r"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", des) !== nothing
                 return FormatInfo(:packed, "provisional_extended", "provisional (extended format, cycle >=620)")
             end
         end

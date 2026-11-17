@@ -436,9 +436,20 @@ class MPCDesignation {
     // =========================================================================
 
     private static function packExtendedProvisional(int $year, string $halfMonth, string $secondLetter, int $cycle): string {
-        $yearShort = $year % 100;
+        // The year code is a single base-62 character, so only years
+        // 2000-2061 are encodable.
+        if ($year < 2000 || $year > 2061) {
+            throw new MPCDesignationException(
+                "Extended provisional format requires year 2000-2061: $year");
+        }
+        $yearShort = $year - 2000;
         $letterPos = self::letterToPosition($secondLetter);
+        // (PHP promotes integer overflow to float, so huge cycles cannot wrap.)
         $baseSequence = ($cycle - 620) * 25 + $letterPos - 1;
+        if ($baseSequence >= 62 ** 4) {
+            throw new MPCDesignationException(
+                "Cycle count too large for extended provisional format: $cycle");
+        }
         $seqEncoded = self::numToBase62String($baseSequence, 4);
         $yearChar = self::numToBase62($yearShort);
         return "_$yearChar$halfMonth$seqEncoded";
@@ -446,7 +457,7 @@ class MPCDesignation {
 
     public static function unpackExtendedProvisional(string $packed): string {
         $p = trim($packed);
-        if (strlen($p) !== 7 || $p[0] !== '_') {
+        if (!preg_match('/^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/', $p)) {
             throw new MPCDesignationException("Invalid extended packed provisional");
         }
 
@@ -757,6 +768,20 @@ class MPCDesignation {
     // Full comet designations (with type prefix)
     // =========================================================================
 
+    /**
+     * Unpack the 7-char provisional part of a full comet designation, which
+     * may be comet-style, asteroid-style, or an extended asteroid-style
+     * provisional (cycle >= 620) such as P/2025 OZ695 -> P_PO00Ud.
+     */
+    private static function unpackCometProvisionalPart(string $provisionalPart): string {
+        if ($provisionalPart !== '' && $provisionalPart[0] === '_') {
+            return self::unpackExtendedProvisional($provisionalPart);
+        }
+        return self::isAsteroidStylePacked($provisionalPart)
+            ? self::unpackProvisional($provisionalPart)
+            : self::unpackCometProvisional($provisionalPart);
+    }
+
     public static function unpackCometFull(string $packed): string {
         $p = $packed;
         $len = strlen($p);
@@ -769,9 +794,7 @@ class MPCDesignation {
                 throw new MPCDesignationException("Invalid comet type: $cometType");
             }
 
-            $provisional = self::isAsteroidStylePacked($provisionalPart)
-                ? self::unpackProvisional($provisionalPart)
-                : self::unpackCometProvisional($provisionalPart);
+            $provisional = self::unpackCometProvisionalPart($provisionalPart);
 
             return "$cometType/$provisional";
         }
@@ -801,9 +824,7 @@ class MPCDesignation {
                 throw new MPCDesignationException("Invalid comet type: $cometType");
             }
 
-            $provisional = self::isAsteroidStylePacked($provisionalPart)
-                ? self::unpackProvisional($provisionalPart)
-                : self::unpackCometProvisional($provisionalPart);
+            $provisional = self::unpackCometProvisionalPart($provisionalPart);
 
             if ($numPart === '') {
                 return "$cometType/$provisional";
@@ -873,14 +894,14 @@ class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (strlen($designation) === 12) {
-            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
+            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (12-char)');
             }
         }
 
         // Check for packed comet designation (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (8-char)');
             }
         }
@@ -955,7 +976,7 @@ class MPCDesignation {
         // Check for packed provisional asteroid (7 chars)
         if (strlen($des) === 7) {
             if ($des[0] === '_') {
-                if (preg_match('/^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$/', $des)) {
+                if (preg_match('/^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/', $des)) {
                     return new FormatInfo('packed', 'provisional_extended', 'provisional (extended format, cycle >=620)');
                 }
             }

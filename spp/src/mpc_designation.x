@@ -114,8 +114,9 @@ char	des[ARB]
 int	format, dtype
 
 int	len, i, dashpos, strlen(), mpc_strchr(), mpc_strstr()
-char	first, space
+char	first, space, c
 bool	alldig, mpc_iscent(), mpc_ishalfmo(), mpc_isb62(), mpc_isseclet()
+bool	mpc_isext(), mpc_isctype()
 
 begin
 	format = 0
@@ -192,9 +193,12 @@ begin
 
 	# Packed provisional (7 chars)
 	if (len == 7) {
+	    # Extended provisional _YHbbbb (half-month A-Y excluding I)
 	    if (first == '_') {
-		format = 1
-		dtype = 8
+		if (mpc_isext (des, 1)) {
+		    format = 1
+		    dtype = 8
+		}
 		return
 	    }
 
@@ -230,6 +234,27 @@ begin
 	    format = 1
 	    dtype = 7
 	    return
+	}
+
+	# Packed numbered comet with provisional (12 chars), e.g. 0001PJ95O010
+	# or 0001P_PO00Ud (extended asteroid-style provisional)
+	if (len == 12) {
+	    alldig = true
+	    do i = 1, 4 {
+		if (!IS_DIGIT(des[i]))
+		    alldig = false
+	    }
+	    if (alldig && mpc_isctype (des[5])) {
+		if (mpc_isext (des, 6) ||
+		    (des[6] >= 'I' && des[6] <= 'L' && IS_DIGIT(des[7]) &&
+		     IS_DIGIT(des[8]) && mpc_ishalfmo(des[9]) &&
+		     mpc_isb62(des[10]) && IS_DIGIT(des[11]) &&
+		     (IS_DIGIT(des[12]) || IS_LOWER(des[12])))) {
+		    format = 1
+		    dtype = 6
+		    return
+		}
+	    }
 	}
 
 	# Packed comet full (8-9 chars)
@@ -304,10 +329,13 @@ begin
 	    }
 	}
 
-	# Unpacked comet with prefix
-	if (len >= 7 && des[2] == '/') {
-	    if (first=='P' || first=='C' || first=='D' ||
-		first=='X' || first=='A' || first=='I') {
+	# Unpacked comet with prefix, optionally numbered (e.g. 1P/2025 OZ695)
+	i = 1
+	while (IS_DIGIT(des[i]))
+	    i = i + 1
+	if (len >= i + 6 && des[i + 1] == '/') {
+	    c = des[i]
+	    if (mpc_isctype (c)) {
 		format = 2
 		dtype = 6
 		return
@@ -650,7 +678,8 @@ begin
 	order = 0
 	i = 8
 	while (IS_DIGIT(unpacked[i])) {
-	    # Check for integer overflow (max extended cycle is about 600000)
+	    # Guard against integer overflow; any cycle this large is out of
+	    # range anyway (max extended cycle is 591673)
 	    if (order > 600000) {
 		packed[1] = EOS
 		return
@@ -661,13 +690,7 @@ begin
 
 	# Check for cycle overflow (max 619 for standard format)
 	if (order >= 620) {
-	    # Extended format: max cycle is 620 + (62^4 - 1) / 25 ~ 591535
-	    # But practical max is around 14 million total entries
-	    # For safety, reject cycle > 591535
-	    if (order > 591535) {
-		packed[1] = EOS
-		return
-	    }
+	    # Extended format; mpc_pkext validates year and sequence range
 	    call mpc_pkext (year, unpacked[6], unpacked[7], order, packed, maxch)
 	    return
 	}
@@ -692,8 +715,15 @@ int	maxch
 
 int	year, baseseq, cycle, letpos, mpc_b62c(), mpc_b62d4()
 char	seclet, mpc_p2l()
+bool	mpc_isext()
 
 begin
+	# Must match _[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}
+	if (!mpc_isext (packed, 1)) {
+	    unpacked[1] = EOS
+	    return
+	}
+
 	year = 2000 + mpc_b62c (packed[2])
 	baseseq = mpc_b62d4 (packed, 4)
 	cycle = 620 + baseseq / 25
@@ -720,9 +750,20 @@ int	yrshort, letpos, baseseq, mpc_l2p()
 char	mpc_n2b62()
 
 begin
-	yrshort = mod (year, 100)
+	# The year code is a single base-62 character: only 2000-2061 fit
+	if (year < 2000 || year > 2061) {
+	    packed[1] = EOS
+	    return
+	}
+	yrshort = year - 2000
 	letpos = mpc_l2p (seclet)
 	baseseq = (cycle - 620) * 25 + letpos - 1
+
+	# Sequence must fit in 4 base-62 digits (62^4 - 1 = 14776335)
+	if (baseseq > 14776335) {
+	    packed[1] = EOS
+	    return
+	}
 
 	packed[1] = '_'
 	packed[2] = mpc_n2b62 (yrshort)
@@ -1005,7 +1046,7 @@ char	packed[ARB], unpacked[ARB]
 int	maxch
 
 int	year, order, mpc_centc(), mpc_deccyc()
-char	frag, ufrag
+char	frag, ufrag, frag2, ufrag2
 bool	mpc_ishalfmo()
 
 begin
@@ -1017,12 +1058,25 @@ begin
 	year = mpc_centc (packed[1]) + (packed[2] - '0') * 10 + (packed[3] - '0')
 	order = mpc_deccyc (packed, 5)
 	frag = packed[7]
+	frag2 = EOS
+	if (frag != EOS)
+	    frag2 = packed[8]
 
 	if (frag == '0' || frag == EOS) {
 	    call sprintf (unpacked, maxch, "%d %c%d")
 		call pargi (year)
 		call pargc (packed[4])
 		call pargi (order)
+	} else if (IS_LOWER(frag2)) {
+	    # Two-letter fragment (e.g. J30J01aa -> 1930 J1-AA)
+	    ufrag = frag - 32
+	    ufrag2 = frag2 - 32
+	    call sprintf (unpacked, maxch, "%d %c%d-%c%c")
+		call pargi (year)
+		call pargc (packed[4])
+		call pargi (order)
+		call pargc (ufrag)
+		call pargc (ufrag2)
 	} else {
 	    ufrag = frag - 32
 	    call sprintf (unpacked, maxch, "%d %c%d-%c")
@@ -1042,16 +1096,27 @@ procedure mpc_uncful (packed, unpacked, maxch)
 char	packed[ARB], unpacked[ARB]
 int	maxch
 
-int	len, year, order, bcecode, mpc_deccyc(), strlen()
+int	len, year, order, bcecode, cnum, i, mpc_deccyc(), strlen()
 char	ctype, bceprefix, halfmo, frag, frag2, ufrag, ufrag2, provpk[10], provup[30]
 
 begin
 	len = strlen (packed)
 	ctype = packed[1]
 
+	# Numbered comet with provisional (12 chars): NNNNT + 7-char provisional
+	cnum = 0
+	if (len == 12) {
+	    do i = 1, 4 {
+		if (IS_DIGIT(packed[i]))
+		    cnum = cnum * 10 + (packed[i] - '0')
+	    }
+	    ctype = packed[5]
+	}
+
 	# Check for BCE comet (prefix is /, ., or -)
 	bceprefix = packed[2]
-	if (bceprefix == '/' || bceprefix == '.' || bceprefix == '-') {
+	if (len != 12 &&
+	    (bceprefix == '/' || bceprefix == '.' || bceprefix == '-')) {
 	    bcecode = (packed[3] - '0') * 10 + (packed[4] - '0')
 	    year = 99 - bcecode
 	    if (bceprefix == '.')
@@ -1094,7 +1159,7 @@ begin
 	}
 
 	# Check for ancient comet (year < 1000, digit in position 2)
-	if (IS_DIGIT(packed[2])) {
+	if (len != 12 && IS_DIGIT(packed[2])) {
 	    year = (packed[2] - '0') * 100 + (packed[3] - '0') * 10 + (packed[4] - '0')
 	    halfmo = packed[5]
 	    order = mpc_deccyc (packed, 6)
@@ -1131,17 +1196,39 @@ begin
 	}
 
 	# Standard comet: delegate to existing functions
-	call strcpy (packed, provpk, 10)
-	call mpc_shiftl (provpk, 1)
+	if (len == 12) {
+	    do i = 1, 7
+		provpk[i] = packed[i + 5]
+	    provpk[8] = EOS
+	} else {
+	    call strcpy (packed, provpk, 10)
+	    call mpc_shiftl (provpk, 1)
+	}
 
-	if (IS_UPPER(packed[len]))
+	# Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud.
+	# Test this first: its last char is base-62 and may be lowercase.
+	if (provpk[1] == '_')
+	    call mpc_unext (provpk, provup, 30)
+	else if (IS_UPPER(packed[len]))
 	    call mpc_unprov (provpk, provup, 30)
 	else
 	    call mpc_uncprv (provpk, provup, 30)
 
-	call sprintf (unpacked, maxch, "%c/%s")
-	    call pargc (ctype)
-	    call pargstr (provup)
+	if (provup[1] == EOS) {
+	    unpacked[1] = EOS
+	    return
+	}
+
+	if (cnum > 0) {
+	    call sprintf (unpacked, maxch, "%d%c/%s")
+		call pargi (cnum)
+		call pargc (ctype)
+		call pargstr (provup)
+	} else {
+	    call sprintf (unpacked, maxch, "%c/%s")
+		call pargc (ctype)
+		call pargstr (provup)
+	}
 end
 
 
@@ -1154,7 +1241,7 @@ char	unpacked[ARB], packed[ARB]
 int	maxch
 
 int	i, j, year, order, century, spcpos, dashpos, slashpos, absyear, bcecode
-int	mpc_strchr(), mpc_strfrom(), strlen()
+int	cnum, mpc_strchr(), mpc_strfrom(), strlen()
 char	ctype, halfmo, frag, frag2, fragchar, centcode, yrstr[5], provpart[40], mpc_centl()
 char	slash, space, dash, bceprefix
 bool	isneg, twoletter, mpc_ishalfmo()
@@ -1177,6 +1264,21 @@ begin
 	}
 
 	ctype = unpacked[slashpos - 1]
+
+	# Optional comet number before the type letter (e.g. 1P/2025 OZ695)
+	cnum = 0
+	do i = 1, slashpos - 2 {
+	    if (!IS_DIGIT(unpacked[i]) || cnum > 9999) {
+		packed[1] = EOS
+		return
+	    }
+	    cnum = cnum * 10 + (unpacked[i] - '0')
+	}
+	if (slashpos > 2 && (cnum < 1 || cnum > 9999)) {
+	    packed[1] = EOS
+	    return
+	}
+
 	spcpos = mpc_strfrom (unpacked, space, slashpos + 1)
 	if (spcpos == 0) {
 	    packed[1] = EOS
@@ -1333,6 +1435,8 @@ begin
 	    provpart[j] = EOS
 
 	    call mpc_pkprov (provpart, packed, maxch)
+	    if (packed[1] == EOS)
+		return
 	    call mpc_shiftr (packed, 1)
 	    packed[1] = ctype
 	} else {
@@ -1349,6 +1453,15 @@ begin
 	    } else {
 		packed[9] = EOS
 	    }
+	}
+
+	# Numbered comet: prefix the 4-digit zero-padded number
+	if (cnum > 0 && packed[1] != EOS) {
+	    call mpc_shiftr (packed, 4)
+	    call sprintf (yrstr, 5, "%04d")
+		call pargi (cnum)
+	    do i = 1, 4
+		packed[i] = yrstr[i]
 	}
 end
 
@@ -1583,6 +1696,43 @@ begin
 end
 
 
+# MPC_ISEXT -- Check for an extended provisional _YHbbbb starting at s[start]
+# (pattern _[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}, ending the string)
+
+bool procedure mpc_isext (s, start)
+
+char	s[ARB]
+int	start
+
+int	i
+bool	mpc_isb62(), mpc_ishalfmo()
+
+begin
+	if (s[start] != '_')
+	    return (false)
+	if (!mpc_isb62 (s[start + 1]))
+	    return (false)
+	if (!mpc_ishalfmo (s[start + 2]))
+	    return (false)
+	do i = start + 3, start + 6 {
+	    if (!mpc_isb62 (s[i]))
+		return (false)
+	}
+	return (s[start + 7] == EOS)
+end
+
+
+# MPC_ISCTYPE -- Check if char is a valid comet type (P, C, D, X, A, I)
+
+bool procedure mpc_isctype (c)
+
+char	c
+
+begin
+	return (c == 'P' || c == 'C' || c == 'D' || c == 'X' || c == 'A' || c == 'I')
+end
+
+
 # MPC_DECCYC -- Decode 2-char cycle count
 
 int procedure mpc_deccyc (s, start)
@@ -1797,6 +1947,7 @@ int	i, len, strlen()
 
 begin
 	len = strlen (s)
+	s[len + n + 1] = EOS
 	do i = len + n, n + 1, -1 {
 	    s[i] = s[i - n]
 	}

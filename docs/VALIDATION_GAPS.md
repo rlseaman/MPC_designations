@@ -23,13 +23,13 @@ check and removing the skip.
 
 | Implementation | error suite |
 |---|---|
-| Python, Tcl | 98 / 98, **0 skips** — the validation reference |
+| Python, Tcl | 124 / 124, **0 skips** — the validation reference |
 | C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C skips 2 inherent null-byte cases) |
-| **nim** | 87 pass / **11 skip** |
-| **haskell** | 81 pass / **17 skip** |
-| **bash** | 78 pass / **20 skip** |
-| **awk** | 75 pass / **23 skip** |
-| **forth** | 67 pass / **31 skip** (most permissive; no error channel) |
+| **nim** | 113 pass / **11 skip** |
+| **haskell** | 107 pass / **17 skip** |
+| **bash** | 104 pass / **20 skip** |
+| **awk** | 101 pass / **23 skip** |
+| **forth** | 95 pass / **29 skip** (most permissive; no error channel) |
 
 ## Gaps by theme
 
@@ -38,7 +38,8 @@ No validation of numeric magnitudes. Affects: **awk, bash, nim, forth** (and
 `comet_order_zero` in **haskell**).
 - Asteroid number: `asteroid_zero` (0), `asteroid_max_plus_one` (>15,396,335),
   `asteroid_huge`, `asteroid_overflow`, `packed_above_max` (`~{000`).
-- Provisional cycle count: `cycle_huge`, `cycle_overflow` (closed in awk and
+- Provisional cycle count: `cycle_huge`, `cycle_overflow` (closed in forth in
+  1.1.2; closed in awk and
   bash in 1.1.1 by the extended-format range checks).
 - Comet order number: `comet_order_zero`, `comet_order_huge` (closed in awk
   and bash in 1.1.1).

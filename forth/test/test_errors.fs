@@ -185,8 +185,6 @@ variable skip-hit?
   s" out_of_bounds" s" packed_above_max"     s" no packed upper-bound check" ?skip
   s" out_of_bounds" s" year_future"          s" no future-year range check" ?skip
   s" out_of_bounds" s" year_zero"            s" no year-zero rejection" ?skip
-  s" out_of_bounds" s" cycle_huge"           s" no cycle-count range check" ?skip
-  s" out_of_bounds" s" cycle_overflow"       s" no cycle-count overflow check" ?skip
   s" out_of_bounds" s" comet_order_huge"     s" no comet order range check" ?skip
   s" out_of_bounds" s" comet_order_zero"     s" no comet order-zero check" ?skip
   s" format"      s" three_letters"          s" trailing letters ignored, not rejected" ?skip

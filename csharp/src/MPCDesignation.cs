@@ -244,6 +244,10 @@ namespace MPC
         private static bool IsSatellitePlanet(char c) => SATELLITE_PLANETS.Contains(c);
         private static bool IsValidHalfMonth(char c) => c >= 'A' && c <= 'Y' && c != 'I';
 
+        // Packed extended provisional (cycle >= 620): _YHbbbb
+        private static bool IsExtendedPackedProvisional(string s) =>
+            Regex.IsMatch(s, @"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$");
+
         private static string GetCometTypeName(char type)
         {
             return type switch
@@ -437,8 +441,23 @@ namespace MPC
             // Check if we need extended format
             if (orderNum >= 620)
             {
-                int yearDigit = year % 100;
+                // The year code is a single base-62 character, so only 2000-2061 are encodable.
+                if (year < 2000 || year > 2061)
+                {
+                    throw new MPCDesignationException($"Extended provisional format requires year 2000-2061: {year}");
+                }
+                int yearDigit = year - 2000;
+                const long maxSequence = 62L * 62 * 62 * 62;
+                // Check the cycle first so the arithmetic below cannot overflow.
+                if (orderNum - 620 >= maxSequence)
+                {
+                    throw new MPCDesignationException($"Cycle count too large for extended provisional format: {orderNum}");
+                }
                 long baseSequence = (orderNum - 620) * 25 + LetterToPosition(sl) - 1;
+                if (baseSequence >= maxSequence)
+                {
+                    throw new MPCDesignationException($"Cycle count too large for extended provisional format: {orderNum}");
+                }
                 string seqEncoded = NumToBase62String(baseSequence, 4);
                 return $"_{NumToBase62(yearDigit)}{hm}{seqEncoded}";
             }
@@ -479,6 +498,10 @@ namespace MPC
             // Extended format with underscore
             if (p.Length == 7 && p[0] == '_')
             {
+                if (!IsExtendedPackedProvisional(p))
+                {
+                    throw new MPCDesignationException($"Invalid extended packed provisional: {p}");
+                }
                 int yearDigit = Base62ToNum(p[1]);
                 char halfMonth = p[2];
                 long baseSequence = Base62StringToNum(p.Substring(3, 4));
@@ -979,7 +1002,9 @@ namespace MPC
                 throw new MPCDesignationException($"Invalid comet type: {cometType}");
             }
 
-            string provisional = IsAsteroidStylePacked(provisionalPart)
+            // An extended asteroid-style provisional (cycle >= 620), e.g.
+            // P/2025 OZ695 -> P_PO00Ud, carries the underscore form.
+            string provisional = provisionalPart[0] == '_' || IsAsteroidStylePacked(provisionalPart)
                 ? UnpackProvisional(provisionalPart)
                 : UnpackCometProvisional(provisionalPart);
 
@@ -1005,7 +1030,9 @@ namespace MPC
             // Check for packed 12-char comet before trimming
             // Half-month (index 8) is a calendar code A-Y excluding I (object-type independent)
             if (origLen == 12 && IsCometType(designation[4]) &&
-                IsValidHalfMonth(designation[8]))
+                (IsValidHalfMonth(designation[8]) ||
+                 (designation.Take(4).All(c => c == ' ' || (c >= '0' && c <= '9')) &&
+                  IsExtendedPackedProvisional(designation.Substring(5)))))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometFull;
@@ -1016,8 +1043,9 @@ namespace MPC
             // Check for packed 8-char comet
             // Half-month (index 4) is a calendar code A-Y excluding I
             if (origLen == 8 && IsCometType(designation[0]) &&
-                designation[1] >= 'A' && designation[1] <= 'L' &&
-                IsValidHalfMonth(designation[4]))
+                ((designation[1] >= 'A' && designation[1] <= 'L' &&
+                  IsValidHalfMonth(designation[4])) ||
+                 IsExtendedPackedProvisional(designation.Substring(1))))
             {
                 info.Format = Format.Packed;
                 info.Type = DesignationType.CometFull;
@@ -1133,7 +1161,7 @@ namespace MPC
             // Check for packed provisional (7 chars)
             if (len == 7)
             {
-                if (des[0] == '_')
+                if (IsExtendedPackedProvisional(des))
                 {
                     info.Format = Format.Packed;
                     info.Type = DesignationType.ProvisionalExtended;

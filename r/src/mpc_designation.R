@@ -271,7 +271,7 @@ unpack_permanent <- function(packed) {
 
   # Tilde format (>= 620,000)
   if (first == "~") {
-    return(620000 + base62_string_to_num(substr(p, 2, 5)))
+    return(as.integer(620000 + base62_string_to_num(substr(p, 2, 5))))
   }
 
   # Simple numeric format (< 100,000)
@@ -283,14 +283,14 @@ unpack_permanent <- function(packed) {
   if (grepl("^[A-Z]$", first)) {
     val <- utf8ToInt(first) - 55  # A=10
     rest <- as.integer(substr(p, 2, 5))
-    return(val * 10000 + rest)
+    return(as.integer(val * 10000 + rest))
   }
 
   # Extended format with lowercase letter (360,000 - 619,999)
   if (grepl("^[a-z]$", first)) {
     val <- utf8ToInt(first) - 61  # a=36
     rest <- as.integer(substr(p, 2, 5))
-    return(val * 10000 + rest)
+    return(as.integer(val * 10000 + rest))
   }
 
   mpc_error("Invalid packed permanent designation")
@@ -464,7 +464,9 @@ pack_provisional <- function(unpacked) {
   }
 
   century_code <- century_codes_rev[[as.character(century)]]
-  order_num <- if (nchar(order_str) == 0) 0 else as.integer(order_str)
+  # as.numeric (not as.integer) so very long cycle strings do not become NA;
+  # pack_extended_provisional rejects out-of-range values.
+  order_num <- if (nchar(order_str) == 0) 0 else as.numeric(order_str)
 
   # Check if we need extended format
   if (order_num >= 620) {
@@ -482,9 +484,17 @@ pack_provisional <- function(unpacked) {
 #' Pack extended provisional designation
 #' @keywords internal
 pack_extended_provisional <- function(year, half_month, second_letter, cycle) {
-  year_short <- year %% 100
+  # The year code is a single base-62 character, so only 2000-2061 fit.
+  if (year < 2000 || year > 2061) {
+    mpc_error(sprintf("Extended provisional format requires year 2000-2061: %d", year))
+  }
+  year_short <- year - 2000
   letter_pos <- letter_to_position(second_letter)
   base_sequence <- (cycle - 620) * 25 + letter_pos - 1
+  if (base_sequence >= 62^4) {
+    mpc_error(sprintf("Cycle count too large for extended provisional format: %s",
+                      format(cycle, scientific = FALSE)))
+  }
   seq_encoded <- num_to_base62_string(base_sequence, 4)
   year_char <- num_to_base62(year_short)
   sprintf("_%s%s%s", year_char, half_month, seq_encoded)
@@ -496,8 +506,8 @@ pack_extended_provisional <- function(year, half_month, second_letter, cycle) {
 #' @export
 unpack_extended_provisional <- function(packed) {
   p <- trimws(packed)
-  if (nchar(p) != 7 || substr(p, 1, 1) != "_") {
-    mpc_error("Invalid extended packed provisional")
+  if (!grepl("^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", p)) {
+    mpc_error(sprintf("Invalid extended packed provisional: %s", p))
   }
 
   year_digit <- substr(p, 2, 2)
@@ -864,7 +874,10 @@ unpack_comet_full <- function(packed) {
       mpc_error(sprintf("Invalid comet type: %s", comet_type))
     }
 
-    provisional <- if (is_asteroid_style_packed(provisional_part)) {
+    # Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud
+    provisional <- if (substr(provisional_part, 1, 1) == "_") {
+      unpack_extended_provisional(provisional_part)
+    } else if (is_asteroid_style_packed(provisional_part)) {
       unpack_provisional(provisional_part)
     } else {
       unpack_comet_provisional(provisional_part)
@@ -898,7 +911,10 @@ unpack_comet_full <- function(packed) {
       mpc_error(sprintf("Invalid comet type: %s", comet_type))
     }
 
-    provisional <- if (is_asteroid_style_packed(provisional_part)) {
+    # Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud
+    provisional <- if (substr(provisional_part, 1, 1) == "_") {
+      unpack_extended_provisional(provisional_part)
+    } else if (is_asteroid_style_packed(provisional_part)) {
       unpack_provisional(provisional_part)
     } else {
       unpack_comet_provisional(provisional_part)
@@ -980,7 +996,7 @@ detect_format <- function(designation) {
 
   # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
   if (nchar(designation) == 12) {
-    if (grepl("^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
+    if (grepl("^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (12-char)"))
     }
@@ -988,7 +1004,7 @@ detect_format <- function(designation) {
 
   # Check for packed comet designation (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$", designation)) {
+    if (grepl("^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (8-char)"))
     }
@@ -1081,7 +1097,7 @@ detect_format <- function(designation) {
   # Check for packed provisional asteroid (7 chars)
   if (nchar(des) == 7) {
     if (substr(des, 1, 1) == "_") {
-      if (grepl("^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$", des)) {
+      if (grepl("^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", des)) {
         return(list(format = "packed", type = "provisional_extended",
                     subtype = "provisional (extended format, cycle >=620)"))
       }

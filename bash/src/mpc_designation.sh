@@ -667,10 +667,58 @@ unpack_satellite() {
 # Format detection
 #==============================================================================
 
+# Comet with an extended asteroid-style provisional: P_PO00Ud -> P/2025 OZ695
+unpack_extended_comet() {
+    local r
+    r=$(unpack_extended_provisional "${1:1}") || return 1
+    echo "${1:0:1}/$r"
+}
+
+# 12-char numbered comet with provisional: 0001PJ82U010 -> 1P/1982 U1
+unpack_full_comet() {
+    local r
+    r=$(convert_simple "${1:4}") || return 1
+    echo "$((10#${1:0:4}))$r"
+}
+
+# 1P/1982 U1 -> 0001PJ82U010
+pack_full_comet() {
+    local desig="$1" num r
+    num="${desig%%[PDCXAI]*}"
+    if [ "${#num}" -gt 4 ] || [ "$((10#$num))" -lt 1 ]; then
+        echo "ERROR: Comet number out of range (1-9999): $desig" >&2
+        return 1
+    fi
+    r=$(convert_simple "${desig:${#num}}") || return 1
+    if [ "${#r}" -ne 8 ]; then
+        echo "ERROR: Invalid comet provisional for numbered comet: $desig" >&2
+        return 1
+    fi
+    printf '%04d%s\n' "$((10#$num))" "$r"
+}
+
 detect_format() {
     local desig="$1"
     local len="${#desig}"
     local first="${desig:0:1}"
+
+    # Comet with an extended asteroid-style provisional (8 chars: P_PO00Ud)
+    if [[ "$desig" =~ ^[PDCXAI]_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$ ]]; then
+        echo "packed_extended_comet"; return
+    fi
+
+    # Packed numbered comet with provisional (12 chars: 0001PJ82U010)
+    if [ "$len" -eq 12 ] && [[ "$desig" =~ ^[0-9]{4}[PDCXAI] ]]; then
+        case "$(detect_format "${desig:4}")" in
+            packed_provisional_comet|packed_extended_comet)
+                echo "packed_full_comet"; return ;;
+        esac
+    fi
+
+    # Unpacked numbered comet with provisional (1P/1982 U1)
+    if [[ "$desig" =~ ^[0-9]+[PDCXAI]/-?[0-9]+\ [A-Z] ]]; then
+        echo "unpacked_full_comet"; return
+    fi
 
     # Packed numbered comet: 0001P (5 chars), 0073Pa (6 chars), 0073Paa (7 chars)
     # Must be exactly 4 digits + P/D + optional lowercase fragment
@@ -857,6 +905,15 @@ convert_simple() {
             ;;
         packed_extended)
             unpack_extended_provisional "$desig"
+            ;;
+        packed_extended_comet)
+            unpack_extended_comet "$desig"
+            ;;
+        packed_full_comet)
+            unpack_full_comet "$desig"
+            ;;
+        unpacked_full_comet)
+            pack_full_comet "$desig"
             ;;
         unpacked_provisional)
             pack_provisional "$desig"

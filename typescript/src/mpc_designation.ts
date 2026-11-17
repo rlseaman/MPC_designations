@@ -354,8 +354,16 @@ function needsExtendedFormat(cycle: number): boolean {
  * Pack a provisional designation using extended format (underscore prefix).
  */
 function packExtendedProvisional(year: number, halfMonth: string, secondLetter: string, cycle: number): string {
-    const yearShort = year % 100;
+    // The year code is a single base-62 character, so only years 2000-2061
+    // are encodable.
+    if (year < 2000 || year > 2061) {
+        throw new MPCDesignationError(`Extended provisional format requires year 2000-2061: ${year}`);
+    }
+    const yearShort = year - 2000;
     const baseSequence = (cycle - 620) * 25 + letterToPosition(secondLetter) - 1;
+    if (!Number.isSafeInteger(baseSequence) || baseSequence >= 62 ** 4) {
+        throw new MPCDesignationError(`Cycle count too large for extended provisional format: ${cycle}`);
+    }
     const seqEncoded = numToBase62String(baseSequence, 4);
     return '_' + numToBase62(yearShort) + halfMonth + seqEncoded;
 }
@@ -365,7 +373,7 @@ function packExtendedProvisional(year: number, halfMonth: string, secondLetter: 
  */
 export function unpackExtendedProvisional(packed: string): string {
     packed = packed.trim();
-    if (packed.length !== 7 || packed[0] !== '_') {
+    if (!/^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/.test(packed)) {
         throw new MPCDesignationError(`Invalid extended packed provisional: ${packed}`);
     }
 
@@ -933,8 +941,12 @@ export function unpackCometFull(packed: string): string {
         throw new MPCDesignationError(`Invalid comet type: ${cometType}`);
     }
 
+    // An extended asteroid-style provisional (cycle >= 620) such as
+    // P/2025 OZ695 -> P_PO00Ud carries the underscore form.
     let provisional: string;
-    if (isAsteroidStylePacked(provisionalPart)) {
+    if (provisionalPart[0] === '_') {
+        provisional = unpackExtendedProvisional(provisionalPart);
+    } else if (isAsteroidStylePacked(provisionalPart)) {
         provisional = unpackProvisional(provisionalPart);
     } else {
         provisional = unpackCometProvisional(provisionalPart);
@@ -1012,7 +1024,7 @@ export function detectFormat(designation: string): FormatInfo {
 
     // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if (designation.length === 12) {
-        if (/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/.test(designation)) {
+        if (/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/.test(designation)) {
             return {
                 format: 'packed',
                 type: 'comet_full',
@@ -1023,7 +1035,7 @@ export function detectFormat(designation: string): FormatInfo {
 
     // Check for packed comet designation (8 chars: type + 7 char provisional)
     if (designation.length === 8) {
-        if (/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/.test(designation)) {
+        if (/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/.test(designation)) {
             return {
                 format: 'packed',
                 type: 'comet_full',
@@ -1113,7 +1125,7 @@ export function detectFormat(designation: string): FormatInfo {
     if (des.length === 7) {
         // Extended format with underscore
         if (des[0] === '_') {
-            if (/^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$/.test(des)) {
+            if (/^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/.test(des)) {
                 return {
                     format: 'packed',
                     type: 'provisional_extended',

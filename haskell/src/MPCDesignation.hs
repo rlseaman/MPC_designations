@@ -44,7 +44,7 @@ module MPCDesignation
     , designationsEqual
     ) where
 
-import Data.Char (ord, chr, isDigit, isUpper, isLower, isAlpha, toUpper, toLower)
+import Data.Char (ord, chr, isDigit, isUpper, isLower, isAlpha, isAlphaNum, isAscii, toUpper, toLower)
 import Data.List (elemIndex)
 import Data.Maybe (fromMaybe)
 import Text.Read (readMaybe)
@@ -200,8 +200,15 @@ positionToLetter pos
 
 -- | Check if half-month letter is valid (A-Y excluding I)
 isValidHalfMonth :: Char -> Bool
-isValidHalfMonth c = isAlpha c && c' >= 'A' && c' <= 'Y' && c' /= 'I'
-  where c' = toUpper c
+isValidHalfMonth c = c >= 'A' && c <= 'Y' && c /= 'I'
+
+-- | Check if a 7-char string is a valid packed extended provisional.
+-- Mirrors reference regex: ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$
+isPackedExtendedProvisional :: String -> Bool
+isPackedExtendedProvisional ('_' : y : h : rest) =
+    isBase62 y && isValidHalfMonth h && length rest == 4 && all isBase62 rest
+  where isBase62 c = isAscii c && isAlphaNum c
+isPackedExtendedProvisional _ = False
 
 -- | Check if a packed 7-char string is a valid asteroid provisional.
 -- Mirrors reference regex: ^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$
@@ -342,7 +349,12 @@ packProvisional unpacked
             Left $ MPCError "Invalid second letter: I (letter I is not used in provisional designations)"
         let century = read (take 2 stdYear) :: Int
         centCode <- getCenturyCode century
-        let orderNum = if null stdOrderStr then 0 else read stdOrderStr :: Int
+        let orderBig = if null stdOrderStr then 0 else read stdOrderStr :: Integer
+        -- Reject cycles beyond the extended format before converting to Int
+        -- (avoids silent overflow for huge cycle strings)
+        when (orderBig - 620 > toInteger maxExtendedSequence `div` 25) $
+            Left $ MPCError $ "Cycle count too large for extended provisional format: " ++ stdOrderStr
+        let orderNum = fromInteger orderBig :: Int
         if orderNum >= 620
             then packExtendedProvisional (read stdYear) stdHalfMonth stdSecondLetter orderNum
             else do
@@ -383,16 +395,27 @@ packProvisional unpacked
 -- | Pack extended provisional (cycle >= 620)
 packExtendedProvisional :: Int -> Char -> Char -> Int -> Either MPCError String
 packExtendedProvisional year halfMonth secondLetter cycle = do
-    yearChar <- numToBase62 (year `mod` 100)
+    -- The year code is a single base-62 character, so only 2000-2061 are encodable.
+    if year < 2000 || year > 2061
+        then Left $ MPCError $ "Extended provisional format requires year 2000-2061: " ++ show year
+        else Right ()
+    yearChar <- numToBase62 (year - 2000)
     letterPos <- letterToPosition secondLetter
     let baseSeq = (cycle - 620) * 25 + letterPos - 1
+    if baseSeq > maxExtendedSequence
+        then Left $ MPCError $ "Cycle count too large for extended provisional format: " ++ show cycle
+        else Right ()
     seqEncoded <- numToBase62String 4 baseSeq
     return $ '_' : yearChar : halfMonth : seqEncoded
+
+-- | Largest sequence number encodable in 4 base-62 digits (62^4 - 1)
+maxExtendedSequence :: Int
+maxExtendedSequence = 62 ^ (4 :: Int) - 1
 
 -- | Unpack extended provisional
 unpackExtendedProvisional :: String -> Either MPCError String
 unpackExtendedProvisional packed
-    | length packed /= 7 || head packed /= '_' =
+    | not (isPackedExtendedProvisional packed) =
         Left $ MPCError $ "Invalid extended packed provisional: " ++ packed
     | otherwise = do
         yearDigit <- base62ToNum (packed !! 1)
@@ -499,7 +522,10 @@ unpackCometFull packed
     | length packed == 8 && head packed `elem` cometTypes = do
         let ctype = head packed
             provPart = tail packed
-        prov <- if isAsteroidStylePacked provPart
+        -- Extended asteroid-style provisional (cycle >= 620): P_PO00Ud -> P/2025 OZ695
+        prov <- if take 1 provPart == "_"
+                then unpackExtendedProvisional provPart
+                else if isAsteroidStylePacked provPart
                 then unpackProvisional provPart
                 else unpackCometProvisional provPart
         return $ ctype : '/' : prov
@@ -515,12 +541,17 @@ unpackCometFull packed
             numPart = trim $ take 4 padded
             ctype = padded !! 4
             provPart = drop 5 padded
-        prov <- if isAsteroidStylePacked provPart
+        -- Extended asteroid-style provisional (cycle >= 620): P_PO00Ud -> P/2025 OZ695
+        prov <- if take 1 provPart == "_"
+                then unpackExtendedProvisional provPart
+                else if isAsteroidStylePacked provPart
                 then unpackProvisional provPart
                 else unpackCometProvisional provPart
         if null numPart
             then return $ ctype : '/' : prov
-            else return $ numPart ++ ctype : '/' : prov
+            else case readMaybe numPart :: Maybe Int of
+                Just n  -> return $ show n ++ ctype : '/' : prov
+                Nothing -> Left $ MPCError $ "Invalid comet number: " ++ numPart
     | otherwise = Left $ MPCError $ "Invalid packed full comet: " ++ packed
   where
     trim = dropWhile (== ' ') . reverse . dropWhile (== ' ') . reverse
@@ -703,7 +734,7 @@ detectFormat des
         Right $ FormatInfo Packed Permanent "permanent numbered (letter-prefix)"
 
     -- Packed provisional extended (no spaces)
-    | len == 7 && head trimmed == '_' && ' ' `notElem` trimmed =
+    | len == 7 && isPackedExtendedProvisional trimmed =
         Right $ FormatInfo Packed ProvisionalExtended "provisional extended"
 
     -- Packed provisional standard (no spaces allowed)
@@ -738,6 +769,16 @@ detectFormat des
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
       trimmed !! 1 `elem` "./\\-" && isValidHalfMonth (trimmed !! 4) =
         Right $ FormatInfo Packed CometBCE "comet BCE"
+
+    -- Packed comet with extended asteroid-style provisional (8 chars): P_PO00Ud
+    | len == 8 && head trimmed `elem` cometTypes &&
+      isPackedExtendedProvisional (tail trimmed) =
+        Right $ FormatInfo Packed CometFull "comet with extended provisional"
+
+    -- Packed comet full (12 chars) with extended provisional: 0001P_PO00Ud
+    | length des == 12 && all (\c -> c == ' ' || isDigit c) (take 4 des) &&
+      des !! 4 `elem` cometTypes && isPackedExtendedProvisional (drop 5 des) =
+        Right $ FormatInfo Packed CometFull "comet full format (extended provisional)"
 
     -- Packed comet full (8 chars, no spaces, second char is century code not slash)
     -- Comet-style half-month (index 4) is a calendar code A-Y skipping I.

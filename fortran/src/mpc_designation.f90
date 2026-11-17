@@ -174,6 +174,22 @@ contains
         is_valid_half_month = (c >= 'A' .and. c <= 'Y' .and. c /= 'I')
     end function is_valid_half_month
 
+    !> Check for a structurally valid extended packed provisional:
+    !> ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$
+    logical function is_extended_packed(s)
+        character(len=*), intent(in) :: s
+        integer :: i
+        is_extended_packed = .false.
+        if (len_trim(s) /= 7) return
+        if (s(1:1) /= '_') return
+        if (index(BASE62_CHARS, s(2:2)) == 0) return
+        if (.not. is_valid_half_month(s(3:3))) return
+        do i = 4, 7
+            if (index(BASE62_CHARS, s(i:i)) == 0) return
+        end do
+        is_extended_packed = .true.
+    end function is_extended_packed
+
     !> Convert base-62 character to number
     integer function base62_to_num(c)
         character(len=1), intent(in) :: c
@@ -512,7 +528,7 @@ contains
         call clear_error()
         p = trim_str(packed)
 
-        if (len_trim(p) /= 7 .or. p(1:1) /= '_') then
+        if (.not. is_extended_packed(p)) then
             call set_error('Invalid extended packed provisional')
             unpacked = ''
             return
@@ -738,11 +754,26 @@ contains
         character(len=20) :: p
         character(len=1) :: ctype
         character(len=8) :: prov_part
-        integer :: plen
+        character(len=5) :: num_prefix
+        integer :: plen, num, ios
 
         call clear_error()
         p = trim_str(packed)
         plen = len_trim(p)
+        num_prefix = ''
+
+        ! 12-char format: 4-digit number + comet type + 7-char provisional
+        if (plen == 12) then
+            read(p(1:4), '(I4)', iostat=ios) num
+            if (ios /= 0 .or. .not. is_all_digits(p(1:4)) .or. num < 1) then
+                call set_error('Invalid comet number')
+                unpacked = ''
+                return
+            end if
+            write(num_prefix, '(I0)') num
+            p = p(5:12)
+            plen = 8
+        end if
 
         if (plen == 8) then
             ctype = p(1:1)
@@ -754,12 +785,17 @@ contains
                 return
             end if
 
+            ! Extended asteroid-style (cycle >= 620, e.g. P_PO00Ud): the last
+            ! char is base-62 and may be lowercase, so test this first.
+            if (prov_part(1:1) == '_') then
+                unpacked = trim(num_prefix) // ctype // '/' // trim(unpack_extended_provisional(prov_part(1:7)))
             ! Check if asteroid-style (ends with uppercase)
-            if (is_upper(prov_part(7:7))) then
-                unpacked = ctype // '/' // trim(unpack_provisional(prov_part))
+            else if (is_upper(prov_part(7:7))) then
+                unpacked = trim(num_prefix) // ctype // '/' // trim(unpack_provisional(prov_part))
             else
-                unpacked = ctype // '/' // trim(unpack_comet_provisional(prov_part(1:7)))
+                unpacked = trim(num_prefix) // ctype // '/' // trim(unpack_comet_provisional(prov_part(1:7)))
             end if
+            if (MPCDesignationError) unpacked = ''
             return
         end if
 
@@ -1028,7 +1064,17 @@ contains
         ! handled by unpack_provisional which validates its own half-month at pos 4.
         if (dlen == 8 .and. index(COMET_TYPES, first) > 0 .and. index(des(1:dlen), ' ') == 0) then
             ! Check if it's asteroid-style or comet-style provisional
-            if (is_upper(des(8:8))) then
+            if (des(2:2) == '_') then
+                ! Extended asteroid-style provisional (cycle >= 620): P_PO00Ud
+                if (is_extended_packed(des(2:8))) then
+                    info%format = 'packed'
+                    info%dtype = 'comet_full'
+                    info%subtype = 'comet with extended provisional designation (8-char)'
+                else
+                    call set_error('Invalid extended packed provisional')
+                end if
+                return
+            else if (is_upper(des(8:8))) then
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
@@ -1048,6 +1094,17 @@ contains
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
+                return
+            end if
+        end if
+
+        ! Packed numbered comet with provisional (12 chars): 0001PJ82U010, 0001P_PO00Ud
+        if (dlen == 12 .and. is_all_digits(des(1:4)) .and. index(COMET_TYPES, des(5:5)) > 0 .and. &
+            index(des(1:dlen), ' ') == 0) then
+            if (is_valid_half_month(des(9:9)) .or. is_extended_packed(des(6:12))) then
+                info%format = 'packed'
+                info%dtype = 'comet_full'
+                info%subtype = 'comet with provisional designation (12-char)'
                 return
             end if
         end if
@@ -1118,6 +1175,18 @@ contains
             info%dtype = 'comet_full'
             info%subtype = 'comet provisional'
             return
+        end if
+
+        ! Unpacked numbered comet with provisional: "1P/1982 U1", "1P/2025 OZ695"
+        i = index(des(1:dlen), '/')
+        if (i >= 3 .and. dlen >= i + 5) then
+            if (is_all_digits(des(1:i-2)) .and. index(COMET_TYPES, des(i-1:i-1)) > 0 .and. &
+                index(des(1:i), ' ') == 0) then
+                info%format = 'unpacked'
+                info%dtype = 'comet_full'
+                info%subtype = 'numbered comet with provisional'
+                return
+            end if
         end if
 
         ! Old-style provisional: "AYYY HH" or "BYYY HH" (A=1800s, B=1900s)
@@ -1465,10 +1534,24 @@ contains
             return
         end if
 
-        ! Parse order number
+        ! Parse order number (reject non-digits and values that could overflow)
         if (len_trim(u) > 7) then
+            if (.not. is_all_digits(u(8:))) then
+                call set_error('Invalid cycle count')
+                packed = ''
+                return
+            end if
+            if (len_trim(u(8:)) > 9) then
+                call set_error('Cycle count too large')
+                packed = ''
+                return
+            end if
             read(u(8:), '(I10)', iostat=ios) order_num
-            if (ios /= 0) order_num = 0
+            if (ios /= 0) then
+                call set_error('Invalid cycle count')
+                packed = ''
+                return
+            end if
         else
             order_num = 0
         end if
@@ -1476,6 +1559,7 @@ contains
         ! Check if extended format needed
         if (order_num >= 620) then
             packed = pack_extended_provisional_impl(year, half_month, second_letter, order_num)
+            if (MPCDesignationError) packed = ''
             return
         end if
 
@@ -1495,9 +1579,24 @@ contains
         character(len=7) :: packed
         integer :: year_short, letter_pos, base_seq
 
-        year_short = mod(year, 100)
+        packed = ''
+        ! Year code is a single base-62 character: only 2000-2061 encodable
+        if (year < 2000 .or. year > 2061) then
+            call set_error('Extended provisional format requires year 2000-2061')
+            return
+        end if
+        year_short = year - 2000
+        ! Max sequence 62^4-1 = 14776335; guard before arithmetic (int32)
+        if (cycle > 591673) then
+            call set_error('Cycle count too large for extended provisional format')
+            return
+        end if
         letter_pos = letter_to_position(second_letter)
         base_seq = (cycle - 620) * 25 + letter_pos - 1
+        if (base_seq > 14776335) then
+            call set_error('Cycle count too large for extended provisional format')
+            return
+        end if
 
         packed = '_' // num_to_base62(year_short) // half_month // num_to_base62_string(base_seq, 4)
     end function pack_extended_provisional_impl
@@ -1507,7 +1606,7 @@ contains
         character(len=*), intent(in) :: unpacked
         character(len=15) :: packed  ! Longer for 2-letter fragments
         character(len=40) :: u
-        integer :: i, year, order_num, ios, space_pos, abs_year, bce_code, dash_pos, frag_len
+        integer :: i, year, order_num, ios, space_pos, abs_year, bce_code, dash_pos, frag_len, num
         character(len=1) :: ctype, half_month, bce_prefix, fragment, fragment2
         character(len=20) :: prov_part, year_str
         character(len=10) :: prov_packed  ! 10 chars for type + 2-letter fragments
@@ -1663,6 +1762,19 @@ contains
 
         if (MPCDesignationError) then
             packed = ''
+            return
+        end if
+
+        ! Periodic number prefix ("1P/1982 U1"): 12-char packed form
+        if (i > 2) then
+            read(u(1:i-2), '(I10)', iostat=ios) num
+            if (ios /= 0 .or. .not. is_all_digits(u(1:i-2)) .or. len_trim(u(1:i-2)) > 4 .or. &
+                num < 1 .or. num > 9999) then
+                call set_error('Comet number out of range (1-9999)')
+                packed = ''
+                return
+            end if
+            write(packed, '(I4.4,A1,A)') num, ctype, trim(prov_packed)
             return
         end if
 

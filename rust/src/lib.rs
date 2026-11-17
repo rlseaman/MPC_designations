@@ -347,9 +347,29 @@ fn needs_extended_format(cycle: u32) -> bool {
     cycle >= 620
 }
 
+/// Largest sequence number encodable in 4 base-62 digits (62^4 - 1)
+const MAX_EXTENDED_SEQUENCE: u32 = 62 * 62 * 62 * 62 - 1;
+
 fn pack_extended_provisional(year: u32, half_month: char, second_letter: char, cycle: u32) -> Result<String> {
-    let year_short = year % 100;
+    // The year code is a single base-62 character, so only 2000-2061 are encodable.
+    if !(2000..=2061).contains(&year) {
+        return Err(MPCDesignationError::new(format!(
+            "Extended provisional format requires year 2000-2061: {}", year
+        )));
+    }
+    let year_short = year - 2000;
+    // Reject huge cycles before arithmetic to avoid overflow
+    if cycle - 620 > MAX_EXTENDED_SEQUENCE / 25 {
+        return Err(MPCDesignationError::new(format!(
+            "Cycle count too large for extended provisional format: {}", cycle
+        )));
+    }
     let base_sequence = (cycle - 620) * 25 + letter_to_position(second_letter)? - 1;
+    if base_sequence > MAX_EXTENDED_SEQUENCE {
+        return Err(MPCDesignationError::new(format!(
+            "Cycle count too large for extended provisional format: {}", cycle
+        )));
+    }
     let seq_encoded = num_to_base62_string(base_sequence, 4)?;
     Ok(format!("_{}{}{}", num_to_base62(year_short)?, half_month, seq_encoded))
 }
@@ -358,7 +378,7 @@ fn unpack_extended_provisional(packed: &str) -> Result<String> {
     let packed = packed.trim();
     let chars: Vec<char> = packed.chars().collect();
 
-    if chars.len() != 7 || chars[0] != '_' {
+    if regex_captures!(r"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", packed).is_none() {
         return Err(MPCDesignationError::new(format!(
             "Invalid extended packed provisional: {}", packed
         )));
@@ -883,7 +903,10 @@ fn unpack_comet_full(packed: &str) -> Result<String> {
         return Err(MPCDesignationError::new(format!("Invalid comet type: {}", comet_type)));
     }
 
-    let provisional = if is_asteroid_style_packed(&provisional_part) {
+    // Extended asteroid-style provisional (cycle >= 620): P_PO00Ud -> P/2025 OZ695
+    let provisional = if provisional_part.starts_with('_') {
+        unpack_extended_provisional(&provisional_part)?
+    } else if is_asteroid_style_packed(&provisional_part) {
         unpack_provisional(&provisional_part)?
     } else {
         unpack_comet_provisional(&provisional_part)?
@@ -965,7 +988,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed full comet designation (12 chars with spaces)
     if designation.len() == 12 {
-        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (12-char)".to_string();
@@ -975,7 +998,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet designation (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (8-char)".to_string();
@@ -1056,7 +1079,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
     // Check for packed provisional asteroid (7 chars)
     if des.len() == 7 {
         if des.starts_with('_') {
-            if regex_captures!(r"^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$", des).is_some() {
+            if regex_captures!(r"^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", des).is_some() {
                 info.format = "packed".to_string();
                 info.designation_type = "provisional_extended".to_string();
                 info.subtype = "provisional (extended format, cycle >=620)".to_string();

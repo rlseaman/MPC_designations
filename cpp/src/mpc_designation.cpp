@@ -177,6 +177,18 @@ bool MPCDesignation::isValidHalfMonth(char c) {
     return c >= 'A' && c <= 'Y' && c != 'I';
 }
 
+// Structurally valid extended packed provisional:
+// ^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$
+static bool isExtendedPacked(const std::string& s) {
+    if (s.length() != 7 || s[0] != '_') return false;
+    if (!std::isalnum(static_cast<unsigned char>(s[1]))) return false;
+    if (!(s[2] >= 'A' && s[2] <= 'Y' && s[2] != 'I')) return false;
+    for (size_t i = 3; i < 7; i++) {
+        if (!std::isalnum(static_cast<unsigned char>(s[i]))) return false;
+    }
+    return true;
+}
+
 std::string MPCDesignation::getCometTypeName(char type) {
     switch (type) {
         case 'P': return "periodic";
@@ -366,8 +378,15 @@ std::string MPCDesignation::packProvisional(const std::string& unpacked) {
 
     // Check if we need extended format
     if (orderNum >= 620) {
-        int yearDigit = year % 100;
+        // Year code is a single base-62 character: only 2000-2061 encodable
+        if (year < 2000 || year > 2061) {
+            throw MPCDesignationError("Extended provisional format requires year 2000-2061: " + std::to_string(year));
+        }
+        int yearDigit = year - 2000;
         long baseSequence = (orderNum - 620) * 25 + letterToPosition(secondLetter) - 1;
+        if (baseSequence > 14776335L) {  // 62^4 - 1
+            throw MPCDesignationError("Cycle count too large for extended provisional format: " + orderStr);
+        }
         std::string seqEncoded = numToBase62String(baseSequence, 4);
         char buf[16];
         snprintf(buf, sizeof(buf), "_%c%c%s", numToBase62(yearDigit), halfMonth, seqEncoded.c_str());
@@ -402,6 +421,9 @@ std::string MPCDesignation::unpackProvisional(const std::string& packed) {
 
     // Extended format with underscore
     if (p.length() == 7 && p[0] == '_') {
+        if (!isExtendedPacked(p)) {
+            throw MPCDesignationError("Invalid extended packed provisional: " + p);
+        }
         int yearDigit = base62ToNum(p[1]);
         char halfMonth = p[2];
         long baseSequence = base62StringToNum(p.substr(3, 4));
@@ -889,7 +911,10 @@ std::string MPCDesignation::unpackCometFull(const std::string& packed) {
     }
 
     std::string provisional;
-    if (isAsteroidStylePacked(provisionalPart)) {
+    if (!provisionalPart.empty() && provisionalPart[0] == '_') {
+        // Extended asteroid-style provisional (cycle >= 620): P_PO00Ud
+        provisional = unpackProvisional(provisionalPart);
+    } else if (isAsteroidStylePacked(provisionalPart)) {
         provisional = unpackProvisional(provisionalPart);
     } else {
         provisional = unpackCometProvisional(provisionalPart);
@@ -919,7 +944,7 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     // Check for packed 12-char comet before trimming
     // Half-month (index 8) is a calendar code A-Y excluding I (object-type independent)
     if (origLen == 12 && isCometType(designation[4]) &&
-        isValidHalfMonth(designation[8])) {
+        (isValidHalfMonth(designation[8]) || isExtendedPacked(designation.substr(5)))) {
         info.format = Format::Packed;
         info.type = Type::CometFull;
         info.subtype = "comet with provisional designation (12-char)";
@@ -934,6 +959,15 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
         info.format = Format::Packed;
         info.type = Type::CometFull;
         info.subtype = "comet with provisional designation (8-char)";
+        return info;
+    }
+
+    // Check for packed 8-char comet with extended provisional: P_PO00Ud
+    if (origLen == 8 && isCometType(designation[0]) &&
+        isExtendedPacked(designation.substr(1))) {
+        info.format = Format::Packed;
+        info.type = Type::CometFull;
+        info.subtype = "comet with extended provisional designation (8-char)";
         return info;
     }
 
@@ -1052,6 +1086,9 @@ FormatInfo MPCDesignation::detectFormat(const std::string& designation) {
     // Check for packed provisional (7 chars)
     if (len == 7) {
         if (des[0] == '_') {
+            if (!isExtendedPacked(des)) {
+                throw MPCDesignationError("Invalid extended packed provisional: " + des);
+            }
             info.format = Format::Packed;
             info.type = Type::ProvisionalExtended;
             info.subtype = "provisional (extended format, cycle >=620)";

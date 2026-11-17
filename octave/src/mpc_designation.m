@@ -403,9 +403,16 @@ end
 % =============================================================================
 
 function s = pack_extended_provisional(year, half_month, second_letter, cycle)
-  year_short = mod(year, 100);
+  % The year code is a single base-62 character, so only 2000-2061 fit.
+  if year < 2000 || year > 2061
+    error('MPCDesignationError:OutOfRange', 'Extended provisional format requires year 2000-2061: %d', year);
+  end
+  year_short = year - 2000;
   letter_pos = letter_to_position(second_letter);
   base_sequence = (cycle - 620) * 25 + letter_pos - 1;
+  if base_sequence >= 62^4
+    error('MPCDesignationError:OutOfRange', 'Cycle count too large for extended provisional format: %.0f', cycle);
+  end
   seq_encoded = num_to_base62_string(base_sequence, 4);
   year_char = num_to_base62(year_short);
   s = sprintf('_%s%s%s', year_char, half_month, seq_encoded);
@@ -413,8 +420,8 @@ end
 
 function s = mpc_unpack_extended_provisional(packed)
   packed = strtrim(packed);
-  if length(packed) ~= 7 || packed(1) ~= '_'
-    error('MPCDesignationError:InvalidFormat', 'Invalid extended packed provisional');
+  if isempty(regexp(packed, '^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$', 'once'))
+    error('MPCDesignationError:InvalidFormat', 'Invalid extended packed provisional: %s', packed);
   end
 
   year_digit = packed(2);
@@ -732,7 +739,10 @@ function s = mpc_unpack_comet_full(packed)
       error('MPCDesignationError:InvalidType', 'Invalid comet type: %s', comet_type);
     end
 
-    if is_asteroid_style_packed(provisional_part)
+    % Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud
+    if provisional_part(1) == '_'
+      provisional = mpc_unpack_extended_provisional(provisional_part);
+    elseif is_asteroid_style_packed(provisional_part)
       provisional = mpc_unpack_provisional(provisional_part);
     else
       provisional = mpc_unpack_comet_provisional(provisional_part);
@@ -768,7 +778,10 @@ function s = mpc_unpack_comet_full(packed)
       error('MPCDesignationError:InvalidType', 'Invalid comet type: %s', comet_type);
     end
 
-    if is_asteroid_style_packed(provisional_part)
+    % Extended asteroid-style provisional (cycle >= 620), e.g. P_PO00Ud
+    if provisional_part(1) == '_'
+      provisional = mpc_unpack_extended_provisional(provisional_part);
+    elseif is_asteroid_style_packed(provisional_part)
       provisional = mpc_unpack_provisional(provisional_part);
     else
       provisional = mpc_unpack_comet_provisional(provisional_part);
@@ -875,7 +888,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed full comet (12 chars with spaces)
   if length(designation) == 12
-    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI][IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (12-char)';
@@ -885,7 +898,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (8-char)';
@@ -995,7 +1008,7 @@ function info = mpc_detect_format(designation)
   % Check for packed provisional (7 chars)
   if length(des) == 7
     if des(1) == '_'
-      if ~isempty(regexp(des, '^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$', 'once'))
+      if ~isempty(regexp(des, '^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$', 'once'))
         info.format = 'packed';
         info.type = 'provisional_extended';
         info.subtype = 'provisional (extended format, cycle >=620)';

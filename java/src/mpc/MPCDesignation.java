@@ -543,18 +543,27 @@ public class MPCDesignation {
 
     private static String packExtendedProvisional(int year, char halfMonth, char secondLetter, int cycle)
             throws MPCDesignationException {
-        int yearShort = year % 100;
+        // The year code is a single base-62 character, so only 2000-2061 are encodable.
+        if (year < 2000 || year > 2061) {
+            throw new MPCDesignationException(
+                "Extended provisional format requires year 2000-2061: " + year);
+        }
+        int yearShort = year - 2000;
         int letterPos = letterToPosition(secondLetter);
-        int baseSequence = (cycle - 620) * 25 + letterPos - 1;
-        String seqEncoded = numToBase62String(baseSequence, 4);
+        long baseSequence = ((long) cycle - 620) * 25 + letterPos - 1;
+        if (baseSequence >= 62L * 62 * 62 * 62) {
+            throw new MPCDesignationException(
+                "Cycle count too large for extended provisional format: " + cycle);
+        }
+        String seqEncoded = numToBase62String((int) baseSequence, 4);
         char yearChar = numToBase62(yearShort);
         return "_" + yearChar + halfMonth + seqEncoded;
     }
 
     public static String unpackExtendedProvisional(String packed) throws MPCDesignationException {
         String p = packed.trim();
-        if (p.length() != 7 || p.charAt(0) != '_') {
-            throw new MPCDesignationException("Invalid extended packed provisional");
+        if (!Pattern.matches("^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", p)) {
+            throw new MPCDesignationException("Invalid extended packed provisional: " + p);
         }
 
         char yearDigit = p.charAt(1);
@@ -915,7 +924,10 @@ public class MPCDesignation {
             }
 
             String provisional;
-            if (isAsteroidStylePacked(provisionalPart)) {
+            if (provisionalPart.charAt(0) == '_') {
+                // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+                provisional = unpackExtendedProvisional(provisionalPart);
+            } else if (isAsteroidStylePacked(provisionalPart)) {
                 provisional = unpackProvisional(provisionalPart);
             } else {
                 provisional = unpackCometProvisional(provisionalPart);
@@ -952,7 +964,10 @@ public class MPCDesignation {
             }
 
             String provisional;
-            if (isAsteroidStylePacked(provisionalPart)) {
+            if (provisionalPart.charAt(0) == '_') {
+                // Extended asteroid-style provisional (cycle >= 620), e.g. P/2025 OZ695 -> P_PO00Ud
+                provisional = unpackExtendedProvisional(provisionalPart);
+            } else if (isAsteroidStylePacked(provisionalPart)) {
                 provisional = unpackProvisional(provisionalPart);
             } else {
                 provisional = unpackCometProvisional(provisionalPart);
@@ -1055,7 +1070,7 @@ public class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length() == 12) {
-            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
+            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (12-char)";
@@ -1065,7 +1080,7 @@ public class MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (8-char)";
@@ -1177,7 +1192,7 @@ public class MPCDesignation {
         if (des.length() == 7) {
             // Extended format with underscore
             if (des.charAt(0) == '_') {
-                if (Pattern.matches("^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$", des)) {
+                if (Pattern.matches("^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$", des)) {
                     info.format = FormatType.PACKED;
                     info.type = "provisional_extended";
                     info.subtype = "provisional (extended format, cycle >=620)";

@@ -332,6 +332,24 @@ sub unpack_provisional {
     }
 }
 
+# Unpack an extended provisional designation (underscore format, cycle >= 620):
+# _YHbbbb -> "2024 AA620"
+sub unpack_extended_provisional {
+    my ($packed) = @_;
+    $packed =~ s/^\s+|\s+$//g;
+    die "Invalid extended packed provisional: $packed\n"
+        unless $packed =~ /^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/;
+
+    my $year_char = substr($packed, 1, 1);
+    my $half_month = substr($packed, 2, 1);
+    my $base_sequence = base62_string_to_num(substr($packed, 3, 4));
+    my $cycle = 620 + int($base_sequence / 25);
+    my $second_letter = position_to_letter(($base_sequence % 25) + 1);
+    # Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
+    my $year = 2000 + base62_to_num($year_char);
+    return "$year $half_month$second_letter$cycle";
+}
+
 sub pack_provisional {
     my ($unpacked) = @_;
     $unpacked =~ s/^\s+|\s+$//g;
@@ -388,8 +406,14 @@ sub pack_provisional {
 
         # Extended format for cycle >= 620
         if ($order_num >= 620) {
-            my $year_char = num_to_base62($year % 100);
+            # The year code is a single base-62 character, so only years
+            # 2000-2061 are encodable.
+            die "Extended provisional format requires year 2000-2061: $year\n"
+                if $year_int < 2000 || $year_int > 2061;
+            my $year_char = num_to_base62($year_int - 2000);
             my $base_sequence = ($order_num - 620) * 25 + letter_to_position($second_letter) - 1;
+            die "Cycle count too large for extended provisional format: $order_num\n"
+                if $base_sequence >= 62**4;
             my $seq_encoded = num_to_base62_string($base_sequence, 4);
             return "_${year_char}${half_month}${seq_encoded}";
         }
@@ -669,8 +693,12 @@ sub unpack_comet_full {
 
     die "Invalid comet type: $comet_type\n" unless exists $COMET_TYPES{$comet_type};
 
+    # An extended asteroid-style provisional (cycle >= 620) such as
+    # P/2025 OZ695 -> P_PO00Ud carries the underscore form.
     my $provisional;
-    if (is_asteroid_style_packed($provisional_part)) {
+    if (substr($provisional_part, 0, 1) eq '_') {
+        $provisional = unpack_extended_provisional($provisional_part);
+    } elsif (is_asteroid_style_packed($provisional_part)) {
         $provisional = unpack_provisional($provisional_part);
     } else {
         $provisional = unpack_comet_provisional($provisional_part);
@@ -737,14 +765,14 @@ sub detect_format {
 
     # Check for packed full comet (12 chars)
     if (length($designation) == 12) {
-        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
+        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (12-char)' };
         }
     }
 
     # Check for packed comet (8 chars)
     if (length($designation) == 8) {
-        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z])$/) {
+        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (8-char)' };
         }
         if ($designation =~ /^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
@@ -805,7 +833,7 @@ sub detect_format {
     if (length($des) == 7) {
         if (substr($des, 0, 1) eq '_') {
             # Year code: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
-            if ($des =~ /^_[0-9A-Za-z][A-Z][0-9A-Za-z]{4}$/) {
+            if ($des =~ /^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$/) {
                 return { format => 'packed', type => 'provisional_extended', subtype => 'provisional extended' };
             }
         }
@@ -890,20 +918,7 @@ sub convert {
         } elsif ($info->{type} =~ /^(provisional|survey)$/) {
             $result = unpack_provisional($designation);
         } elsif ($info->{type} eq 'provisional_extended') {
-            # Extended provisional unpacking
-            my $des = $designation;
-            $des =~ s/^\s+|\s+$//g;
-            my $year_char = substr($des, 1, 1);
-            my $half_month = substr($des, 2, 1);
-            my $seq_encoded = substr($des, 3, 4);
-            my $base_sequence = base62_string_to_num($seq_encoded);
-            my $cycle = 620 + int($base_sequence / 25);
-            my $letter_pos = ($base_sequence % 25) + 1;
-            my $second_letter = position_to_letter($letter_pos);
-            # Year code is base-62: digit (0-9 for 2000-2009) or letter (A=10 for 2010, etc.)
-            # Extended format is for years 2000-2099, year code is year % 100
-            my $year = 2000 + base62_to_num($year_char);
-            $result = "$year $half_month$second_letter$cycle";
+            $result = unpack_extended_provisional($designation);
         } elsif ($info->{type} eq 'comet_numbered') {
             $result = unpack_comet_numbered($designation);
         } elsif ($info->{type} eq 'comet_provisional') {

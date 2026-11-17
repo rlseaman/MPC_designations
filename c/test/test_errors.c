@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
         }
 
         /* Run the test */
-        char output[MPC_MAX_PACKED];
+        char output[MPC_MAX_UNPACKED];  /* convert may unpack */
         int err = mpc_convert_simple(input, output, sizeof(output));
 
         int test_passed = 0;
