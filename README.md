@@ -81,7 +81,7 @@ the 124-case shared error suite (with documented, language-inherent skips — se
 code; the 1.1.2 changes were verified on a 38,122-pair subset containing every
 comet and extended-format pair, in both directions.
 
-**Roundtrip note:** 2,625 old-style designations (e.g., `A873 OA`) normalize to modern format (`1873 OA`) on unpack. This is correct behavior—the packed representation is identical either way.
+**Roundtrip note:** the corpus includes 2,625 pre-1925 designations in A-prefix form (e.g., `A873 OA` ↔ `I73O00A`). Per the MPC, the A-prefix form is the primary designation for these objects, so unpacking produces it and both roundtrips (`unpack(pack(x))` and `pack(unpack(y))`) are exact.
 
 ## Quick Start
 
@@ -498,7 +498,7 @@ MPC_designations/
 
 ## Testing
 
-Each implementation includes tests against 2+ million known-good conversions and 94 error handling tests.
+Each implementation includes tests against ~3 million known-good conversions (2,110,813 provisional + 899,365 numbered, both directions) and 124 error-handling tests.
 
 ```bash
 # Run all tests for all languages

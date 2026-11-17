@@ -7,7 +7,7 @@ implementations (Python, TCL, C, Go, Java, Rust), and 2M+ test cases.
 ## Sources
 
 1. **MPC Official**: https://www.minorplanetcenter.net/iau/info/PackedDes.html
-2. **Repository test data**: 2,021,090 provisional designation pairs + 114 error cases
+2. **Repository test data**: 2,110,813 provisional + 899,365 numbered designation pairs + 124 error cases
 3. **Language implementations**: Python, TCL, C, Go, Java, Rust (all produce identical results)
 4. **MPC Help Desk**: Direct clarifications received (see Part 11)
 
@@ -179,7 +179,7 @@ For discoveries beyond cycle 619, an extended 7-character format is used.
 | Position | Field | Values | Notes |
 |----------|-------|--------|-------|
 | 1 | Marker | _ | Underscore indicates extended |
-| 2 | Year code | 0-9,A-z | base62(year % 100) |
+| 2 | Year code | 0-9,A-Z,a-z | base62(year − 2000); years 2000–2061 only |
 | 3 | Half-month | A-Y (not I) | Same as standard |
 | 4-7 | Sequence | 0000-zzzz | 4-char base-62 |
 
@@ -196,6 +196,17 @@ Where letter_position: A=0, B=1, ..., Z=24 (skipping I).
 | 2015 BB620 | _FB0001 | seq=(620-620)×25+1=1 |
 | 2015 BP620 | _FB000E | seq=(620-620)×25+14=14 (E in base62) |
 | 2024 AB631 | _OA004S | Year 24→O, A=half-month, seq=(631-620)×25+1=276 |
+
+**Limits** (enforced by all implementations since 1.1.2):
+- Year must be 2000–2061 (one base-62 character). Pre-2000 years with cycle ≥ 620
+  are unencodable and rejected — `1925 AA620` must not silently become 2025.
+- Sequence must be ≤ 62⁴−1 = 14,776,335, so the largest designation is
+  `2000 AL591673` → `_0Azzzz`. Larger values are rejected, not wrapped.
+- Packed input must match `^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$`.
+
+**Comets**: an asteroid-style comet provisional with cycle ≥ 620 uses the same
+form after the type letter — `P/2025 OZ695` → `P_PO00Ud` (first seen in MPC data
+in 2025); with a periodic number, `1P/2025 OZ695` → `0001P_PO00Ud`.
 
 ### 2.6 Old-Style Provisional Designations
 
@@ -529,8 +540,8 @@ versions. The test data focuses on provisional satellites.
 
 ### 6.1 Cross-Language Consistency
 
-All 6 implementations (Python, TCL, C, Go, Java, Rust) produce **identical results**
-for all 2,021,090 test cases.
+All 25 implementations produce **identical results** for all 2,110,813
+provisional and 899,365 numbered test pairs, in both directions.
 
 ### 6.2 Known Limitations
 
@@ -771,7 +782,7 @@ This reference covers all known MPC designation formats:
 - **Natural satellites**: Provisional format
 
 All implementations in this repository handle these formats identically,
-validated by 2,021,090+ test cases with zero discrepancies.
+validated by ~3 million test pairs with zero discrepancies.
 
 **✓ Clarified by MPC Help Desk** (see Part 11):
 1. Old-style vs. A-prefix designation relationship - ✓ RESOLVED
@@ -787,4 +798,4 @@ validated by 2,021,090+ test cases with zero discrepancies.
 2. [MPC Old-Style Designations](https://www.minorplanetcenter.net/iau/info/DesDoc.html)
 3. [MPC Provisional Designation Definition](https://www.minorplanetcenter.net/mpcops/documentation/provisional-designation-definition/)
 4. [PDS Small Bodies Node - Target Names](https://pds-smallbodies.astro.umd.edu/howto/sbn_target_names.shtml)
-5. Repository test data: 2,021,090 designation pairs + 114 error cases
+5. Repository test data: 2,110,813 provisional + 899,365 numbered designation pairs + 124 error cases

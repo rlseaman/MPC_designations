@@ -14,8 +14,15 @@ When adding helper functions to a language, you MUST verify ALL of these changes
 4. **Pre-1925 A-prefix unpacking**: `J08C00J` → `A908 CJ` (NOT `1908 CJ`)
 5. **Century code validation**: Asteroids require I-L (1800-2199), comets allow A-L (1000-2199)
 6. **Helper functions**: All 6 functions with 77 test cases
+7. **Extended provisional limits** (1.1.2): year 2000–2061 (`base62(year-2000)`),
+   sequence ≤ 62⁴−1, strict packed pattern `^_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4}$`
+8. **Comet extended provisionals** (1.1.2): `P/2025 OZ695` ↔ `P_PO00Ud`,
+   `1P/2025 OZ695` ↔ `0001P_PO00Ud`
+9. **Numbered comet + provisional (12-char)**: `1P/1982 U1` ↔ `0001PJ82U010`
 
 Run ALL tests before marking complete: `make test-all` (error, helper, csv, roundtrip)
+and the full corpus in both directions (`prov_unpack_to_pack` and `numbered_pack`;
+see `CLAUDE.md`).
 
 ## Summary of Changes
 
@@ -124,6 +131,9 @@ The master test file was updated by merging:
 - `comet_names.csv` (4,295 entries)
 
 **Final merged file**: 2,022,404 unique entries
+
+**2026-11-17 refresh**: 2,110,813 pairs (MPC export unioned with the above), plus a
+new `numbered_pack.csv.gz` (899,365 pairs). See `test-data/README.md`.
 
 **8 entries in primary but not secondary**:
 - 1977 UB, 1999 RE70, 2000 EC98, 2003 BM80, 2005 QN173, 2008 GO98, C/2002 VQ94, C/2012 KA51

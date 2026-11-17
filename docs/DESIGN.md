@@ -75,7 +75,7 @@ test corpus.
 
 The authoritative definition of correct behavior lives in
 `test-data/prov_unpack_to_pack.csv` (the 2M-entry conversion corpus) and
-`test-data/error_test_cases.csv` (the 94 error cases). Per-language tests run
+`test-data/error_test_cases.csv` (the 124 error cases). Per-language tests run
 the corpus through each implementation and diff the output. A new
 implementation is considered complete when its output matches the corpus
 exactly and its error cases return errors rather than nonsense.

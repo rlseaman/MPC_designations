@@ -37,7 +37,7 @@ make test-roundtrip CSV=../test-data/prov_unpack_to_pack.csv  # Roundtrip verifi
 
 ## Performance
 
-Tested with 2,022,404 entries:
+Tested with 2,022,404 entries (1.0 corpus; timings not re-measured on the 1.1.2 corpus):
 
 | Operation | Time | Rate |
 |-----------|------|------|

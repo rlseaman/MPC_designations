@@ -88,9 +88,10 @@ Code Quality Assurance
 ----------------------
 Despite the gforth bug, the MPC designation converter code is correct:
 
-- All 2,022,404 CSV test cases pass with 0 failures when the test completes
+- The full 1.1.2 corpus (2,110,813 provisional + 899,365 numbered pairs, both
+  directions) passes with 0 failures; run gforth with stdin from /dev/null
 - 77/77 helper function tests pass
-- 86/86 error handling tests pass
+- Shared error suite: 95 pass / 29 documented skips of 124
 - The code has been thoroughly tested for:
   - Numbered asteroids (1 to 620000+)
   - Provisional designations (standard, extended, old-style A-prefix)

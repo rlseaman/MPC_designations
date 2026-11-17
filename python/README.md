@@ -30,20 +30,22 @@ Or simply copy `src/mpc_designation/` to your project.
 
 ## CLI Usage
 
+Installing the package provides an `mpc-designation` command:
+
 ```bash
 # Single conversion
-python -m mpc_designation '1995 XA'
+mpc-designation '1995 XA'
 # Output: J95X00A
 
 # Multiple designations
-python -m mpc_designation 1 '1995 XA' 'C/1995 O1'
+mpc-designation 1 '1995 XA' 'C/1995 O1'
 # Output:
 # 1 -> 00001
 # 1995 XA -> J95X00A
 # C/1995 O1 -> CJ95O010
 
 # Verbose mode
-python -m mpc_designation -v '1995 XA'
+mpc-designation -v '1995 XA'
 # Output:
 #   Input:    1995 XA
 #   Detected: unpacked format, provisional

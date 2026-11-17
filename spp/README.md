@@ -318,10 +318,10 @@ CSV benchmark (2M+ conversions, path hardcoded relative to build/):
 
 - **Unit tests**: 32 passed, 0 failed
 - **Helper tests**: 77 passed, 0 failed
-- **Error tests**: 92 passed, 2 failed
+- **Error tests** (1.1.2, 124 cases): 122 passed, 2 failed
   - The 2 failures are null byte tests (documented limitation of EOS-terminated strings)
-- **CSV benchmark**: 2,022,404 passed, 0 failed
-  - Execution time: ~1.0 second for 2M+ conversions
+- **CSV corpus** (1.1.2): 2,110,813 provisional and 899,365 numbered pairs, both directions, 0 failed
+  - Execution time: ~1–3 seconds per file
 
 All conversion tests pass, including:
 - Standard provisional designations

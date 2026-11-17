@@ -5,16 +5,16 @@ respective package registries. This document is descriptive and
 work-queue-shaped, not prescriptive — priorities should be revisited each
 time you pick up this chore.
 
-Current tracking version across packaging: **1.0.1**. Any fresh manifest work
+Current tracking version across packaging: **1.1.2**. Any fresh manifest work
 should target this version to stay in sync.
 
 ## What's already published
 
 | Ecosystem | Package identifier | Install command | Notes |
 |---|---|---|---|
-| PyPI | `mpc-designation` | `pip install mpc-designation` | v1.0.1 live as of 2026-04-17 |
-| conda-forge | `mpc-designation` | `conda install -c conda-forge mpc-designation` | PR [#33021](https://github.com/conda-forge/staged-recipes/pull/33021) in review; auto-bumps via `regro-cf-autotick-bot` after merge |
-| Go module proxy | `github.com/rlseaman/mpc_designations/go` | `go get github.com/rlseaman/mpc_designations/go@v1.0.1` | Path-prefixed tags `go/v1.0.0`, `go/v1.0.1` pushed; proxy indexes lazily |
+| PyPI | `mpc-designation` | `pip install mpc-designation` | v1.1.2 live as of 2026-11-17 (1.0.1, 1.1.0, 1.1.2 published; 1.1.1 skipped — PyPI never carried it) |
+| conda-forge | `mpc-designation` | `conda install -c conda-forge mpc-designation` | PR [#33021](https://github.com/conda-forge/staged-recipes/pull/33021) open since 2026-04-17, recipe at 1.1.0, CI green, no reviewer assigned as of 2026-11-17 (likely needs a `@conda-forge/help-python` ping); auto-bumps via `regro-cf-autotick-bot` after merge |
+| Go module proxy | `github.com/rlseaman/mpc_designations/go` | `go get github.com/rlseaman/mpc_designations/go@v1.1.2` | Path-prefixed tags `go/v1.0.0` … `go/v1.1.2` pushed; proxy indexes lazily |
 
 ## Priority order
 
@@ -84,7 +84,7 @@ Then update `rust/Makefile` targets to use `--features dev` where needed.
 
 **Other smaller fixes before publish:**
 
-- `version = "1.0.0"` → `"1.0.1"` to match PyPI.
+- Version is kept in sync with `VERSION` at each release (1.1.2 as of this writing).
 - `authors = ["MPC Designations Contributors"]` → `["Rob Seaman <rseaman@arizona.edu>"]`.
 - Missing `readme = "README.md"` — without it, crates.io won't render the README.
 - Missing `homepage` — add the GitHub repo URL.
@@ -109,7 +109,7 @@ name on crates.io.
 **Manifest:** `js/package.json` exists.
 
 **Likely fixes:** verify `name`, `version`, `main`, `bin`, `repository`,
-`author`, `license`, `keywords` are all set. Version should be `1.0.1`.
+`author`, `license`, `keywords` are all set. Version tracks `VERSION`.
 Author should match arizona.edu email.
 
 **Publish workflow:**
@@ -154,7 +154,7 @@ See "What's already published" above. Future releases need two tag pushes:
 # julia/Project.toml
 name = "MPCDesignations"       # PascalCase per Julia convention
 uuid = "<generate-with-Pkg.generate>"
-version = "1.0.1"
+version = "1.1.2"
 authors = ["Rob Seaman <rseaman@arizona.edu>"]
 
 [compat]
