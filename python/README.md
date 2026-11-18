@@ -19,6 +19,17 @@ result = convert_simple('J95X00A')  # Returns '1995 XA'
 pip install mpc-designation
 ```
 
+### Arrays: mpc-designation-fast
+
+For NumPy arrays, the companion package
+[`mpc-designation-fast`](../python-fast/) converts whole arrays in C
+(`convert_array`, `pack_array`, `unpack_array`), 70–90× faster with results
+identical to this package:
+
+```bash
+pip install mpc-designation-fast
+```
+
 ### From Source
 
 ```bash
@@ -321,7 +332,7 @@ convert_simple('1700 AA')    # Error - year before 1800 for asteroids
 ## Testing
 
 ```bash
-# Run error handling tests (134 test cases)
+# Run error handling tests (140 test cases)
 python test/test_errors.py ../test-data/error_test_cases.csv
 
 # Run fragment handling tests

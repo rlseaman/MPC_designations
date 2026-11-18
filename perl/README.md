@@ -158,7 +158,7 @@ designations_equal('73P-A', '73P-B');      # 0 (false)
 ## Testing
 
 ```bash
-# Run error handling tests (134 cases)
+# Run error handling tests (140 cases)
 perl test/test_errors.pl ../test-data/error_test_cases.csv
 
 # Run helper function tests (77 cases)

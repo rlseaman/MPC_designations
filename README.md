@@ -8,7 +8,9 @@ Convert between packed and unpacked Minor Planet Center (MPC) designations for a
 
 Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
-Python users: `pip install mpc-designation`. See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for every other language.
+Python users: `pip install mpc-designation`; for NumPy arrays (millions of
+designations) add `pip install mpc-designation-fast`, a C-backed companion
+that is 70–90× faster with identical results ([`python-fast/`](python-fast/)). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for every other language.
 
 ## Implementations
 
@@ -45,7 +47,7 @@ All production implementations pass the same test suite and produce identical re
 ## Test Results
 
 All 25 implementations pass the full conversion corpus in both directions, plus
-the 134-case shared error suite (with documented, language-inherent skips — see
+the 140-case shared error suite (with documented, language-inherent skips — see
 `docs/VALIDATION_GAPS.md`). Corpus refreshed from the MPC catalog on
 2026-11-17 (see `test-data/README.md`).
 
@@ -146,6 +148,10 @@ s" 1995 XA" convert-simple type  \ Prints: J95X00A
 ```python
 from mpc_designation import convert_simple
 convert_simple('1995 XA')  # Returns 'J95X00A'
+
+# Arrays (pip install mpc-designation-fast)
+from mpc_designation_fast import pack_array
+pack_array(['1995 XA', '1P', 'C/1995 O1'])  # array(['J95X00A', '0001P', 'CJ95O010'])
 ```
 
 ### R
@@ -498,7 +504,7 @@ MPC_designations/
 
 ## Testing
 
-Each implementation includes tests against ~3 million known-good conversions (2,110,817 provisional + 899,365 numbered, both directions) and 134 error-handling tests.
+Each implementation includes tests against ~3 million known-good conversions (2,110,817 provisional + 899,365 numbered, both directions) and 140 error-handling tests.
 
 ```bash
 # Run all tests for all languages

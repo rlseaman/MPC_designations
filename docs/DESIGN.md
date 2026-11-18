@@ -2,7 +2,7 @@
 
 This repository is unusual. It contains the **same library, implemented 25
 times**, in 25 different programming languages, each passing the same
-~3.0-million-pair conversion corpus and the same 134-case error suite. That is
+~3.0-million-pair conversion corpus and the same 140-case error suite. That is
 deliberate. This document explains why.
 
 ## This is a corpus, not a product
@@ -75,7 +75,7 @@ test corpus.
 
 The authoritative definition of correct behavior lives in
 `test-data/prov_unpack_to_pack.csv` (the 2M-entry conversion corpus) and
-`test-data/error_test_cases.csv` (the 134 error cases). Per-language tests run
+`test-data/error_test_cases.csv` (the 140 error cases). Per-language tests run
 the corpus through each implementation and diff the output. A new
 implementation is considered complete when its output matches the corpus
 exactly and its error cases return errors rather than nonsense.

@@ -198,7 +198,7 @@ Thrown for invalid designations. Inherits from `std::runtime_error`.
 make test-all
 
 # Run specific tests
-make test-errors    # Error handling tests (134 cases)
+make test-errors    # Error handling tests (140 cases)
 make test-helpers   # Helper function tests (77 cases)
 make test-csv       # Conversion tests (2M+ entries)
 make test-roundtrip # Roundtrip verification

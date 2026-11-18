@@ -76,7 +76,7 @@ help:
 	@echo "  build          Compile all executables"
 	@echo "  clean          Remove all build artifacts"
 	@echo "  test           Run conversion tests"
-	@echo "  test-errors    Run error handling tests (134 cases)"
+	@echo "  test-errors    Run error handling tests (140 cases)"
 	@echo "  test-helpers   Run helper function tests (77 cases)"
 	@echo "  test-csv       Run CSV conversion tests (2M+ entries)"
 	@echo "  test-roundtrip Run round-trip tests"

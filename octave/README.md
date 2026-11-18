@@ -154,7 +154,7 @@ end
 ## Testing
 
 ```bash
-# Error handling tests (134 cases)
+# Error handling tests (140 cases)
 make test-errors
 
 # Helper function tests (77 cases)

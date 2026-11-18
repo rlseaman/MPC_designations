@@ -217,7 +217,7 @@ Fragment letters include all A-Z (including I, per MPC data).
 # Build all
 make
 
-# Run error handling tests (134 test cases)
+# Run error handling tests (140 test cases)
 make test-errors
 
 # Run helper function tests (77 test cases)

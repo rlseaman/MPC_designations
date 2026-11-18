@@ -23,13 +23,13 @@ check and removing the skip.
 
 | Implementation | error suite |
 |---|---|
-| Python, Tcl | 134 / 134, **0 skips** — the validation reference |
+| Python, Tcl | 140 / 140, **0 skips** — the validation reference |
 | C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (R skips the 2 null-byte cases, which R strings cannot hold; SPP reports them as failures; C passes them via its length-aware API since 1.1.4) |
-| **nim** | 124 pass / **10 skip** |
-| **haskell** | 117 pass / **17 skip** |
-| **bash** | 114 pass / **20 skip** |
-| **awk** | 112 pass / **22 skip** |
-| **forth** | 106 pass / **28 skip** (most permissive; no error channel) |
+| **nim** | 130 pass / **10 skip** |
+| **haskell** | 123 pass / **17 skip** |
+| **bash** | 120 pass / **20 skip** |
+| **awk** | 118 pass / **22 skip** |
+| **forth** | 112 pass / **28 skip** (most permissive; no error channel) |
 
 ## Gaps by theme
 
@@ -81,6 +81,41 @@ length-aware `_n` API). Likely permanent skips.
 ### 6. Injection / unicode lookalikes
 - **forth**: `sql_injection` (`1; DROP TABLE--`) parsed rather than rejected.
 - **haskell**: `mixed_encoding` (Cyrillic `А`), `nbsp` (non-breaking space).
+
+### 7. Malformed input beyond the shared suite (all languages; 1.1.6)
+Found in 1.1.5 by differential fuzzing: 11,131 malformed inputs (3 samples of
+each of 4,348 input shapes, from character substitutions, case flips,
+insertions, deletions and padding of corpus designations), labelled with the
+Python reference's accept/reject verdict and run through every harness.
+After the 1.1.5 fixes (Python/all: digit comet fragments; C: detection ported
+from the reference), these remained (counts are of sampled shapes, measured
+before 1.1.5's fragment fix, so a few rows of each count are now fixed):
+
+| Agree with reference | Small differences | Large differences |
+|---|---|---|
+| Python, C, Java, JS, TS, Perl, PHP, Ruby, Rust | Julia, Kotlin, Octave, R, Swift (2 each, `C/1984 NB1`-shape), C# (10), Go (24) | C++ (~74), Tcl (108, leading/trailing spaces around `_` extended forms), Fortran (~560), Haskell (~930), Nim (~1,650), Bash/AWK (~2,200), Forth (~3,100) |
+
+- **Leading/trailing spaces**: `docs/ERROR_CHECKING.md` says all
+  implementations trim them; awk, bash, forth, nim, fortran, haskell and Tcl
+  (extended forms) reject padded input instead.
+- **Over-acceptance**: trailing junk after provisionals (`2024 AB 2`),
+  loosely parsed digits in surveys/satellites/comet years (`PLS2Z40`,
+  `CK0MS110`), malformed cycle characters.
+- **nim, awk, bash, forth**: no detection branch for the bare 7-char packed
+  comet provisional (`J95A010` → `1995 A1`, `K06S45a` → `2006 S45-A` are
+  rejected; forth returns them unchanged). A missing feature, not just
+  validation.
+- **Reference quirks to decide on** (change Python first, then all 25):
+  `pack()`/`unpack()` pass already-converted input through after detection
+  only, so `pack('00000')` returns `00000` and `unpack()` echoes any digit
+  string; a numbered ancient comet drops its number (`12P/240 V1` →
+  `P240V010`); padded 8/9/12-char packed comets are rejected
+  (`' CJ95O010'`) because those forms are recognized before trimming.
+
+Plan: add a shared malformed-input suite (a few thousand rows generated from
+the reference's verdicts) to `test-data/`, then bring each implementation to
+zero differences. Tooling: the C/Python differential and the fuzz generator
+used here are in `python-fast/tests/test_fast.py` (`mutations()`).
 
 ## Suggested priority
 

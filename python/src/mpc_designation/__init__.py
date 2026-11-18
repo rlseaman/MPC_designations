@@ -133,6 +133,6 @@ def _get_version():
         return version("mpc-designation")
     except Exception:
         # Fallback for development or if package not installed
-        return "1.1.4"
+        return "1.1.5"
 
 __version__ = _get_version()

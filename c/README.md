@@ -177,6 +177,13 @@ int mpc_convert_simple_n(const char *input, size_t input_len, char *output, size
 int mpc_convert_n(const char *input, size_t input_len, char *output, size_t output_size, mpc_info_t *info);
 int mpc_detect_format_n(const char *input, size_t input_len, mpc_info_t *info);
 
+// Batch conversion over fixed-width slots, e.g. a NumPy 'S' buffer (since 1.1.5).
+// mode: MPC_BATCH_CONVERT, MPC_BATCH_PACK or MPC_BATCH_UNPACK. Each result is
+// NUL-padded into an out_width slot; status[i] is MPC_OK or the error code.
+// Returns the number of failures. Used by mpc-designation-fast.
+size_t mpc_batch(int mode, const char *input, size_t in_width,
+                 char *output, size_t out_width, signed char *status, size_t count);
+
 // Format conversion (minimal <-> 12-char MPC report format)
 int mpc_to_report_format(const char *minimal, char *report, size_t outlen);
 int mpc_from_report_format(const char *report, char *minimal, size_t outlen);
@@ -231,7 +238,7 @@ make clean
 # Conversion tests (2M+ test cases)
 make test
 
-# Error handling tests (134 test cases)
+# Error handling tests (140 test cases)
 make test-errors
 
 # Fragment handling tests
@@ -353,7 +360,7 @@ null embedded in the input is indistinguishable from end-of-string. Callers
 holding raw buffers (for example, language bindings) should use the `_n`
 variants, which take an explicit length and reject any byte outside printable
 ASCII, NUL included. The error-test runner uses `mpc_convert_simple_n()` and
-passes all 134 cases with no skips (since 1.1.4).
+passes all 140 cases with no skips (since 1.1.4).
 
 ## Examples
 

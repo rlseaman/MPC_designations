@@ -19,7 +19,13 @@ Historical change rationale and the per-language feature checklist live in
 
 - `<lang>/` — one directory per implementation, each with `src/`, `test/`,
   `Makefile`, `README.md`.
-- `test-data/error_test_cases.csv` — shared error suite (134 cases;
+- `python-fast/` — `mpc-designation-fast`, a separate PyPI package: a
+  stable-ABI CPython extension over the C library's `mpc_batch()` with a NumPy
+  front end. `setup.py` copies `c/src/mpc_designation.[ch]` into `csrc/`
+  (git-ignored) at build time. Its tests require element-for-element parity
+  with the pure-Python package, including on fuzzed malformed input, so any
+  reference behavior change must also be made in C before they pass.
+- `test-data/error_test_cases.csv` — shared error suite (140 cases;
   `category,subcategory,input,expected_error,description`, expected
   `valid|format|range`). Harnesses for awk, bash, nim, forth, haskell, R carry
   documented expected-skips.

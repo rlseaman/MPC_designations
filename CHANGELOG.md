@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.5] — 2026-11-18
+
+### Added
+- New package **`mpc-designation-fast`** (`python-fast/`): NumPy array
+  conversion backed by the C library. `convert_array`, `pack_array` and
+  `unpack_array` take `str` or `bytes` arrays of any shape and run about
+  45–65 ns per designation (70–90× the pure-Python package), releasing the
+  GIL. Results match `mpc_designation.convert_simple`/`pack`/`unpack`
+  element for element, enforced by tests on the full corpus, the shared
+  error suite and malformed-input fuzzing. Wheels use the stable ABI (one per
+  platform for CPython ≥ 3.9).
+- C: `mpc_batch()` converts fixed-width slot arrays (e.g. a NumPy `S`
+  buffer) in one call, with a per-element status array.
+- Error suite: 6 `comet_fragment` cases (now 140).
+
+### Fixed
+- All 25 implementations: a digit 1–9 in the fragment position of a packed
+  comet provisional is now an error. `J95X003`, `K06SE45`, `PJ95X003`,
+  `0001PJ95X003`, `C999X013` and `C.53P013` used to unpack to nonsense such as
+  `1995 X0-3` in most implementations, the Python reference included.
+- C: format detection is now a faithful port of the reference's, and the
+  comet packers parse exactly like it. C previously accepted many malformed
+  inputs, ignoring trailing junk or parsing digits loosely: `2024 AB 2`,
+  `PLS2Z40`, `T2S4i87`, `CK0MS110`, `SK05JB0Q`, `C/2025 K1EC`, `0C/2007 C5`,
+  and passed `K03UYWZ` through `mpc_pack()` unchanged. On 5.5 million mutated
+  and systematically generated inputs C and Python now agree exactly.
+- C: `mpc_pack()`/`mpc_unpack()` no longer silently truncate long
+  pass-through input; they return `MPC_ERR_BUFFER`.
+
+### Known
+- Malformed-input fuzzing shows that several other implementations still
+  differ from the reference on inputs outside the shared error suite (see
+  `docs/VALIDATION_GAPS.md`, theme 6). Scheduled for 1.1.6.
+
 ## [1.1.4] — 2026-11-18
 
 C only; no behavior change in any implementation. Contributed by Mario Juric
@@ -303,7 +337,8 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.4...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.5...HEAD
+[1.1.5]: https://github.com/rlseaman/MPC_designations/compare/v1.1.4...v1.1.5
 [1.1.4]: https://github.com/rlseaman/MPC_designations/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/rlseaman/MPC_designations/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...v1.1.2
