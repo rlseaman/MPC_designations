@@ -7,12 +7,21 @@ package and gives the same results, element for element, about 100× faster
 on large arrays.
 
 ```bash
-pip install mpc-designation-fast
+pip install mpc-designation-fast \
+    --find-links https://github.com/rlseaman/MPC_designations/releases/expanded_assets/v1.1.5
 ```
 
-Pre-built wheels cover CPython 3.9+ on Linux, macOS and Windows; one wheel per
-platform serves every Python version (stable ABI). NumPy and `mpc-designation`
-are installed as dependencies.
+For now the package is distributed through the
+[GitHub release](https://github.com/rlseaman/MPC_designations/releases/tag/v1.1.5),
+not PyPI. Pre-built wheels cover CPython 3.9+ on Linux (glibc and musl,
+x86_64 and aarch64), macOS (arm64 and x86_64) and Windows (x64); one wheel per
+platform serves every Python version (stable ABI), and pip picks the right
+one. NumPy and `mpc-designation` are installed from PyPI as dependencies. On
+other platforms, build from source (needs a C compiler):
+
+```bash
+pip install "mpc-designation-fast @ git+https://github.com/rlseaman/MPC_designations@v1.1.5#subdirectory=python-fast"
+```
 
 ## Usage
 

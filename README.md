@@ -9,8 +9,9 @@ Convert between packed and unpacked Minor Planet Center (MPC) designations for a
 Based on the MPC specification: https://www.minorplanetcenter.net/iau/info/PackedDes.html
 
 Python users: `pip install mpc-designation`; for NumPy arrays (millions of
-designations) add `pip install mpc-designation-fast`, a C-backed companion
-that is 70–90× faster with identical results ([`python-fast/`](python-fast/)). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for every other language.
+designations) add `mpc-designation-fast`, a C-backed companion that is
+70–90× faster with identical results ([`python-fast/`](python-fast/); for now
+installed from the GitHub release, not PyPI). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for every other language.
 
 ## Implementations
 
@@ -149,7 +150,7 @@ s" 1995 XA" convert-simple type  \ Prints: J95X00A
 from mpc_designation import convert_simple
 convert_simple('1995 XA')  # Returns 'J95X00A'
 
-# Arrays (pip install mpc-designation-fast)
+# Arrays (mpc-designation-fast; see python-fast/README.md to install)
 from mpc_designation_fast import pack_array
 pack_array(['1995 XA', '1P', 'C/1995 O1'])  # array(['J95X00A', '0001P', 'CJ95O010'])
 ```

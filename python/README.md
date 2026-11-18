@@ -27,8 +27,13 @@ For NumPy arrays, the companion package
 identical to this package:
 
 ```bash
-pip install mpc-designation-fast
+pip install mpc-designation-fast \
+    --find-links https://github.com/rlseaman/MPC_designations/releases/expanded_assets/v1.1.5
 ```
+
+The package is distributed through the GitHub release rather than PyPI for
+now; pip picks the right pre-built wheel for your platform and installs
+NumPy and `mpc-designation` from PyPI.
 
 ### From Source
 
