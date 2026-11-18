@@ -232,6 +232,8 @@ static int validate_whitespace(const char *s) {
     return MPC_OK;
 }
 
+static int is_valid_half_month(char c);
+
 static int is_digit_str(const char *s, size_t len) {
     if (len == 0) return 0;
     for (size_t i = 0; i < len; i++) {
@@ -244,10 +246,10 @@ static int is_std_packed_provisional(const char *s, size_t len) {
     if (len != 7) return 0;
     if (!(s[0] >= 'I' && s[0] <= 'L')) return 0;
     if (!(s[1] >= '0' && s[1] <= '9' && s[2] >= '0' && s[2] <= '9')) return 0;
-    if (!(s[3] >= 'A' && s[3] <= 'Z')) return 0;
+    if (!is_valid_half_month(s[3])) return 0;
     if (!((s[4] >= '0' && s[4] <= '9') || (s[4] >= 'A' && s[4] <= 'Z') || (s[4] >= 'a' && s[4] <= 'z'))) return 0;
     if (!(s[5] >= '0' && s[5] <= '9')) return 0;
-    if (!(s[6] >= 'A' && s[6] <= 'Z')) return 0;
+    if (!(s[6] >= 'A' && s[6] <= 'Z' && s[6] != 'I')) return 0;
     return 1;
 }
 
@@ -258,7 +260,8 @@ static int is_std_unpacked_provisional(const char *s, size_t len) {
           s[2] >= '0' && s[2] <= '9' &&
           s[3] >= '0' && s[3] <= '9')) return 0;
     if (s[4] != ' ') return 0;
-    if (!(s[5] >= 'A' && s[5] <= 'Z' && s[6] >= 'A' && s[6] <= 'Z')) return 0;
+    if (!is_valid_half_month(s[5])) return 0;
+    if (!(s[6] >= 'A' && s[6] <= 'Z' && s[6] != 'I')) return 0;
     for (size_t i = 7; i < len; i++) {
         if (s[i] < '0' || s[i] > '9') return 0;
     }
@@ -281,8 +284,6 @@ static int is_packed_survey(const char *s, size_t len) {
     }
     return 0;
 }
-
-static int is_valid_half_month(char c);
 
 static int write_u32_dec(char *dst, unsigned int v) {
     char tmp[10];
@@ -327,21 +328,11 @@ static int pack_provisional_fast_std(const char *s, size_t len, char *output, si
     century_code_int = century_to_code(century);
     if (century_code_int < 0) return MPC_ERR_FORMAT;
 
-    if (order_num >= 620) {
-        int year_digit = year % 100;
-        int letter_pos = letter_to_position(second_letter);
-        long base_sequence;
-        if (letter_pos < 1) return MPC_ERR_FORMAT;
-        base_sequence = (order_num - 620) * 25 + letter_pos - 1;
-        if (base_sequence > 14776335L) return MPC_ERR_RANGE;
-
-        output[0] = '_';
-        output[1] = num_to_base62(year_digit);
-        output[2] = half_month;
-        num_to_base62_string(base_sequence, output + 3, 4);
-        output[7] = '\0';
-        return MPC_OK;
-    }
+    /*
+     * Cycle >= 620 needs the extended format, with its own year and sequence
+     * limits; leave it to the canonical path (a non-OK return falls back).
+     */
+    if (order_num >= 620) return MPC_ERR_FORMAT;
 
     {
         int tens = (int)(order_num / 10);
@@ -1891,7 +1882,12 @@ int mpc_convert_simple(const char *input, char *output, size_t outlen) {
         if (err == MPC_OK) return MPC_OK;
     }
 
-    if (is_digit_str(input, len)) {
+    /*
+     * All-digit input is an unpacked number to pack, except a 5-digit string
+     * with a leading zero ("00001"), which is a packed permanent number and
+     * must unpack ("1"). Let that case fall through to the canonical path.
+     */
+    if (is_digit_str(input, len) && !(len == 5 && input[0] == '0')) {
         number = atol(input);
         return mpc_pack_permanent(number, output, outlen);
     }

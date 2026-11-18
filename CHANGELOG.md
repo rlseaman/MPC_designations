@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.4] — 2026-11-18
+
+C only; no behavior change in any implementation. Contributed by Mario Jurić
+(from his fork), adapted to the current format rules.
+
+### Added
+- C: length-aware functions `mpc_convert_n`, `mpc_convert_simple_n` and
+  `mpc_detect_format_n` take an explicit byte count, so embedded NUL bytes
+  (and any other non-printable byte) are seen and rejected. The C error-test
+  runner uses them and now passes all 134 cases with no skips (previously
+  the two NUL cases were documented skips).
+
+### Changed
+- C: `mpc_convert_simple()` handles the common asteroid provisional and survey
+  forms with pure-C fast paths, about 6× faster on the provisional corpus
+  (1.17 s → 0.19 s for 2,110,817 pack conversions). Anything outside the
+  fast-path shapes, and anything a fast path declines, goes through the
+  canonical parser, so results are unchanged: verified on the full corpus in
+  both directions and by differential testing against 1.1.3 on 5.5 million
+  mutated and systematically generated inputs. Compared with the original
+  contribution, the fast paths now leave extended-format packing (cycle ≥ 620)
+  to the canonical parser, reject `I` as a second letter and invalid
+  half-month letters, and unpack 5-digit numbers with a leading zero
+  (`00001` → `1`).
+
 ## [1.1.3] — 2026-11-17
 
 ### Added
@@ -278,7 +303,8 @@ same test corpus.
 
 ---
 
-[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/rlseaman/MPC_designations/compare/v1.1.4...HEAD
+[1.1.4]: https://github.com/rlseaman/MPC_designations/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/rlseaman/MPC_designations/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/rlseaman/MPC_designations/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/rlseaman/MPC_designations/compare/v1.1.0...v1.1.1

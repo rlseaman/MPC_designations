@@ -14,8 +14,8 @@ collision cases (`C03UYWZ`, `K03UYWZ`, `K95I00A`, `1995 XI`) **pass** in all
 five harnesses here — they are not skips.
 
 Each gap is currently recorded as a **documented expected-skip** in the
-language's harness (the same convention `c/test/test_errors.c` uses for its two
-inherent null-byte cases), so the suites report `Failed: 0` with an explicit
+language's harness (the convention `c/test/test_errors.c` used for its two
+null-byte cases until 1.1.4), so the suites report `Failed: 0` with an explicit
 `Skipped: N` and per-case reasons. Closing a gap = implementing the missing
 check and removing the skip.
 
@@ -24,7 +24,7 @@ check and removing the skip.
 | Implementation | error suite |
 |---|---|
 | Python, Tcl | 134 / 134, **0 skips** — the validation reference |
-| C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (C and R skip 2 inherent null-byte cases; SPP reports them as failures) |
+| C, C++, C#, Go, Java, Kotlin, Rust, Swift, Julia, PHP, Perl, Ruby, R, Octave, TypeScript, JS | full suite (R skips the 2 null-byte cases, which R strings cannot hold; SPP reports them as failures; C passes them via its length-aware API since 1.1.4) |
 | **nim** | 124 pass / **10 skip** |
 | **haskell** | 117 pass / **17 skip** |
 | **bash** | 114 pass / **20 skip** |
@@ -69,7 +69,8 @@ bash, forth, haskell** (varies).
 
 ### 4. Embedded NUL bytes (inherent, shared with C)
 `null_byte`, `null_middle`. **awk, bash** — a NUL terminates/splits the value,
-same root cause as the documented C limitation. Likely permanent skips.
+the same root cause C had with plain strings (C now passes via its
+length-aware `_n` API). Likely permanent skips.
 
 ### 5. Genuinely missing features
 - **bash**: no ancient (`<1000 CE`) or BCE comet support — `ancient_comet`
@@ -101,4 +102,4 @@ For each language, implement the missing check (reference Python's
 entry from that harness's skip-list and confirm the case now PASSES against
 `test-data/error_test_cases.csv`. The harness already prints which cases are
 skipped, so progress is directly measurable: the goal is `Skipped: 0` (except
-awk/bash null-byte, which match the C precedent).
+awk/bash null-byte, which are inherent to those languages).

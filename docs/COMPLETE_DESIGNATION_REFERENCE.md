@@ -547,7 +547,7 @@ provisional and 899,365 numbered test pairs, in both directions.
 
 | Limitation | Affected | Notes |
 |------------|----------|-------|
-| C string null bytes | C | C strings terminate at null; cannot detect embedded nulls |
+| C string null bytes | C | Plain C strings terminate at null; use the length-aware `_n` functions (1.1.4+) to detect embedded nulls |
 | Fortran identifier length | SPP | 6-char limit causes "mapping not unique" warnings |
 | Unicode input | All | Non-ASCII characters (>126) are rejected |
 

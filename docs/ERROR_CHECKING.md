@@ -28,7 +28,7 @@ All implementations check for invalid whitespace characters:
 | Control characters | Yes | Yes | Yes | ASCII 0-31 rejected |
 | Delete character | Yes | Yes | Yes | ASCII 127 rejected |
 | Extended ASCII (128-255) | Yes | Yes | Yes | Should be rejected |
-| Null bytes | Partial | Yes | Yes | C strings truncate at null |
+| Null bytes | Yes (`_n` API) | Yes | Yes | Plain C strings truncate at null; the length-aware `_n` functions reject it |
 | Unicode characters | No | No | No | Currently accepted (known gap) |
 
 ### 3. Numeric Range Validation
@@ -126,12 +126,11 @@ The following validations are currently missing or incomplete:
 3. **Comet order zero:** `C/1995 A0` should be rejected (order numbers start at 1)
 4. **Satellite zero:** `S/2019 J 0` should be rejected (numbers start at 1)
 5. **Survey zero:** `0 P-L` should be rejected (survey numbers are positive)
-6. **Null bytes in C:** C string handling truncates at null bytes rather than
-   rejecting. The two affected test cases (`invalid_char/null_byte` and
-   `edge_case/null_middle`) are explicitly marked as expected skips in the C
-   error-test runner (`c/test/test_errors.c`); they continue to run in all
-   other language implementations. CI reports `Skipped: 2` for C on these
-   cases and does not mark the build failed.
+6. **Null bytes in C:** plain C string handling truncates at null bytes rather
+   than rejecting. Since 1.1.4 the C library has length-aware variants
+   (`mpc_convert_simple_n` etc.) that see and reject embedded NULs; the C
+   error-test runner uses them and passes `invalid_char/null_byte` and
+   `edge_case/null_middle` with no skips.
 
 ## Error Messages
 

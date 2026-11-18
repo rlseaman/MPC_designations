@@ -21,7 +21,7 @@ Historical change rationale and the per-language feature checklist live in
   `Makefile`, `README.md`.
 - `test-data/error_test_cases.csv` — shared error suite (134 cases;
   `category,subcategory,input,expected_error,description`, expected
-  `valid|format|range`). Harnesses for awk, bash, nim, forth, haskell, C carry
+  `valid|format|range`). Harnesses for awk, bash, nim, forth, haskell, R carry
   documented expected-skips.
 - `test-data/prov_unpack_to_pack.csv.gz` (2,110,817 pairs) and
   `test-data/numbered_pack.csv.gz` (899,365 pairs) — `unpacked,packed` with one
@@ -43,6 +43,11 @@ Historical change rationale and the per-language feature checklist live in
   stdin from `/dev/null` and a timeout.
 - SPP/IRAF builds locally with `xc`; linking needs `-/fsanitize=undefined`
   because the installed `libvops` was built with UBSan.
+- C's `mpc_convert_simple()` has fast paths for common provisional/survey
+  shapes that bypass the canonical parser; any format-rule change must keep
+  them conservative (decline ⇒ canonical fallback). Corpus tests can't catch
+  over-acceptance there: differential-test against the previous release on
+  mutated inputs.
 - CI (`.github/workflows/test.yml`) covers C, Python (3.9–3.12, pinned to
   ubuntu-24.04 because ubuntu-latest has no 3.9), and Tcl.
 

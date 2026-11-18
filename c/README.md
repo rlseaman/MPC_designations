@@ -2,7 +2,11 @@
 
 C99 library and CLI tool for converting between packed and unpacked MPC designations.
 
-Performance note: this implementation includes pure-C hot-path conversion optimizations for high-volume batch workloads.
+Performance note: `mpc_convert_simple()` short-circuits the common asteroid
+provisional and survey forms with pure-C fast paths (about 20 million
+conversions per second on the 2.1M-pair corpus); every other input, and any
+input a fast path declines, goes through the canonical parser. Contributed
+by Mario Jurić.
 
 ## Quick Start
 
@@ -166,6 +170,12 @@ int mpc_convert(const char *input, char *output, size_t output_size, mpc_info_t 
 
 // Format detection (without conversion)
 int mpc_detect_format(const char *input, mpc_info_t *info);
+
+// Length-aware variants: take an explicit byte count, so an embedded NUL
+// (or any other non-printable byte) is seen and rejected (since 1.1.4)
+int mpc_convert_simple_n(const char *input, size_t input_len, char *output, size_t output_size);
+int mpc_convert_n(const char *input, size_t input_len, char *output, size_t output_size, mpc_info_t *info);
+int mpc_detect_format_n(const char *input, size_t input_len, mpc_info_t *info);
 
 // Format conversion (minimal <-> 12-char MPC report format)
 int mpc_to_report_format(const char *minimal, char *report, size_t outlen);
@@ -336,14 +346,14 @@ The library validates all inputs and returns appropriate error codes:
 
 Use `mpc_strerror()` to get human-readable error messages.
 
-### Known limitation: null bytes in input
+### Null bytes in input
 
-C strings terminate at the first null byte, so a null embedded in the input
-is indistinguishable from end-of-string. Two cases in the shared error-test
-suite (`invalid_char/null_byte` and `edge_case/null_middle`) are therefore
-marked as expected skips in `c/test/test_errors.c`; they continue to run in
-all other language implementations. The test runner reports `Skipped: 2` for
-these cases and still exits successfully.
+C strings terminate at the first null byte, so with the ordinary functions a
+null embedded in the input is indistinguishable from end-of-string. Callers
+holding raw buffers (for example, language bindings) should use the `_n`
+variants, which take an explicit length and reject any byte outside printable
+ASCII, NUL included. The error-test runner uses `mpc_convert_simple_n()` and
+passes all 134 cases with no skips (since 1.1.4).
 
 ## Examples
 
