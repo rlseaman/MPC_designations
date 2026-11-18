@@ -1,0 +1,3 @@
+include csrc/mpc_designation.c csrc/mpc_designation.h
+include LICENSE README.md
+recursive-include tests *.py

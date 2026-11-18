@@ -1,0 +1,54 @@
+name: Build mpc-designation-fast wheels
+
+# Builds abi3 wheels (one per platform, CPython >= 3.9) and an sdist for
+# python-fast/. Runs on release tags and on demand; the artifacts are
+# uploaded to PyPI by hand (twine), like the pure-Python package.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  wheels:
+    name: Wheels on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.23.3
+        with:
+          package-dir: python-fast
+          output-dir: wheelhouse
+        env:
+          # Test each wheel against the repository's reference package.
+          CIBW_BEFORE_TEST: pip install {project}/python
+          CIBW_TEST_REQUIRES: pytest
+          CIBW_TEST_COMMAND: pytest {project}/python-fast/tests -q -m "not corpus"
+          # Apple Silicon runner also cross-builds the Intel wheel (untested there).
+          CIBW_ARCHS_MACOS: arm64 x86_64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: wheelhouse/*.whl
+
+  sdist:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build sdist
+        run: |
+          python -m pip install build
+          python -m build --sdist python-fast --outdir dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz

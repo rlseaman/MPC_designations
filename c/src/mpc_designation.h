@@ -179,6 +179,29 @@ int mpc_convert_simple(const char *input, char *output, size_t outlen);
  */
 int mpc_convert_simple_n(const char *input, size_t input_len, char *output, size_t outlen);
 
+/*
+ * Batch conversion over fixed-width slots (e.g. a NumPy 'S' array buffer).
+ *
+ * Each of the `count` input slots is `in_width` bytes; its value is the slot
+ * with trailing NUL padding removed (embedded NULs or other non-printable
+ * bytes are errors). Each result is written NUL-padded into an `out_width`
+ * byte output slot (no terminator needed when it fills the slot); a failed
+ * element gets an all-NUL slot. status[i] receives MPC_OK or the error code.
+ *
+ * Modes:
+ *   MPC_BATCH_CONVERT - like mpc_convert_simple() (auto-detect direction)
+ *   MPC_BATCH_PACK    - like mpc_pack()   (packed input passes through)
+ *   MPC_BATCH_UNPACK  - like mpc_unpack() (unpacked input passes through)
+ *
+ * Returns the number of failed elements. Since 1.1.5.
+ */
+#define MPC_BATCH_CONVERT 0
+#define MPC_BATCH_PACK    1
+#define MPC_BATCH_UNPACK  2
+
+size_t mpc_batch(int mode, const char *input, size_t in_width,
+                 char *output, size_t out_width, signed char *status, size_t count);
+
 /* =============================================================================
  * CATEGORY-SPECIFIC FUNCTIONS
  * ============================================================================= */

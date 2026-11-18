@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mpc-designation-fast"
+version = "1.1.5"
+description = "Fast NumPy array conversion of MPC (Minor Planet Center) designations, backed by C"
+readme = "README.md"
+license = "CC0-1.0"
+requires-python = ">=3.9"
+dependencies = [
+    "numpy>=1.21",
+    "mpc-designation>=1.1.5",
+]
+authors = [
+    { name = "Rob Seaman", email = "rseaman@arizona.edu" },
+]
+maintainers = [
+    { name = "Rob Seaman", email = "rseaman@arizona.edu" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: C",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+keywords = ["astronomy", "minor planet", "asteroid", "comet", "MPC", "numpy"]
+
+[project.urls]
+Homepage = "https://github.com/rlseaman/MPC_designations"
+Documentation = "https://github.com/rlseaman/MPC_designations/tree/main/python-fast#readme"
+Repository = "https://github.com/rlseaman/MPC_designations.git"
+Changelog = "https://github.com/rlseaman/MPC_designations/blob/main/CHANGELOG.md"
+Issues = "https://github.com/rlseaman/MPC_designations/issues"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.cibuildwheel]
+# One abi3 wheel per platform (stable ABI, CPython >= 3.9); the test
+# command lives in .github/workflows/wheels-fast.yml.
+build = "cp39-*"
+skip = "*-musllinux_i686 *-win32 *-manylinux_i686"
+
+[tool.pytest.ini_options]
+markers = ["corpus: needs the repository's test-data/ directory"]
