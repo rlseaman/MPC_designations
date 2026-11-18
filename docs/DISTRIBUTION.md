@@ -5,16 +5,16 @@ respective package registries. This document is descriptive and
 work-queue-shaped, not prescriptive — priorities should be revisited each
 time you pick up this chore.
 
-Current tracking version across packaging: **1.1.3**. Any fresh manifest work
+Current tracking version across packaging: **1.1.4**. Any fresh manifest work
 should target this version to stay in sync.
 
 ## What's already published
 
 | Ecosystem | Package identifier | Install command | Notes |
 |---|---|---|---|
-| PyPI | `mpc-designation` | `pip install mpc-designation` | v1.1.3 live as of 2026-11-17 (1.0.1, 1.1.0, 1.1.2, 1.1.3 published; 1.1.1 skipped — PyPI never carried it) |
+| PyPI | `mpc-designation` | `pip install mpc-designation` | v1.1.3 live as of 2026-11-17 (1.0.1, 1.1.0, 1.1.2, 1.1.3 published; 1.1.1 skipped — PyPI never carried it; 1.1.4 not uploaded because it changed only C, so the Python package is identical to 1.1.3) |
 | conda-forge | `mpc-designation` | `conda install -c conda-forge mpc-designation` | PR [#33021](https://github.com/conda-forge/staged-recipes/pull/33021) open since 2026-04-17, recipe at 1.1.3 (uses conda-forge's global `python_min`, currently 3.11), review requested from `@conda-forge/help-python` on 2026-11-17; auto-bumps via `regro-cf-autotick-bot` after merge |
-| Go module proxy | `github.com/rlseaman/mpc_designations/go` | `go get github.com/rlseaman/mpc_designations/go@v1.1.3` | Path-prefixed tags `go/v1.0.0` … `go/v1.1.3` pushed; proxy indexes lazily |
+| Go module proxy | `github.com/rlseaman/mpc_designations/go` | `go get github.com/rlseaman/mpc_designations/go@v1.1.4` | Path-prefixed tags `go/v1.0.0` … `go/v1.1.4` pushed; proxy indexes lazily |
 
 ## Priority order
 

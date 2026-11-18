@@ -13,8 +13,8 @@ authors:
     given-names: Rob
     email: rseaman@arizona.edu
 license: CC0-1.0
-version: "1.1.3"
-date-released: "2026-11-17"
+version: "1.1.4"
+date-released: "2026-11-18"
 repository-code: "https://github.com/rlseaman/MPC_designations"
 url: "https://github.com/rlseaman/MPC_designations"
 keywords:

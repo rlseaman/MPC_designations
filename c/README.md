@@ -6,7 +6,7 @@ Performance note: `mpc_convert_simple()` short-circuits the common asteroid
 provisional and survey forms with pure-C fast paths (about 20 million
 conversions per second on the 2.1M-pair corpus); every other input, and any
 input a fast path declines, goes through the canonical parser. Contributed
-by Mario Jurić.
+by Mario Juric.
 
 ## Quick Start
 

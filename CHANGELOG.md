@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.4] — 2026-11-18
 
-C only; no behavior change in any implementation. Contributed by Mario Jurić
+C only; no behavior change in any implementation. Contributed by Mario Juric
 (from his fork), adapted to the current format rules.
 
 ### Added
