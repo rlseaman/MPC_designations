@@ -101,7 +101,7 @@ def _unescape(s):
 def test_error_suite():
     if not os.path.exists(ERRORS):
         pytest.skip("test-data not available")
-    with open(ERRORS, newline="") as f:
+    with open(ERRORS, newline="", encoding="utf-8") as f:
         rows = [r for r in csv.reader(f) if r and not r[0].startswith("#")][1:]
     inputs = [_unescape(r[2]) for r in rows]
     for fast, slow in FUNCS:
