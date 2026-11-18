@@ -579,11 +579,11 @@ function detect_format(desig,    len, first, prefix, last) {
         if (desig ~ /^[PDCXAI]_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z][0-9A-Za-z]$/) {
             return "packed_extended_comet"
         }
-        if (desig ~ /^[PDCXAI][A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]$/) {
+        if (desig ~ /^[PDCXAI][A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]$/) {
             return "packed_provisional_comet"
         }
-        if (desig ~ /^[PDCXAI][0-9][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/ || \
-            desig ~ /^[PDCXAI][\/.-][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/) {
+        if (desig ~ /^[PDCXAI][0-9][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0a-z]$/ || \
+            desig ~ /^[PDCXAI][\/.-][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9][0a-z]$/) {
             return "packed_ancient_comet"
         }
         if (first == "S" && second ~ /[IJKL]/) {

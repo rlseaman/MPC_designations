@@ -813,11 +813,11 @@ detect_format() {
         local second="${desig:1:1}"
         case "$first" in
             [PDCXAI])
-                if [[ "$desig" =~ ^.[A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9]([0-9A-Za-z]|[a-z][a-z])$ ]]; then
+                if [[ "$desig" =~ ^.[A-L][0-9][0-9][A-HJ-Y][0-9A-Za-z][0-9]([0A-Za-z]|[a-z][a-z])$ ]]; then
                     echo "packed_provisional_comet"; return
                 fi
                 # Ancient (3-digit year) or BCE (/ . - prefix) comet, 8 chars
-                if [[ "$desig" =~ ^.([0-9][0-9][0-9]|[-/.][0-9][0-9])[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$ ]]; then
+                if [[ "$desig" =~ ^.([0-9][0-9][0-9]|[-/.][0-9][0-9])[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$ ]]; then
                     echo "packed_provisional_comet"; return
                 fi
                 ;;

@@ -632,18 +632,19 @@ proc detectFormat*(desig: string): DesignationFormat =
       return fmtUnknown
     # Standard provisional comet: type + century[A-L] + YY + half-month + cycle + order
     # Half-month at index 4 is a calendar code (A-Y skipping I).
+    # A comet fragment is '0' (none) or a letter, never a digit 1-9.
     if first in COMET_TYPES and second in {'I', 'J', 'K', 'L', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'} and
-       isValidHalfMonth(desig[4]):
+       isValidHalfMonth(desig[4]) and desig[7] notin {'1'..'9'}:
       return fmtPackedProvisionalComet
     # BCE comet: type + prefix(/ . -) + 2 digits + half-month + order + fragment
     if first in COMET_TYPES and second in {'/', '.', '-'} and
        desig[2] in {'0'..'9'} and desig[3] in {'0'..'9'} and
-       isValidHalfMonth(desig[4]):
+       isValidHalfMonth(desig[4]) and desig[7] notin {'1'..'9'}:
       return fmtPackedAncientComet
     # Ancient comet: comet type + 3 digit year + half-month + order + fragment
     if first in COMET_TYPES and second >= '0' and second <= '9' and
        desig[2] in {'0'..'9'} and desig[3] in {'0'..'9'} and
-       isValidHalfMonth(desig[4]):
+       isValidHalfMonth(desig[4]) and desig[7] notin {'1'..'9'}:
       return fmtPackedAncientComet
     if first == 'S' and second in {'I', 'J', 'K', 'L'}:
       return fmtPackedSatellite
@@ -669,7 +670,7 @@ proc detectFormat*(desig: string): DesignationFormat =
           return fmtPackedProvisionalComet
       elif prov[0] in {'I', 'J', 'K', 'L'} and prov[1] in {'0'..'9'} and prov[2] in {'0'..'9'} and
            isValidHalfMonth(prov[3]) and prov[4] in {'0'..'9', 'A'..'Z', 'a'..'z'} and
-           prov[5] in {'0'..'9'} and prov[6] in {'0'..'9', 'a'..'z'}:
+           prov[5] in {'0'..'9'} and prov[6] in {'0', 'a'..'z'}:
         return fmtPackedProvisionalComet
 
   # Unpacked numbered asteroid (all digits)

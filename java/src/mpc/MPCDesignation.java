@@ -1082,7 +1082,7 @@ public class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length() == 12) {
-            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
+            if (Pattern.matches("^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (12-char)";
@@ -1092,7 +1092,7 @@ public class MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_full";
                 info.subtype = "comet with provisional designation (8-char)";
@@ -1112,7 +1112,7 @@ public class MPCDesignation {
 
         // Check for packed ancient comet (8 chars)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_ancient";
                 info.subtype = "comet with ancient provisional (year < 1000)";
@@ -1122,7 +1122,7 @@ public class MPCDesignation {
 
         // Check for packed BCE comet (8 chars)
         if (designation.length() == 8 && COMET_TYPES.indexOf(designation.charAt(0)) >= 0) {
-            if (Pattern.matches("^([PCDXAI])([/.\\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation)) {
+            if (Pattern.matches("^([PCDXAI])([/.\\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_bce";
                 info.subtype = "comet with BCE provisional";
@@ -1236,7 +1236,7 @@ public class MPCDesignation {
             }
 
             // Check for packed comet provisional (7 chars)
-            if (Pattern.matches("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des)) {
+            if (Pattern.matches("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", des)) {
                 info.format = FormatType.PACKED;
                 info.type = "comet_provisional";
                 info.subtype = "comet provisional";

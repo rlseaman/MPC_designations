@@ -634,6 +634,14 @@ namespace MPC
             char halfMonth = p[3];
             int orderNum = DecodeCycleCount(p.Substring(4, 2));
             string fragment = len == 7 ? p.Substring(6, 1) : p.Substring(6, 2);
+            // Fragment is '0' (none) or letters; a digit 1-9 is invalid
+            foreach (char c in fragment)
+            {
+                if (c >= '1' && c <= '9')
+                {
+                    throw new MPCDesignationException($"Invalid comet fragment: {fragment}");
+                }
+            }
 
             int fullYear = century * 100 + yearShort;
 
@@ -898,6 +906,12 @@ namespace MPC
                 halfMonth = p[4];
                 orderNum = DecodeCycleCount(p.Substring(5, 2));
                 fragment = p[7];
+            }
+
+            // Fragment is '0' (none) or a letter; a digit 1-9 is invalid
+            if (fragment >= '1' && fragment <= '9')
+            {
+                throw new MPCDesignationException($"Invalid comet fragment: {fragment}");
             }
 
             var sb = new StringBuilder();
@@ -1214,14 +1228,14 @@ namespace MPC
                     return info;
                 }
 
-                // Comet provisional: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$
+                // Comet provisional: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$
                 // Century A-L (1000-2199); half-month A-Y skipping I; 6th char always a
-                // digit; trailing 0-9 or a-z.
+                // digit; trailing 0 (no fragment) or a-z (fragment letter).
                 if (des[0] >= 'A' && des[0] <= 'L' && char.IsDigit(des[1]) && char.IsDigit(des[2]) &&
                     IsValidHalfMonth(des[3]) &&
                     (char.IsDigit(des[4]) || char.IsUpper(des[4]) || char.IsLower(des[4])) &&
                     char.IsDigit(des[5]) &&
-                    (char.IsDigit(des[6]) || char.IsLower(des[6])))
+                    (des[6] == '0' || char.IsLower(des[6])))
                 {
                     info.Format = Format.Packed;
                     info.Type = DesignationType.CometProvisional;

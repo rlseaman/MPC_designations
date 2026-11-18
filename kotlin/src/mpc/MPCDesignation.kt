@@ -929,7 +929,7 @@ object MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (designation.length == 12) {
-            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
+            val pattern = Regex("""^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (12-char)")
             }
@@ -937,7 +937,7 @@ object MPCDesignation {
 
         // Check for packed comet designation (8 chars: type + 7 char provisional)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
+            val pattern = Regex("""^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_full", "comet with provisional designation (8-char)")
             }
@@ -953,7 +953,7 @@ object MPCDesignation {
 
         // Check for packed ancient comet (8 chars)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
+            val pattern = Regex("""^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_ancient", "comet with ancient provisional (year < 1000)")
             }
@@ -961,7 +961,7 @@ object MPCDesignation {
 
         // Check for packed BCE comet (8 chars)
         if (designation.length == 8 && designation[0] in COMET_TYPES) {
-            val pattern = Regex("""^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$""")
+            val pattern = Regex("""^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$""")
             if (pattern.matches(designation)) {
                 return Info(FormatType.PACKED, "comet_bce", "comet with BCE provisional")
             }
@@ -1049,7 +1049,7 @@ object MPCDesignation {
             }
 
             // Check for packed comet provisional (7 chars)
-            val cometProvPattern = Regex("""^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$""")
+            val cometProvPattern = Regex("""^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$""")
             if (cometProvPattern.matches(des)) {
                 return Info(FormatType.PACKED, "comet_provisional", "comet provisional")
             }

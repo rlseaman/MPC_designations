@@ -905,14 +905,14 @@ class MPCDesignation {
 
         // Check for packed full comet designation BEFORE trimming (12 chars with spaces)
         if (strlen($designation) === 12) {
-            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
+            if (preg_match('/^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (12-char)');
             }
         }
 
         // Check for packed comet designation (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/', $designation)) {
                 return new FormatInfo('packed', 'comet_full', 'comet with provisional designation (8-char)');
             }
         }
@@ -926,14 +926,14 @@ class MPCDesignation {
 
         // Check for packed ancient comet (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_ancient', 'comet with ancient provisional (year < 1000)');
             }
         }
 
         // Check for packed BCE comet (8 chars)
         if (strlen($designation) === 8 && in_array($designation[0], self::COMET_TYPES)) {
-            if (preg_match('/^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/', $designation)) {
+            if (preg_match('/^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$/', $designation)) {
                 return new FormatInfo('packed', 'comet_bce', 'comet with BCE provisional');
             }
         }
@@ -1004,7 +1004,7 @@ class MPCDesignation {
                 return new FormatInfo('packed', 'survey', "survey (Trojan T-{$des[1]})");
             }
 
-            if (preg_match('/^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/', $des)) {
+            if (preg_match('/^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$/', $des)) {
                 return new FormatInfo('packed', 'comet_provisional', 'comet provisional');
             }
         }

@@ -770,20 +770,20 @@ sub detect_format {
 
     # Check for packed full comet (12 chars)
     if (length($designation) == 12) {
-        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
+        if ($designation =~ /^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (12-char)' };
         }
     }
 
     # Check for packed comet (8 chars)
     if (length($designation) == 8) {
-        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
+        if ($designation =~ /^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$/) {
             return { format => 'packed', type => 'comet_full', subtype => 'comet with provisional (8-char)' };
         }
-        if ($designation =~ /^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
+        if ($designation =~ /^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$/) {
             return { format => 'packed', type => 'comet_ancient', subtype => 'comet ancient provisional' };
         }
-        if ($designation =~ /^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$/) {
+        if ($designation =~ /^([PCDXAI])([\/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$/) {
             return { format => 'packed', type => 'comet_bce', subtype => 'comet BCE provisional' };
         }
     }
@@ -851,7 +851,7 @@ sub detect_format {
         if ($des =~ /^T[123]S\d{4}$/) {
             return { format => 'packed', type => 'survey', subtype => 'survey (Trojan)' };
         }
-        if ($des =~ /^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$/) {
+        if ($des =~ /^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$/) {
             return { format => 'packed', type => 'comet_provisional', subtype => 'comet provisional' };
         }
     }

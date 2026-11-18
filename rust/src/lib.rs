@@ -999,7 +999,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed full comet designation (12 chars with spaces)
     if designation.len() == 12 {
-        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
+        if regex_captures!(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (12-char)".to_string();
@@ -1009,7 +1009,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet designation (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_full".to_string();
             info.subtype = "comet with provisional designation (8-char)".to_string();
@@ -1029,7 +1029,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed ancient comet (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_ancient".to_string();
             info.subtype = "comet with ancient provisional (year < 1000)".to_string();
@@ -1039,7 +1039,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed BCE comet (8 chars)
     if designation.len() == 8 {
-        if regex_captures!(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation).is_some() {
+        if regex_captures!(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_bce".to_string();
             info.subtype = "comet with BCE provisional".to_string();
@@ -1144,7 +1144,7 @@ pub fn detect_format(designation: &str) -> Result<FormatInfo> {
 
     // Check for packed comet provisional
     if des.len() == 7 {
-        if regex_captures!(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des).is_some() {
+        if regex_captures!(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", des).is_some() {
             info.format = "packed".to_string();
             info.designation_type = "comet_provisional".to_string();
             info.subtype = "comet provisional".to_string();

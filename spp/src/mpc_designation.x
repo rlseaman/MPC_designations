@@ -221,8 +221,9 @@ begin
 		return
 	    }
 
+	    # Comet fragment: '0' (none) or a lowercase letter, never 1-9
 	    if (mpc_iscent(first) && mpc_isb62(des[5]) && IS_DIGIT(des[6]) &&
-		(IS_DIGIT(des[7]) || IS_LOWER(des[7]))) {
+		(des[7] == '0' || IS_LOWER(des[7]))) {
 		format = 1
 		dtype = 5
 		return
@@ -249,7 +250,7 @@ begin
 		    (des[6] >= 'I' && des[6] <= 'L' && IS_DIGIT(des[7]) &&
 		     IS_DIGIT(des[8]) && mpc_ishalfmo(des[9]) &&
 		     mpc_isb62(des[10]) && IS_DIGIT(des[11]) &&
-		     (IS_DIGIT(des[12]) || IS_LOWER(des[12])))) {
+		     (des[12] == '0' || IS_LOWER(des[12])))) {
 		    format = 1
 		    dtype = 6
 		    return
@@ -257,8 +258,10 @@ begin
 	    }
 	}
 
-	# Packed comet full (8-9 chars)
-	if ((len == 8 || len == 9) && mpc_strchr(des, space) == 0) {
+	# Packed comet full (8-9 chars). The fragment position of an 8-char
+	# form is '0' (none) or a letter, never a digit 1-9.
+	if ((len == 8 || len == 9) && mpc_strchr(des, space) == 0 &&
+	    !(len == 8 && IS_DIGIT(des[8]) && des[8] != '0')) {
 	    if (first=='P' || first=='C' || first=='D' ||
 		first=='X' || first=='A' || first=='I') {
 		format = 1

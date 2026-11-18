@@ -900,14 +900,14 @@ function detect_format(designation::AbstractString)
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if length(designation) == 12
-        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
+        if match(r"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (12-char)")
         end
     end
 
     # Check for packed comet designation (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
+        if match(r"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation) !== nothing
             return FormatInfo(:packed, "comet_full", "comet with provisional designation (8-char)")
         end
     end
@@ -921,14 +921,14 @@ function detect_format(designation::AbstractString)
 
     # Check for packed ancient comet (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_ancient", "comet with ancient provisional (year < 1000)")
         end
     end
 
     # Check for packed BCE comet (8 chars)
     if length(designation) == 8 && designation[1] in COMET_TYPES
-        if match(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$", designation) !== nothing
+        if match(r"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$", designation) !== nothing
             return FormatInfo(:packed, "comet_bce", "comet with BCE provisional")
         end
     end
@@ -1001,7 +1001,7 @@ function detect_format(designation::AbstractString)
             return FormatInfo(:packed, "survey", "survey (Trojan T-$(des[2]))")
         end
 
-        if match(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des) !== nothing
+        if match(r"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", des) !== nothing
             return FormatInfo(:packed, "comet_provisional", "comet provisional")
         end
     end

@@ -898,7 +898,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed full comet (12 chars with spaces)
   if length(designation) == 12
-    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
+    if ~isempty(regexp(designation, '^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (12-char)';
@@ -908,7 +908,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', 'once'))
       info.format = 'packed';
       info.type = 'comet_full';
       info.subtype = 'comet with provisional designation (8-char)';
@@ -928,7 +928,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed ancient comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_ancient';
       info.subtype = 'comet with ancient provisional (year < 1000)';
@@ -938,7 +938,7 @@ function info = mpc_detect_format(designation)
 
   % Check for packed BCE comet (8 chars)
   if length(designation) == 8 && any(designation(1) == 'PCDXAI')
-    if ~isempty(regexp(designation, '^[PCDXAI][/.\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
+    if ~isempty(regexp(designation, '^[PCDXAI][/.\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_bce';
       info.subtype = 'comet with BCE provisional';
@@ -1047,7 +1047,7 @@ function info = mpc_detect_format(designation)
       return;
     end
 
-    if ~isempty(regexp(des, '^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', 'once'))
+    if ~isempty(regexp(des, '^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$', 'once'))
       info.format = 'packed';
       info.type = 'comet_provisional';
       info.subtype = 'comet provisional';

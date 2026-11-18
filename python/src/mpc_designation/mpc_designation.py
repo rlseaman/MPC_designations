@@ -1139,7 +1139,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
     if len(designation) == 12:
-        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
+        if re.match(r'^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (12-char)'
@@ -1147,7 +1147,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed comet designation (8 chars: type + 7 char provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
+        if re.match(r'^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_full'
             result['subtype'] = 'comet with provisional designation (8-char)'
@@ -1163,7 +1163,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed ancient comet (8 chars: type + 3-digit year + provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
+        if re.match(r'^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_ancient'
             result['subtype'] = 'comet with ancient provisional (year < 1000)'
@@ -1171,7 +1171,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
 
     # Check for packed BCE comet (8 chars: type + BCE prefix + code + provisional)
     if len(designation) == 8:
-        if re.match(r'^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$', designation):
+        if re.match(r'^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$', designation):
             result['format'] = 'packed'
             result['type'] = 'comet_bce'
             result['subtype'] = 'comet with BCE provisional'
@@ -1258,7 +1258,7 @@ def detect_format(designation: str) -> Dict[str, Any]:
     # Check for packed comet provisional (7 or 8 chars starting with century code)
     # 7-char: J95O010 (no fragment or single char), 8-char: J95O01aa (2-letter fragment)
     if len(des) == 7:
-        if re.match(r'^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$', des):
+        if re.match(r'^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$', des):
             result['format'] = 'packed'
             result['type'] = 'comet_provisional'
             result['subtype'] = 'comet provisional'

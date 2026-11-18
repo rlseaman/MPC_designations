@@ -106,11 +106,11 @@ struct Patterns {
     static let ancientCometProv = try! NSRegularExpression(pattern: #"^([A-Z])(\d+)(?:-([A-Z]))?$"#)
 
     // Detect format patterns - packed
-    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
-    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
+    static let packedCometFull12 = try! NSRegularExpression(pattern: #"^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
+    static let packedCometFull8 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$"#)
     static let packedCometFull9 = try! NSRegularExpression(pattern: #"^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$"#)
-    static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
-    static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$"#)
+    static let packedAncientComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$"#)
+    static let packedBCEComet = try! NSRegularExpression(pattern: #"^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$"#)
     static let packedSatellite = try! NSRegularExpression(pattern: #"^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$"#)
     static let packedTilde = try! NSRegularExpression(pattern: #"^~[0-9A-Za-z]{4}$"#)
     static let packedLetterPrefix = try! NSRegularExpression(pattern: #"^[A-Za-z][0-9]{4}$"#)
@@ -119,7 +119,7 @@ struct Patterns {
     static let packedProvisional = try! NSRegularExpression(pattern: #"^[I-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][A-HJ-Z]$"#)
     static let packedSurveyT = try! NSRegularExpression(pattern: #"^T[123]S\d{4}$"#)
     static let packedCometNumbered = try! NSRegularExpression(pattern: #"^[0-9]{4}[PDI][a-z]{0,2}$"#)
-    static let packedCometProv = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$"#)
+    static let packedCometProv = try! NSRegularExpression(pattern: #"^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$"#)
 
     // Detect format patterns - unpacked
     static let unpackedSatellite = try! NSRegularExpression(pattern: #"^S/\d{4} ([JSUN]) \d+$"#)

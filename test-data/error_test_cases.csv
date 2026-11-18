@@ -159,3 +159,10 @@ zero_number,packed_comet_zero,0000P,range,Packed numbered comet zero
 zero_number,packed_comet_zero_fragment,0000Ia,range,Packed numbered comet zero with fragment
 zero_number,packed_full_comet_zero,0000PJ82U010,range,12-char packed numbered comet zero with provisional
 zero_number,packed_asteroid_zero,00000,range,Packed numbered asteroid zero
+# Comet fragments are letters: a digit (other than the 0 "no fragment" marker) in the fragment position is invalid
+comet_fragment,packed_prov_digit_fragment,J95X003,format,Packed comet provisional with digit fragment
+comet_fragment,packed_prov_digit_fragment_cycle,K06SE45,format,Packed comet provisional with digit fragment (letter cycle)
+comet_fragment,packed_full_digit_fragment,PJ95X003,format,Packed 8-char comet with digit fragment
+comet_fragment,packed_numbered_full_digit_fragment,0001PJ95X003,format,12-char packed numbered comet with digit fragment
+comet_fragment,packed_ancient_digit_fragment,C999X013,format,Packed ancient comet with digit fragment
+comet_fragment,packed_bce_digit_fragment,C.53P013,format,Packed BCE comet with digit fragment

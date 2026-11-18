@@ -225,9 +225,9 @@ isPackedProvisional [c0, c1, c2, c3, c4, c5, c6] =
 isPackedProvisional _ = False
 
 -- | Check if a packed 7-char string is a valid comet provisional.
--- Mirrors reference regex: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$
+-- Mirrors reference regex: ^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$
 --   century A-L, year digits, half-month A-Y (calendar code, skip I, no Z),
---   cycle-tens base-62, cycle-units digit, fragment digit-or-lowercase.
+--   cycle-tens base-62, cycle-units digit, fragment '0' (none) or lowercase.
 isPackedCometProvisional :: String -> Bool
 isPackedCometProvisional [c0, c1, c2, c3, c4, c5, c6] =
     c0 `elem` map fst centuryCodes &&
@@ -235,8 +235,12 @@ isPackedCometProvisional [c0, c1, c2, c3, c4, c5, c6] =
     isValidHalfMonth c3 &&
     (isDigit c4 || isUpper c4 || isLower c4) &&
     isDigit c5 &&
-    (isDigit c6 || isLower c6)
+    (c6 == '0' || isLower c6)
 isPackedCometProvisional _ = False
+
+-- | A comet fragment position never holds a digit other than '0' (no fragment).
+isDigitFragment :: Char -> Bool
+isDigitFragment c = isDigit c && c /= '0'
 
 -- | Unpack a permanent (numbered) asteroid designation
 unpackPermanent :: String -> Either MPCError Int
@@ -766,12 +770,14 @@ detectFormat des
     -- Half-month (index 4) is a calendar code A-Y skipping I, object-type
     -- independent; reject invalid letters.
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      all isDigit (take 3 $ drop 1 trimmed) && isValidHalfMonth (trimmed !! 4) =
+      all isDigit (take 3 $ drop 1 trimmed) && isValidHalfMonth (trimmed !! 4) &&
+      not (isDigitFragment (last trimmed)) =
         Right $ FormatInfo Packed CometAncient "comet ancient"
 
     -- Packed BCE comet (8 chars: type + BCE prefix + 2-digit code + provisional)
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      trimmed !! 1 `elem` "./\\-" && isValidHalfMonth (trimmed !! 4) =
+      trimmed !! 1 `elem` "./\\-" && isValidHalfMonth (trimmed !! 4) &&
+      not (isDigitFragment (last trimmed)) =
         Right $ FormatInfo Packed CometBCE "comet BCE"
 
     -- Packed comet with extended asteroid-style provisional (8 chars): P_PO00Ud
@@ -789,7 +795,8 @@ detectFormat des
     -- Asteroid-style provisionals (uppercase order at the end) carry their own
     -- half-month at the same index, also A-Y skipping I, so validate here too.
     | len == 8 && head trimmed `elem` cometTypes && ' ' `notElem` trimmed &&
-      trimmed !! 1 `elem` map fst centuryCodes && isValidHalfMonth (trimmed !! 4) =
+      trimmed !! 1 `elem` map fst centuryCodes && isValidHalfMonth (trimmed !! 4) &&
+      not (isDigitFragment (trimmed !! 7)) =
         Right $ FormatInfo Packed CometFull "comet with provisional"
 
     -- Packed comet full with 2-letter fragment (9 chars)
@@ -799,7 +806,8 @@ detectFormat des
 
     -- Packed comet full (12 chars): number + type (index 4) + 7-char provisional
     -- whose half-month sits at index 8.
-    | length des == 12 && des !! 4 `elem` cometTypes && isValidHalfMonth (des !! 8) =
+    | length des == 12 && des !! 4 `elem` cometTypes && isValidHalfMonth (des !! 8) &&
+      not (isDigitFragment (des !! 11)) =
         Right $ FormatInfo Packed CometFull "comet full format"
 
     -- Unpacked satellite

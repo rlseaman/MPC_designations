@@ -1086,7 +1086,8 @@ contains
                 info%subtype = 'survey'
                 return
             else if (index('IJKL', first) > 0 .and. is_valid_half_month(des(4:4)) .and. &
-                     (is_digit(des(7:7)) .or. is_lower(des(7:7)))) then
+                     (des(7:7) == '0' .or. is_lower(des(7:7)))) then
+                ! Fragment position: '0' (none) or a lowercase letter, never 1-9
                 info%format = 'packed'
                 info%dtype = 'comet_provisional'
                 info%subtype = 'comet provisional'
@@ -1123,6 +1124,9 @@ contains
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (8-char)'
                 return
+            else if (des(8:8) /= '0' .and. .not. is_lower(des(8:8))) then
+                ! Comet fragment must be '0' (none) or a lowercase letter, never 1-9:
+                ! not a packed comet; fall through to the remaining checks
             else if (is_digit(des(2:2)) .and. is_valid_half_month(des(5:5))) then
                 info%format = 'packed'
                 info%dtype = 'comet_ancient'
@@ -1145,7 +1149,9 @@ contains
         ! Packed numbered comet with provisional (12 chars): 0001PJ82U010, 0001P_PO00Ud
         if (dlen == 12 .and. is_all_digits(des(1:4)) .and. index(COMET_TYPES, des(5:5)) > 0 .and. &
             index(des(1:dlen), ' ') == 0) then
-            if (is_valid_half_month(des(9:9)) .or. is_extended_packed(des(6:12))) then
+            if ((is_valid_half_month(des(9:9)) .and. &
+                 .not. (is_digit(des(12:12)) .and. des(12:12) /= '0')) .or. &
+                is_extended_packed(des(6:12))) then
                 info%format = 'packed'
                 info%dtype = 'comet_full'
                 info%subtype = 'comet with provisional designation (12-char)'

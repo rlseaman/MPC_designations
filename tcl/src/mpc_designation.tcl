@@ -107,11 +107,11 @@ namespace eval MPCDesignation {
     variable pat_satellite_unpacked {^S/(\d{4}) ([JSUN]) (\d+)$}
     variable pat_comet_full_unpacked {^(\d*)([PCDXAI])/(-?\d+) (.+)$}
     variable pat_comet_prov_part {^([A-Z])(\d+)(?:-([A-Z]))?$}
-    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
-    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
+    variable pat_packed_full_comet_12 {^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
+    variable pat_packed_comet_8 {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$}
     variable pat_packed_comet_9_frag {^([PCDXAI])([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][a-z]{2})$}
-    variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
-    variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0-9a-z])$}
+    variable pat_packed_ancient_comet {^([PCDXAI])([0-9]{3})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$}
+    variable pat_packed_bce_comet {^([PCDXAI])([/.\-])([0-9]{2})([A-HJ-Y][0-9A-Za-z][0-9][0a-z])$}
     variable pat_packed_tilde {^~[0-9A-Za-z]{4}$}
     variable pat_packed_letter_prefix {^[A-Za-z][0-9]{4}$}
     variable pat_packed_5digit {^[0-9]{5}$}
@@ -127,7 +127,7 @@ namespace eval MPCDesignation {
     variable pat_unpacked_named {^(\d+) [A-Z][a-z]{2,}}
     variable pat_packed_satellite {^S[IJKL][0-9]{2}[JSUN][0-9A-Za-z][0-9]0$}
     variable pat_packed_comet_numbered {^[0-9]{4}([PDI])$}
-    variable pat_packed_comet_prov {^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$}
+    variable pat_packed_comet_prov {^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$}
     variable pat_unpacked_comet_full {^(\d*)([PCDXAI])/(-?\d+) ([A-Z][A-Z0-9]+)(?:-([A-Z]{1,2}))?$}
     variable pat_parenthesized {^\((\d+)\)$}
     variable pat_asteroid_provisional_start {^\d{4} [A-Z][A-Z]}

@@ -39,6 +39,8 @@ create work-buf MAX-LEN allot
 : is-alnum ( c -- f ) dup is-digit swap is-alpha or ;
 \ Half-month letter: A-Y excluding I
 : is-half-month? ( c -- f ) dup [char] A [char] Y 1+ within swap [char] I <> and ;
+\ A packed comet fragment is 0 (none) or a letter, never a digit 1-9
+: frag-digit? ( c -- f ) [char] 1 [char] 9 1+ within ;
 \ Asteroid century code: I-L only (1800-2199)
 : is-ast-century? ( c -- f ) [char] I [char] L 1+ within ;
 \ Numbered comet type letter: P (periodic), D (defunct), I (interstellar)
@@ -1013,6 +1015,8 @@ variable pcp-year-len
   \ Positions 2-3 must be digits (year code)
   over 2 + c@ is-digit 0= if 2drop false exit then
   over 3 + c@ is-digit 0= if 2drop false exit then
+  \ Position 7 (fragment) must not be a digit 1-9
+  over 7 + c@ frag-digit? if 2drop false exit then
   \ Position 4 must be a valid half-month (calendar code A-Y skipping I)
   over 4 + c@ is-half-month?
   if 2drop true else 2drop false then ;
@@ -1025,6 +1029,8 @@ variable pcp-year-len
   over 1+ c@ is-digit 0= if 2drop false exit then
   over 2 + c@ is-digit 0= if 2drop false exit then
   over 3 + c@ is-digit 0= if 2drop false exit then
+  \ Position 7 (fragment) must not be a digit 1-9
+  over 7 + c@ frag-digit? if 2drop false exit then
   \ Position 4 must be a valid half-month (calendar code A-Y skipping I)
   over 4 + c@ is-half-month?
   if 2drop true else 2drop false then ;
@@ -1043,6 +1049,7 @@ variable pcp-year-len
     over 4 all-digit? 0= if 2drop false exit then
     over 4 + c@ is-comet-type? 0= if 2drop false exit then
     over 5 + c@ [char] _ = if drop 5 + 7 is-extended-packed? exit then
+    over 11 + c@ frag-digit? if 2drop false exit then
     drop 8 + c@ is-half-month? exit
   then
   \ 8-char with extended asteroid-style provisional: P_PO00Ud
@@ -1055,7 +1062,9 @@ variable pcp-year-len
     \ Asteroid-style (uppercase order at last position) keeps its own
     \ half-month validation in unpack-prov; only validate comet-style here.
     2dup + 1- c@ is-upper if drop c@ is-comet-type? exit then
-    \ Comet-style: position 0 is type, position 4 is half-month (calendar code)
+    \ Comet-style: position 0 is type, position 4 is half-month (calendar code);
+    \ the fragment position must not be a digit 1-9
+    2dup + 1- c@ frag-digit? if 2drop false exit then
     drop dup c@ is-comet-type? swap 4 + c@ is-half-month? and exit
   then
   dup 9 = if

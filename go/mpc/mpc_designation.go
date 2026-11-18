@@ -1504,7 +1504,7 @@ func isAllDigits(s string) bool {
 }
 
 func isPackedCometFull12(s string) bool {
-	// Pattern: ^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0-9a-z])$
+	// Pattern: ^([ 0-9]{4})([PCDXAI])([IJKL][0-9]{2}[A-Z][0-9A-Za-z]{2}[0a-z])$
 	if len(s) != 12 {
 		return false
 	}
@@ -1533,7 +1533,7 @@ func isPackedCometFull12(s string) bool {
 	if !isBase62(s[9]) || !isBase62(s[10]) {
 		return false
 	}
-	if !isDigitOrLower(s[11]) {
+	if !isZeroOrLower(s[11]) {
 		return false
 	}
 	return true
@@ -1557,6 +1557,10 @@ func isPackedCometFull8(s string) bool {
 		return false
 	}
 	if !isBase62(s[5]) || !isBase62(s[6]) || !isBase62(s[7]) {
+		return false
+	}
+	// Fragment is '0' (none), a letter, or an asteroid-style uppercase letter; never 1-9
+	if s[7] >= '1' && s[7] <= '9' {
 		return false
 	}
 	return true
@@ -1599,7 +1603,7 @@ func isPackedAncientComet(s string) bool {
 	if !isBase62(s[5]) || !isBase62(s[6]) {
 		return false
 	}
-	if !isDigitOrLower(s[7]) {
+	if !isZeroOrLower(s[7]) {
 		return false
 	}
 	return true
@@ -1622,7 +1626,7 @@ func isPackedBCEComet(s string) bool {
 	if !isBase62(s[5]) || !isBase62(s[6]) {
 		return false
 	}
-	if !isDigitOrLower(s[7]) {
+	if !isZeroOrLower(s[7]) {
 		return false
 	}
 	return true
@@ -1787,7 +1791,7 @@ func isPackedCometProv(s string) bool {
 	if !isBase62(s[4]) || !isBase62(s[5]) {
 		return false
 	}
-	if !isDigitOrLower(s[6]) {
+	if !isZeroOrLower(s[6]) {
 		return false
 	}
 	return true
@@ -1961,8 +1965,10 @@ func isBase62(c byte) bool {
 	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
 }
 
-func isDigitOrLower(c byte) bool {
-	return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z')
+// isZeroOrLower reports whether c is a valid packed comet fragment code:
+// '0' (no fragment) or a lowercase fragment letter. Digits 1-9 are invalid.
+func isZeroOrLower(c byte) bool {
+	return c == '0' || (c >= 'a' && c <= 'z')
 }
 
 // Convert converts a designation between packed and unpacked formats

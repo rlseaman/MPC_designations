@@ -1007,7 +1007,7 @@ detect_format <- function(designation) {
 
   # Check for packed full comet designation BEFORE trimming (12 chars with spaces)
   if (nchar(designation) == 12) {
-    if (grepl("^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
+    if (grepl("^[ 0-9]{4}[PCDXAI]([IJKL][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (12-char)"))
     }
@@ -1015,7 +1015,7 @@ detect_format <- function(designation) {
 
   # Check for packed comet designation (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
+    if (grepl("^[PCDXAI]([A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0A-Za-z]|_[0-9A-Za-z][A-HJ-Y][0-9A-Za-z]{4})$", designation)) {
       return(list(format = "packed", type = "comet_full",
                   subtype = "comet with provisional designation (8-char)"))
     }
@@ -1031,7 +1031,7 @@ detect_format <- function(designation) {
 
   # Check for packed ancient comet (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
+    if (grepl("^[PCDXAI][0-9]{3}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", designation)) {
       return(list(format = "packed", type = "comet_ancient",
                   subtype = "comet with ancient provisional (year < 1000)"))
     }
@@ -1039,7 +1039,7 @@ detect_format <- function(designation) {
 
   # Check for packed BCE comet (8 chars)
   if (nchar(designation) == 8 && substr(designation, 1, 1) %in% COMET_TYPES) {
-    if (grepl("^[PCDXAI][/.\\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", designation)) {
+    if (grepl("^[PCDXAI][/.\\-][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", designation)) {
       return(list(format = "packed", type = "comet_bce",
                   subtype = "comet with BCE provisional"))
     }
@@ -1127,7 +1127,7 @@ detect_format <- function(designation) {
                   subtype = sprintf("survey (Trojan T-%s)", substr(des, 2, 2))))
     }
 
-    if (grepl("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0-9a-z]$", des)) {
+    if (grepl("^[A-L][0-9]{2}[A-HJ-Y][0-9A-Za-z][0-9][0a-z]$", des)) {
       return(list(format = "packed", type = "comet_provisional", subtype = "comet provisional"))
     }
   }

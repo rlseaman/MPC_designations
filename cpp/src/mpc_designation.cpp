@@ -556,6 +556,12 @@ std::string MPCDesignation::unpackCometProvisional(const std::string& packed) {
     char halfMonth = p[3];
     int orderNum = decodeCycleCount(p.substr(4, 2));
     std::string fragment = (len == 7) ? std::string(1, p[6]) : p.substr(6, 2);
+    // Fragment is '0' (none) or letters; a digit 1-9 is invalid
+    for (char c : fragment) {
+        if (c >= '1' && c <= '9') {
+            throw MPCDesignationError("Invalid comet fragment: " + fragment);
+        }
+    }
 
     int fullYear = century * 100 + yearShort;
 
@@ -814,6 +820,11 @@ std::string MPCDesignation::unpackAncientComet(const std::string& packed) {
         halfMonth = p[4];
         orderNum = decodeCycleCount(p.substr(5, 2));
         fragment = p[7];
+    }
+
+    // Fragment is '0' (none) or a letter; a digit 1-9 is invalid
+    if (fragment >= '1' && fragment <= '9') {
+        throw MPCDesignationError(std::string("Invalid comet fragment: ") + fragment);
     }
 
     std::stringstream ss;
